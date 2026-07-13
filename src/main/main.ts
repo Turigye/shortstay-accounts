@@ -1,27 +1,16 @@
 import { app, BrowserWindow } from "electron";
 import path from "node:path";
 
-import { PRODUCT_NAME } from "../shared/product";
 import { applySecurityGuards } from "./security";
+import { createBrowserWindowOptions } from "./windowOptions";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 function createWindow(): BrowserWindow {
-  const window = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 640,
-    show: false,
-    title: PRODUCT_NAME,
-    webPreferences: {
-      preload: path.join(__dirname, "index.js"),
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-    },
-  });
+  const window = new BrowserWindow(
+    createBrowserWindowOptions(path.join(__dirname, "index.js")),
+  );
 
   applySecurityGuards(window);
   window.once("ready-to-show", () => window.show());

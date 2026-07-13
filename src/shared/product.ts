@@ -1,1 +1,3 @@
-export const PRODUCT_NAME = "Short-Stay Accounts";
+import packageMetadata from "../../package.json";
+
+export const PRODUCT_NAME = packageMetadata.productName;
