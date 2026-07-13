@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from "electron";
 import path from "node:path";
 
+import { PRODUCT_NAME } from "../shared/product";
 import { applySecurityGuards } from "./security";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
@@ -13,7 +14,7 @@ function createWindow(): BrowserWindow {
     minWidth: 1024,
     minHeight: 640,
     show: false,
-    title: "Short-Stay Accounts",
+    title: PRODUCT_NAME,
     webPreferences: {
       preload: path.join(__dirname, "index.js"),
       nodeIntegration: false,

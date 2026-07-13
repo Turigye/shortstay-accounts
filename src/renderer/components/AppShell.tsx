@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { PRODUCT_NAME } from "../../shared/product";
+
 export type AppScreen =
   | "today"
   | "bookings"
@@ -61,8 +63,7 @@ export function AppShell({
             <BedDouble size={20} strokeWidth={1.9} />
           </span>
           <span>
-            <strong>Short-Stay</strong>
-            <small>Accounts</small>
+            <strong>{PRODUCT_NAME}</strong>
           </span>
         </div>
 

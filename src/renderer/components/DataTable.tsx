@@ -83,7 +83,7 @@ export function DataTable<Row>({
 
               return (
                 <th
-                  aria-sort={column.sortValue ? activeSort ?? "none" : undefined}
+                  aria-sort={activeSort}
                   data-align={column.align ?? "start"}
                   key={column.key}
                   scope="col"
