@@ -7,6 +7,14 @@ import { VitePlugin } from "@electron-forge/plugin-vite";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    ignore: (file) => {
+      if (!file) return false;
+      return !(
+        file.startsWith("/.vite") ||
+        file === "/node_modules" ||
+        file.startsWith("/node_modules/xlsx")
+      );
+    },
   },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ["darwin"])],

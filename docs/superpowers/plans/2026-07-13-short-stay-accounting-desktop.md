@@ -6,7 +6,7 @@
 
 **Architecture:** Electron owns the encrypted SQLite database, filesystem access, backups, and exports. React renders the work-focused desktop UI through a narrow typed preload bridge; pure TypeScript domain modules calculate booking allocation, collected revenue, compensation, statements, and ratios without depending on Electron or the database.
 
-**Tech Stack:** Electron 43.1.0, Electron Forge 7.11.2, Vite 8.1.4, React 19.2.7, TypeScript 7.0.2, Vitest 4.1.10, Playwright 1.61.1, better-sqlite3-multiple-ciphers 12.11.1, Zod 4.4.3, Zustand 5.0.14, Recharts 3.9.2, Lucide React 1.23.0, SheetJS xlsx 0.18.5.
+**Tech Stack:** Electron 43.1.0, Electron Forge 7.11.2, Vite 8.1.4, React 19.2.7, TypeScript 7.0.2, Vitest 4.1.10, Playwright 1.61.1, better-sqlite3-multiple-ciphers 12.11.1, Zod 4.4.3, Zustand 5.0.14, Recharts 3.9.2, Lucide React 1.23.0, SheetJS xlsx 0.20.3 from the official `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` tarball.
 
 ## Global Constraints
 
@@ -152,7 +152,7 @@ Create this complete manifest:
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "recharts": "3.9.2",
-    "xlsx": "0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "4.4.3",
     "zustand": "5.0.14"
   },
