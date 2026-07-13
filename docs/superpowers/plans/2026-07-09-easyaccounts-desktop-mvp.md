@@ -1,4 +1,6 @@
-# EasyAccounts Desktop MVP Implementation Plan
+# EasyAccounts Desktop MVP Implementation Plan (Superseded)
+
+> Superseded by `docs/superpowers/plans/2026-07-13-short-stay-accounting-desktop.md`, which incorporates the approved client note, two-unit short-stay workflow, percentage compensation, manual tax provision, and complete workbook coverage.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
