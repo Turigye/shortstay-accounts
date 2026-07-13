@@ -1,6 +1,7 @@
 import {
   BusinessRepositoryError,
 } from "../db/repositories/business-repository";
+import { BookingRepositoryError } from "../db/repositories/booking-repository";
 import {
   IPC_CHANNELS,
   internalFailure,
@@ -49,6 +50,32 @@ const defaultHandlers: IpcHandlers = {
   [IPC_CHANNELS.BUSINESS_SET_RATE]: () => {
     throw new Error("Business session is unavailable");
   },
+  [IPC_CHANNELS.CUSTOMERS_LIST]: () => [],
+  [IPC_CHANNELS.CUSTOMER_CREATE]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.CUSTOMER_UPDATE]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.CUSTOMER_ARCHIVE]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.BOOKINGS_LIST]: () => [],
+  [IPC_CHANNELS.BOOKING_GET]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.BOOKING_CREATE]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.BOOKING_UPDATE]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.BOOKING_TRANSITION]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.BOOKING_ARCHIVE]: () => {
+    throw new Error("Business session is unavailable");
+  },
 };
 
 const registeredChannels = [
@@ -59,6 +86,16 @@ const registeredChannels = [
   IPC_CHANNELS.BUSINESS_LOCK,
   IPC_CHANNELS.BUSINESS_MANAGE_UNITS,
   IPC_CHANNELS.BUSINESS_SET_RATE,
+  IPC_CHANNELS.CUSTOMERS_LIST,
+  IPC_CHANNELS.CUSTOMER_CREATE,
+  IPC_CHANNELS.CUSTOMER_UPDATE,
+  IPC_CHANNELS.CUSTOMER_ARCHIVE,
+  IPC_CHANNELS.BOOKINGS_LIST,
+  IPC_CHANNELS.BOOKING_GET,
+  IPC_CHANNELS.BOOKING_CREATE,
+  IPC_CHANNELS.BOOKING_UPDATE,
+  IPC_CHANNELS.BOOKING_TRANSITION,
+  IPC_CHANNELS.BOOKING_ARCHIVE,
 ] as const;
 
 export function createBusinessIpcHandlers(
@@ -74,6 +111,25 @@ export function createBusinessIpcHandlers(
     },
     [IPC_CHANNELS.BUSINESS_MANAGE_UNITS]: (payload) => session.manageUnits(payload),
     [IPC_CHANNELS.BUSINESS_SET_RATE]: (payload) => session.setRate(payload),
+    [IPC_CHANNELS.CUSTOMERS_LIST]: () => session.listCustomers(),
+    [IPC_CHANNELS.CUSTOMER_CREATE]: (payload) => session.createCustomer(payload),
+    [IPC_CHANNELS.CUSTOMER_UPDATE]: ({ id, ...payload }) =>
+      session.updateCustomer(id, payload),
+    [IPC_CHANNELS.CUSTOMER_ARCHIVE]: ({ id }) => {
+      session.archiveCustomer(id);
+      return { archived: true };
+    },
+    [IPC_CHANNELS.BOOKINGS_LIST]: (payload) => session.listBookings(payload),
+    [IPC_CHANNELS.BOOKING_GET]: ({ id }) => session.getBooking(id),
+    [IPC_CHANNELS.BOOKING_CREATE]: (payload) => session.createBooking(payload),
+    [IPC_CHANNELS.BOOKING_UPDATE]: ({ id, ...payload }) =>
+      session.updateBooking(id, payload),
+    [IPC_CHANNELS.BOOKING_TRANSITION]: ({ id, status }) =>
+      session.transitionBooking(id, status),
+    [IPC_CHANNELS.BOOKING_ARCHIVE]: ({ id }) => {
+      session.archiveBooking(id);
+      return { archived: true };
+    },
   };
 }
 
@@ -105,6 +161,9 @@ export function registerIpcHandlers(
           return publicFailure(error.code, error.message);
         }
         if (error instanceof BusinessRepositoryError) {
+          return publicFailure(error.code, error.message, error.fieldErrors);
+        }
+        if (error instanceof BookingRepositoryError) {
           return publicFailure(error.code, error.message, error.fieldErrors);
         }
         return internalFailure();

@@ -1,0 +1,259 @@
+import Database from "better-sqlite3-multiple-ciphers";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { createBusinessRepository } from "../../src/main/db/repositories/business-repository";
+import {
+  BookingRepositoryError,
+  createBookingRepository,
+  type BookingRepository,
+} from "../../src/main/db/repositories/booking-repository";
+import { migrateDatabase } from "../../src/main/db/migrations";
+
+interface Fixture {
+  database: Database.Database;
+  repository: BookingRepository;
+  businessId: string;
+  unitIds: [string, string];
+  customerId: string;
+}
+
+const databases: Database.Database[] = [];
+
+function createFixture(): Fixture {
+  const database = new Database(":memory:");
+  databases.push(database);
+  database.pragma("foreign_keys = ON");
+  migrateDatabase(database);
+  const business = createBusinessRepository(database, {
+    now: () => new Date("2026-07-14T09:00:00.000Z"),
+  }).create({
+    name: "Client Business",
+    password: "long local password",
+    unitNames: ["Lake View", "Garden Suite"],
+  });
+  const repository = createBookingRepository(database, business.businessId);
+  const customer = repository.createCustomer({
+    name: "Amina N.",
+    phone: "+256 700 123456",
+    email: "amina@example.com",
+  });
+  return {
+    database,
+    repository,
+    businessId: business.businessId,
+    unitIds: business.unitIds as [string, string],
+    customerId: customer.id,
+  };
+}
+
+afterEach(() => {
+  for (const database of databases.splice(0)) database.close();
+});
+
+function bookingInput(fixture: Fixture, overrides: Record<string, unknown> = {}) {
+  return {
+    unitId: fixture.unitIds[0],
+    customerId: fixture.customerId,
+    checkIn: "2026-07-20",
+    checkOut: "2026-07-22",
+    checkInTime: "14:00",
+    checkOutTime: "11:00",
+    nightlyRate: 180_000,
+    adjustment: -20_000,
+    status: "confirmed" as const,
+    ...overrides,
+  };
+}
+
+describe("customers", () => {
+  it("creates, updates, lists, and archives customers inside the business", () => {
+    const fixture = createFixture();
+    const updated = fixture.repository.updateCustomer(fixture.customerId, {
+      name: "Amina Namusoke",
+      phone: "+256 700 123456",
+      email: null,
+      notes: "Prefers the garden unit",
+    });
+
+    expect(updated).toMatchObject({
+      businessId: fixture.businessId,
+      name: "Amina Namusoke",
+      email: null,
+    });
+    expect(fixture.repository.listCustomers()).toEqual([updated]);
+
+    fixture.repository.archiveCustomer(fixture.customerId);
+    expect(fixture.repository.listCustomers()).toEqual([]);
+    expect(fixture.repository.getCustomer(fixture.customerId)).toMatchObject({ archived: true });
+  });
+
+  it("rejects invalid customer contact details", () => {
+    const { repository } = createFixture();
+    expect(() => repository.createCustomer({ name: " ", phone: "" })).toThrowError(
+      expect.objectContaining<Partial<BookingRepositoryError>>({
+        code: "VALIDATION_ERROR",
+        fieldErrors: expect.objectContaining({ name: expect.any(Array), phone: expect.any(Array) }),
+      }),
+    );
+  });
+});
+
+describe("booking repository", () => {
+  it("creates an exact unpaid booking and preserves manual fields", () => {
+    const fixture = createFixture();
+    const booking = fixture.repository.createBooking({
+      ...bookingInput(fixture),
+      referred: true,
+      referrerName: "Kato Travel",
+      notes: "Late arrival",
+    });
+
+    expect(booking).toMatchObject({
+      businessId: fixture.businessId,
+      customerId: fixture.customerId,
+      customerName: "Amina N.",
+      unitName: "Lake View",
+      checkInTime: "14:00",
+      checkOutTime: "11:00",
+      nights: 2,
+      total: 340_000,
+      paymentState: "unpaid",
+      received: 0,
+      balance: 340_000,
+      referrerName: "Kato Travel",
+      notes: "Late arrival",
+    });
+  });
+
+  it("allows adjacent confirmed stays and rejects true overlaps", () => {
+    const fixture = createFixture();
+    fixture.repository.createBooking(bookingInput(fixture));
+
+    expect(() =>
+      fixture.repository.createBooking(
+        bookingInput(fixture, { checkIn: "2026-07-22", checkOut: "2026-07-24" }),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      fixture.repository.createBooking(
+        bookingInput(fixture, { checkIn: "2026-07-21", checkOut: "2026-07-23" }),
+      ),
+    ).toThrowError(
+      expect.objectContaining<Partial<BookingRepositoryError>>({
+        code: "CONFLICT",
+        fieldErrors: { dates: [expect.stringContaining("Lake View")] },
+      }),
+    );
+  });
+
+  it("lets drafts overlap but rechecks inside the confirm transaction", () => {
+    const fixture = createFixture();
+    const staleDraft = fixture.repository.createBooking(
+      bookingInput(fixture, { status: "draft" }),
+    );
+    fixture.repository.createBooking(bookingInput(fixture));
+
+    expect(() => fixture.repository.transitionBooking(staleDraft.id, "confirmed")).toThrowError(
+      expect.objectContaining<Partial<BookingRepositoryError>>({ code: "CONFLICT" }),
+    );
+    expect(fixture.repository.getBooking(staleDraft.id).status).toBe("draft");
+  });
+
+  it("rechecks overlap when an existing confirmed booking is updated", () => {
+    const fixture = createFixture();
+    const first = fixture.repository.createBooking(bookingInput(fixture));
+    fixture.repository.createBooking(
+      bookingInput(fixture, { checkIn: "2026-07-25", checkOut: "2026-07-27" }),
+    );
+
+    expect(() =>
+      fixture.repository.updateBooking(first.id, {
+        ...bookingInput(fixture),
+        checkIn: "2026-07-24",
+        checkOut: "2026-07-26",
+      }),
+    ).toThrowError(expect.objectContaining<Partial<BookingRepositoryError>>({ code: "CONFLICT" }));
+    expect(fixture.repository.getBooking(first.id).checkOut).toBe("2026-07-22");
+  });
+
+  it("releases cancelled ranges while drafts remain absent from the active schedule", () => {
+    const fixture = createFixture();
+    const booking = fixture.repository.createBooking(bookingInput(fixture));
+    fixture.repository.transitionBooking(booking.id, "cancelled");
+    fixture.repository.createBooking(bookingInput(fixture));
+    fixture.repository.createBooking(bookingInput(fixture, { status: "draft" }));
+
+    expect(fixture.repository.listBookings({ scheduleFrom: "2026-07-20", scheduleTo: "2026-07-23" }))
+      .toHaveLength(1);
+  });
+
+  it("enforces legal transitions and terminal states", () => {
+    const fixture = createFixture();
+    const booking = fixture.repository.createBooking(bookingInput(fixture, { status: "draft" }));
+
+    expect(() => fixture.repository.transitionBooking(booking.id, "completed")).toThrowError(
+      expect.objectContaining<Partial<BookingRepositoryError>>({ code: "INVALID_TRANSITION" }),
+    );
+    fixture.repository.transitionBooking(booking.id, "confirmed");
+    fixture.repository.transitionBooking(booking.id, "checkedIn");
+    fixture.repository.transitionBooking(booking.id, "completed");
+    expect(() => fixture.repository.transitionBooking(booking.id, "cancelled")).toThrowError(
+      expect.objectContaining<Partial<BookingRepositoryError>>({ code: "INVALID_TRANSITION" }),
+    );
+    expect(() => fixture.repository.updateBooking(booking.id, bookingInput(fixture))).toThrowError(
+      expect.objectContaining<Partial<BookingRepositoryError>>({ code: "INVALID_TRANSITION" }),
+    );
+  });
+
+  it("rejects invalid dates, negative totals, and referral omissions", () => {
+    const fixture = createFixture();
+    expect(() =>
+      fixture.repository.createBooking(bookingInput(fixture, { checkOut: "2026-07-20" })),
+    ).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+    expect(() =>
+      fixture.repository.createBooking(bookingInput(fixture, { adjustment: -400_000 })),
+    ).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+    expect(() =>
+      fixture.repository.createBooking(bookingInput(fixture, { referred: true })),
+    ).toThrowError(
+      expect.objectContaining({ fieldErrors: { referrerName: [expect.any(String)] } }),
+    );
+  });
+
+  it("rejects archived and cross-business unit or customer IDs", () => {
+    const fixture = createFixture();
+    const otherBusiness = fixture.database
+      .prepare<[], { id: string }>("INSERT INTO businesses (name) VALUES ('Other Business') RETURNING id")
+      .get();
+    if (!otherBusiness) throw new Error("test business was not created");
+    const otherUnit = fixture.database
+      .prepare<[string], { id: string }>(
+        "INSERT INTO units (business_id, name) VALUES (?, 'Other Unit') RETURNING id",
+      )
+      .get(otherBusiness.id);
+    const otherCustomer = fixture.database
+      .prepare<[string], { id: string }>(
+        "INSERT INTO customers (business_id, name, phone) VALUES (?, 'Other Guest', '0700') RETURNING id",
+      )
+      .get(otherBusiness.id);
+    if (!otherUnit || !otherCustomer) throw new Error("test references were not created");
+
+    expect(() =>
+      fixture.repository.createBooking(bookingInput(fixture, { unitId: otherUnit.id })),
+    ).toThrowError(expect.objectContaining({ code: "NOT_FOUND" }));
+    expect(() =>
+      fixture.repository.createBooking(bookingInput(fixture, { customerId: otherCustomer.id })),
+    ).toThrowError(expect.objectContaining({ code: "NOT_FOUND" }));
+
+    fixture.database
+      .prepare("UPDATE units SET status = 'inactive', archived_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(fixture.unitIds[1]);
+    fixture.repository.archiveCustomer(fixture.customerId);
+    expect(() =>
+      fixture.repository.createBooking(bookingInput(fixture, { unitId: fixture.unitIds[1] })),
+    ).toThrowError(expect.objectContaining({ code: "NOT_FOUND" }));
+    expect(() => fixture.repository.createBooking(bookingInput(fixture))).toThrowError(
+      expect.objectContaining({ code: "NOT_FOUND" }),
+    );
+  });
+});

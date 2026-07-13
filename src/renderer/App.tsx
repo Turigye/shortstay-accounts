@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { AppShell, type AppScreen } from "./components/AppShell";
 import { SettingsScreen } from "./screens/SettingsScreen";
+import { BookingsScreen } from "./screens/BookingsScreen";
 import { SetupScreen } from "./screens/SetupScreen";
 import { UnlockScreen } from "./screens/UnlockScreen";
 import { useAppStore } from "./store/app-store";
@@ -42,7 +43,9 @@ export function App() {
       onLock={() => void lock()}
       onScreenChange={setActiveScreen}
     >
-      {activeScreen === "settings" ? (
+      {activeScreen === "bookings" ? (
+        <BookingsScreen units={business.units} />
+      ) : activeScreen === "settings" ? (
         <SettingsScreen
           business={business}
           busy={busy}

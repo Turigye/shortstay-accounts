@@ -11,6 +11,15 @@ import {
   type ManageUnitsInput,
   type SetRateInput,
 } from "./db/repositories/business-repository";
+import {
+  createBookingRepository,
+  type BookingInput,
+  type BookingListFilter,
+  type BookingRepository,
+  type CustomerInput,
+} from "./db/repositories/booking-repository";
+import type { Booking, Customer } from "../domain/bookings";
+import type { BookingStatus } from "../domain/types";
 
 export type BusinessSessionStatus =
   | { state: "setup" }
@@ -31,6 +40,7 @@ interface BusinessSessionOptions {
   databasePath: string;
   openDatabase?: typeof openEncryptedDatabase;
   createRepository?: (database: Database.Database) => BusinessRepository;
+  createBookingRepository?: (database: Database.Database, businessId: string) => BookingRepository;
 }
 
 export interface BusinessSession {
@@ -41,11 +51,22 @@ export interface BusinessSession {
   getSettings(): BusinessSettings;
   manageUnits(input: ManageUnitsInput): BusinessSettings;
   setRate(input: SetRateInput): BusinessSettings;
+  listCustomers(): Customer[];
+  createCustomer(input: CustomerInput): Customer;
+  updateCustomer(id: string, input: CustomerInput): Customer;
+  archiveCustomer(id: string): void;
+  listBookings(filter?: BookingListFilter): Booking[];
+  getBooking(id: string): Booking;
+  createBooking(input: BookingInput): Booking;
+  updateBooking(id: string, input: BookingInput): Booking;
+  transitionBooking(id: string, status: BookingStatus): Booking;
+  archiveBooking(id: string): void;
 }
 
 export function createBusinessSession(options: BusinessSessionOptions): BusinessSession {
   const openDatabase = options.openDatabase ?? openEncryptedDatabase;
   const createRepository = options.createRepository ?? createBusinessRepository;
+  const createBookings = options.createBookingRepository ?? createBookingRepository;
   let database: Database.Database | undefined;
 
   function repository() {
@@ -53,6 +74,15 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
       throw new BusinessSessionError("LOCKED", "The business file is locked.");
     }
     return createRepository(database);
+  }
+
+  function bookings(): BookingRepository {
+    if (!database) {
+      throw new BusinessSessionError("LOCKED", "The business file is locked.");
+    }
+    const business = repository().getSettings();
+    if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
+    return createBookings(database, business.businessId);
   }
 
   function removeIncompleteFile(): void {
@@ -126,6 +156,46 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
 
     setRate(input: SetRateInput): BusinessSettings {
       return repository().setRate(input);
+    },
+
+    listCustomers(): Customer[] {
+      return bookings().listCustomers();
+    },
+
+    createCustomer(input: CustomerInput): Customer {
+      return bookings().createCustomer(input);
+    },
+
+    updateCustomer(id: string, input: CustomerInput): Customer {
+      return bookings().updateCustomer(id, input);
+    },
+
+    archiveCustomer(id: string): void {
+      bookings().archiveCustomer(id);
+    },
+
+    listBookings(filter: BookingListFilter = {}): Booking[] {
+      return bookings().listBookings(filter);
+    },
+
+    getBooking(id: string): Booking {
+      return bookings().getBooking(id);
+    },
+
+    createBooking(input: BookingInput): Booking {
+      return bookings().createBooking(input);
+    },
+
+    updateBooking(id: string, input: BookingInput): Booking {
+      return bookings().updateBooking(id, input);
+    },
+
+    transitionBooking(id: string, status: BookingStatus): Booking {
+      return bookings().transitionBooking(id, status);
+    },
+
+    archiveBooking(id: string): void {
+      bookings().archiveBooking(id);
     },
   });
 }

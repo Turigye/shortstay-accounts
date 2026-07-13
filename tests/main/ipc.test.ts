@@ -12,6 +12,7 @@ vi.mock("electron", () => ({
 
 import { registerIpcHandlers } from "../../src/main/ipc/register-handlers";
 import { BusinessRepositoryError } from "../../src/main/db/repositories/business-repository";
+import { BookingRepositoryError } from "../../src/main/db/repositories/booking-repository";
 import { createStayBooksApi } from "../../src/preload";
 import {
   IPC_CHANNELS,
@@ -68,6 +69,16 @@ describe("IPC contract", () => {
       IPC_CHANNELS.BUSINESS_LOCK,
       IPC_CHANNELS.BUSINESS_MANAGE_UNITS,
       IPC_CHANNELS.BUSINESS_SET_RATE,
+      IPC_CHANNELS.CUSTOMERS_LIST,
+      IPC_CHANNELS.CUSTOMER_CREATE,
+      IPC_CHANNELS.CUSTOMER_UPDATE,
+      IPC_CHANNELS.CUSTOMER_ARCHIVE,
+      IPC_CHANNELS.BOOKINGS_LIST,
+      IPC_CHANNELS.BOOKING_GET,
+      IPC_CHANNELS.BOOKING_CREATE,
+      IPC_CHANNELS.BOOKING_UPDATE,
+      IPC_CHANNELS.BOOKING_TRANSITION,
+      IPC_CHANNELS.BOOKING_ARCHIVE,
     ]);
     expect(handlers.has("database:query")).toBe(false);
   });
@@ -255,6 +266,86 @@ describe("IPC contract", () => {
     expect(result.fieldErrors["payload.unitNames.1"]).toEqual([
       expect.stringContaining("different"),
     ]);
+  });
+
+  it("accepts strict manual booking fields and rejects unimplemented payment persistence", () => {
+    const payload = {
+      unitId: "unit-1",
+      customerId: "customer-1",
+      checkIn: "2026-07-20",
+      checkOut: "2026-07-22",
+      checkInTime: "14:00",
+      checkOutTime: "11:00",
+      nightlyRate: 180_000,
+      adjustment: -20_000,
+      status: "confirmed",
+      referred: true,
+      referrerName: "Kato Travel",
+      notes: "Late arrival",
+    };
+
+    expect(
+      ipcRequestSchema.safeParse({ channel: IPC_CHANNELS.BOOKING_CREATE, payload }).success,
+    ).toBe(true);
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.BOOKING_CREATE,
+        payload: { ...payload, initialPayment: 100_000 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("validates booking dates and whole-UGX amounts at the process boundary", async () => {
+    const handler = captureHandlers().get(IPC_CHANNELS.BOOKING_CREATE);
+    const base = {
+      unitId: "unit-1",
+      customerId: "customer-1",
+      checkIn: "2026-07-20",
+      checkOut: "2026-07-22",
+      nightlyRate: 180_000,
+    };
+
+    for (const [field, payload] of [
+      ["payload.checkOut", { ...base, checkOut: "2026-02-30" }],
+      ["payload.nightlyRate", { ...base, nightlyRate: 180_000.5 }],
+      ["payload.adjustment", { ...base, adjustment: Number.MAX_SAFE_INTEGER + 1 }],
+    ] as const) {
+      const result = (await handler?.(undefined, payload)) as IpcFailure;
+      expect(result.code).toBe("VALIDATION_ERROR");
+      expect(result.fieldErrors[field]).toEqual([expect.any(String)]);
+    }
+  });
+
+  it("returns overlap and transition errors without hiding their field guidance", async () => {
+    const handlers = new Map<string, RegisteredHandler>();
+    registerIpcHandlers(
+      {
+        handle(channel, handler) {
+          handlers.set(channel, handler);
+        },
+      },
+      {
+        [IPC_CHANNELS.BOOKING_TRANSITION]: () => {
+          throw new BookingRepositoryError(
+            "INVALID_TRANSITION",
+            "A completed booking cannot move to cancelled.",
+            { status: ["This booking is already complete."] },
+          );
+        },
+      },
+    );
+
+    expect(
+      await handlers.get(IPC_CHANNELS.BOOKING_TRANSITION)?.(undefined, {
+        id: "booking-1",
+        status: "cancelled",
+      }),
+    ).toEqual({
+      ok: false,
+      code: "INVALID_TRANSITION",
+      message: "A completed booking cannot move to cancelled.",
+      fieldErrors: { status: ["This booking is already complete."] },
+    });
   });
 });
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { Booking, Customer } from "../domain/bookings";
 import type { BusinessSettings, RoleKey } from "../domain/types";
 
 export const IPC_CHANNELS = {
@@ -10,6 +11,16 @@ export const IPC_CHANNELS = {
   BUSINESS_LOCK: "business:lock",
   BUSINESS_MANAGE_UNITS: "business:manage-units",
   BUSINESS_SET_RATE: "business:set-rate",
+  CUSTOMERS_LIST: "customers:list",
+  CUSTOMER_CREATE: "customers:create",
+  CUSTOMER_UPDATE: "customers:update",
+  CUSTOMER_ARCHIVE: "customers:archive",
+  BOOKINGS_LIST: "bookings:list",
+  BOOKING_GET: "bookings:get",
+  BOOKING_CREATE: "bookings:create",
+  BOOKING_UPDATE: "bookings:update",
+  BOOKING_TRANSITION: "bookings:transition",
+  BOOKING_ARCHIVE: "bookings:archive",
 } as const;
 
 const roleSchema = z.enum([
@@ -148,6 +159,106 @@ const setRateRequestSchema = z
   })
   .strict();
 
+const bookingStatusSchema = z.enum([
+  "draft",
+  "confirmed",
+  "checkedIn",
+  "completed",
+  "cancelled",
+]);
+const timeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, {
+  message: "Enter a valid time in HH:MM format.",
+});
+const wholeUgxSchema = z.number().refine(Number.isSafeInteger, {
+  message: "Enter a whole safe-integer UGX amount.",
+});
+const customerInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    phone: z.string().trim().min(1).max(80),
+    email: z.string().trim().email().max(254).nullable().optional(),
+    notes: z.string().trim().max(2_000).nullable().optional(),
+  })
+  .strict();
+const customersListRequestSchema = z
+  .object({ channel: z.literal(IPC_CHANNELS.CUSTOMERS_LIST), payload: z.object({}).strict() })
+  .strict();
+const customerCreateRequestSchema = z
+  .object({ channel: z.literal(IPC_CHANNELS.CUSTOMER_CREATE), payload: customerInputSchema })
+  .strict();
+const customerUpdateRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.CUSTOMER_UPDATE),
+    payload: customerInputSchema.extend({ id: z.string().min(1) }).strict(),
+  })
+  .strict();
+const customerArchiveRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.CUSTOMER_ARCHIVE),
+    payload: z.object({ id: z.string().min(1) }).strict(),
+  })
+  .strict();
+const bookingInputSchema = z
+  .object({
+    unitId: z.string().min(1),
+    customerId: z.string().min(1),
+    checkIn: dateSchema,
+    checkOut: dateSchema,
+    checkInTime: timeSchema.optional(),
+    checkOutTime: timeSchema.optional(),
+    nightlyRate: wholeUgxSchema.nonnegative(),
+    adjustment: wholeUgxSchema.optional(),
+    status: bookingStatusSchema.optional(),
+    referred: z.boolean().optional(),
+    referrerId: z.string().min(1).nullable().optional(),
+    referrerName: z.string().trim().max(160).nullable().optional(),
+    notes: z.string().trim().max(2_000).nullable().optional(),
+  })
+  .strict();
+const bookingsListRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.BOOKINGS_LIST),
+    payload: z
+      .object({
+        status: bookingStatusSchema.optional(),
+        unitId: z.string().min(1).optional(),
+        customerId: z.string().min(1).optional(),
+        query: z.string().trim().max(160).optional(),
+        scheduleFrom: dateSchema.optional(),
+        scheduleTo: dateSchema.optional(),
+        balance: z.enum(["unpaid", "outstanding", "paid"]).optional(),
+      })
+      .strict(),
+  })
+  .strict();
+const bookingGetRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.BOOKING_GET),
+    payload: z.object({ id: z.string().min(1) }).strict(),
+  })
+  .strict();
+const bookingCreateRequestSchema = z
+  .object({ channel: z.literal(IPC_CHANNELS.BOOKING_CREATE), payload: bookingInputSchema })
+  .strict();
+const bookingUpdateRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.BOOKING_UPDATE),
+    payload: bookingInputSchema.extend({ id: z.string().min(1) }).strict(),
+  })
+  .strict();
+const bookingTransitionRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.BOOKING_TRANSITION),
+    payload: z.object({ id: z.string().min(1), status: bookingStatusSchema }).strict(),
+  })
+  .strict();
+const bookingArchiveRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.BOOKING_ARCHIVE),
+    payload: z.object({ id: z.string().min(1) }).strict(),
+  })
+  .strict();
+
 export const ipcRequestSchema = z.discriminatedUnion("channel", [
   appReadyRequestSchema,
   businessStatusRequestSchema,
@@ -156,6 +267,16 @@ export const ipcRequestSchema = z.discriminatedUnion("channel", [
   businessLockRequestSchema,
   manageUnitsRequestSchema,
   setRateRequestSchema,
+  customersListRequestSchema,
+  customerCreateRequestSchema,
+  customerUpdateRequestSchema,
+  customerArchiveRequestSchema,
+  bookingsListRequestSchema,
+  bookingGetRequestSchema,
+  bookingCreateRequestSchema,
+  bookingUpdateRequestSchema,
+  bookingTransitionRequestSchema,
+  bookingArchiveRequestSchema,
 ]);
 
 export const IPC_FAILURE_CODES = [
@@ -167,6 +288,7 @@ export const IPC_FAILURE_CODES = [
   "NOT_FOUND",
   "ALREADY_EXISTS",
   "CONFLICT",
+  "INVALID_TRANSITION",
 ] as const;
 export type IpcFailureCode = (typeof IPC_FAILURE_CODES)[number];
 
@@ -216,6 +338,46 @@ const businessStatusSchema = z.discriminatedUnion("state", [
   z.object({ state: z.literal("locked") }).strict(),
   z.object({ state: z.literal("ready"), business: businessSettingsSchema }).strict(),
 ]);
+const customerSchema = z
+  .object({
+    id: z.string(),
+    businessId: z.string(),
+    name: z.string(),
+    phone: z.string(),
+    email: z.string().nullable(),
+    notes: z.string().nullable(),
+    archived: z.boolean(),
+  })
+  .strict();
+const bookingSchema = z
+  .object({
+    id: z.string(),
+    businessId: z.string(),
+    unitId: z.string(),
+    unitName: z.string(),
+    customerId: z.string(),
+    customerName: z.string(),
+    customerPhone: z.string(),
+    customerEmail: z.string().nullable(),
+    referrerId: z.string().nullable(),
+    referrerName: z.string().nullable(),
+    checkIn: dateSchema,
+    checkOut: dateSchema,
+    checkInTime: timeSchema,
+    checkOutTime: timeSchema,
+    nights: z.number().int().positive(),
+    nightlyRate: wholeUgxSchema.nonnegative(),
+    adjustment: wholeUgxSchema,
+    total: wholeUgxSchema.nonnegative(),
+    status: bookingStatusSchema,
+    paymentState: z.enum(["unpaid", "partiallyPaid", "fullyPaid", "overpaid"]),
+    received: wholeUgxSchema,
+    balance: wholeUgxSchema,
+    notes: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .strict();
 
 function responseSchema<T extends z.ZodType>(data: T) {
   return z.discriminatedUnion("ok", [
@@ -232,6 +394,16 @@ const responseSchemas = {
   [IPC_CHANNELS.BUSINESS_LOCK]: responseSchema(z.object({ state: z.literal("locked") }).strict()),
   [IPC_CHANNELS.BUSINESS_MANAGE_UNITS]: responseSchema(businessSettingsSchema),
   [IPC_CHANNELS.BUSINESS_SET_RATE]: responseSchema(businessSettingsSchema),
+  [IPC_CHANNELS.CUSTOMERS_LIST]: responseSchema(z.array(customerSchema)),
+  [IPC_CHANNELS.CUSTOMER_CREATE]: responseSchema(customerSchema),
+  [IPC_CHANNELS.CUSTOMER_UPDATE]: responseSchema(customerSchema),
+  [IPC_CHANNELS.CUSTOMER_ARCHIVE]: responseSchema(z.object({ archived: z.literal(true) }).strict()),
+  [IPC_CHANNELS.BOOKINGS_LIST]: responseSchema(z.array(bookingSchema)),
+  [IPC_CHANNELS.BOOKING_GET]: responseSchema(bookingSchema),
+  [IPC_CHANNELS.BOOKING_CREATE]: responseSchema(bookingSchema),
+  [IPC_CHANNELS.BOOKING_UPDATE]: responseSchema(bookingSchema),
+  [IPC_CHANNELS.BOOKING_TRANSITION]: responseSchema(bookingSchema),
+  [IPC_CHANNELS.BOOKING_ARCHIVE]: responseSchema(z.object({ archived: z.literal(true) }).strict()),
 } as const;
 
 export type IpcRequest = z.infer<typeof ipcRequestSchema>;
@@ -256,6 +428,16 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.BUSINESS_LOCK]: { readonly state: "locked" };
   [IPC_CHANNELS.BUSINESS_MANAGE_UNITS]: BusinessSettings;
   [IPC_CHANNELS.BUSINESS_SET_RATE]: BusinessSettings;
+  [IPC_CHANNELS.CUSTOMERS_LIST]: Customer[];
+  [IPC_CHANNELS.CUSTOMER_CREATE]: Customer;
+  [IPC_CHANNELS.CUSTOMER_UPDATE]: Customer;
+  [IPC_CHANNELS.CUSTOMER_ARCHIVE]: { readonly archived: true };
+  [IPC_CHANNELS.BOOKINGS_LIST]: Booking[];
+  [IPC_CHANNELS.BOOKING_GET]: Booking;
+  [IPC_CHANNELS.BOOKING_CREATE]: Booking;
+  [IPC_CHANNELS.BOOKING_UPDATE]: Booking;
+  [IPC_CHANNELS.BOOKING_TRANSITION]: Booking;
+  [IPC_CHANNELS.BOOKING_ARCHIVE]: { readonly archived: true };
 }
 
 export type IpcData<C extends IpcChannel> = IpcDataByChannel[C];

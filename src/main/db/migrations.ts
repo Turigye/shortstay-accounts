@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3-multiple-ciphers";
 
-export const LATEST_SCHEMA_VERSION = 2;
+export const LATEST_SCHEMA_VERSION = 3;
 
 interface Migration {
   readonly version: number;
@@ -462,6 +462,17 @@ const CREATE_VERSION_TWO_SCHEMA = `
   END;
 `;
 
+const CREATE_VERSION_THREE_SCHEMA = `
+  ALTER TABLE bookings ADD COLUMN check_in_time TEXT NOT NULL DEFAULT '14:00'
+    CHECK (check_in_time GLOB '[0-2][0-9]:[0-5][0-9]');
+  ALTER TABLE bookings ADD COLUMN check_out_time TEXT NOT NULL DEFAULT '11:00'
+    CHECK (check_out_time GLOB '[0-2][0-9]:[0-5][0-9]');
+
+  CREATE INDEX bookings_unit_schedule_idx
+    ON bookings(business_id, unit_id, status, check_in, check_out)
+    WHERE archived_at IS NULL;
+`;
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -476,6 +487,15 @@ const migrations: readonly Migration[] = [
     version: 2,
     up(database) {
       database.exec(CREATE_VERSION_TWO_SCHEMA);
+      database
+        .prepare("update app_meta set value = ? where key = 'schema_version'")
+        .run(String(LATEST_SCHEMA_VERSION));
+    },
+  },
+  {
+    version: 3,
+    up(database) {
+      database.exec(CREATE_VERSION_THREE_SCHEMA);
       database
         .prepare("update app_meta set value = ? where key = 'schema_version'")
         .run(String(LATEST_SCHEMA_VERSION));
