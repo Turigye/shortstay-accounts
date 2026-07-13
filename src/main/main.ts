@@ -1,11 +1,14 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 
+import { registerIpcHandlers } from "./ipc/register-handlers";
 import { applySecurityGuards } from "./security";
 import { createBrowserWindowOptions } from "./windowOptions";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
+
+registerIpcHandlers(ipcMain);
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow(
