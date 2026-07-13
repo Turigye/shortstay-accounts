@@ -3,11 +3,9 @@ import {
   BedDouble,
   Building2,
   CalendarDays,
-  CalendarPlus,
-  CircleDollarSign,
   CreditCard,
   LayoutDashboard,
-  Plus,
+  LockKeyhole,
   ReceiptText,
   Settings,
   UsersRound,
@@ -48,12 +46,16 @@ interface AppShellProps {
   activeScreen: AppScreen;
   onScreenChange: (screen: AppScreen) => void;
   children: ReactNode;
+  businessName?: string;
+  onLock?: () => void;
 }
 
 export function AppShell({
   activeScreen,
   onScreenChange,
   children,
+  businessName,
+  onLock,
 }: AppShellProps) {
   return (
     <div className="app-shell">
@@ -90,18 +92,13 @@ export function AppShell({
 
       <div className="workspace">
         <header className="command-bar" aria-label="Quick actions">
-          <button className="command-button command-button-primary" type="button">
-            <CalendarPlus aria-hidden="true" size={17} strokeWidth={1.9} />
-            New Booking
-          </button>
-          <button className="command-button" type="button">
-            <CircleDollarSign aria-hidden="true" size={17} strokeWidth={1.9} />
-            Record Payment
-          </button>
-          <button className="command-button" type="button">
-            <Plus aria-hidden="true" size={17} strokeWidth={2} />
-            Add Expense
-          </button>
+          {businessName ? <strong className="command-business-name">{businessName}</strong> : null}
+          {onLock ? (
+            <button className="command-button" onClick={onLock} type="button">
+              <LockKeyhole aria-hidden="true" size={16} strokeWidth={1.9} />
+              Lock
+            </button>
+          ) : null}
         </header>
 
         <main className="main-content">{children}</main>

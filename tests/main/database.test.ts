@@ -6,7 +6,10 @@ import Database from "better-sqlite3-multiple-ciphers";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { openEncryptedDatabase } from "../../src/main/db/connection";
-import { migrateDatabase } from "../../src/main/db/migrations";
+import {
+  LATEST_SCHEMA_VERSION,
+  migrateDatabase,
+} from "../../src/main/db/migrations";
 import { createAuditRepository } from "../../src/main/db/repositories/audit-repository";
 
 const REQUIRED_TABLES = [
@@ -26,10 +29,12 @@ const REQUIRED_TABLES = [
   "period_closes",
   "recurring_expenses",
   "referral_earnings",
+  "referral_rates",
   "referrers",
   "staff_earnings",
   "staff_roles",
   "suppliers",
+  "tax_provision_rates",
   "units",
 ] as const;
 
@@ -43,8 +48,10 @@ const MUTABLE_ARCHIVABLE_TABLES = [
   "loans",
   "recurring_expenses",
   "referrers",
+  "referral_rates",
   "staff_roles",
   "suppliers",
+  "tax_provision_rates",
   "units",
 ] as const;
 
@@ -131,7 +138,9 @@ describe("encrypted database", () => {
     const tableNames = tableRows.map(({ name }) => name);
 
     expect(tableNames).toEqual(expect.arrayContaining([...REQUIRED_TABLES]));
-    expect(database.pragma("user_version", { simple: true })).toBe(1);
+    expect(database.pragma("user_version", { simple: true })).toBe(
+      LATEST_SCHEMA_VERSION,
+    );
     expect(database.pragma("foreign_keys", { simple: true })).toBe(1);
     expect(database.pragma("journal_mode", { simple: true })).toBe("wal");
 

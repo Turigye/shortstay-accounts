@@ -46,9 +46,33 @@ export interface BusinessSettings {
   name: string;
   currency: "UGX";
   unitIds: string[];
+  units: BusinessUnit[];
   staffRates: Record<RoleKey, number>;
   referralRate: number;
   taxProvisionPerUnit: Ugx;
+  closedMonths: string[];
+  rateHistory: {
+    staff: StaffRateSetting[];
+    referral: RateSetting[];
+    taxProvision: RateSetting[];
+  };
+}
+
+export interface BusinessUnit {
+  id: string;
+  name: string;
+  status: "active" | "inactive";
+}
+
+export interface RateSetting {
+  id: string;
+  value: number;
+  effectiveFrom: string;
+  reason: string | null;
+}
+
+export interface StaffRateSetting extends RateSetting {
+  role: RoleKey;
 }
 
 export interface BookingBalanceSummary {

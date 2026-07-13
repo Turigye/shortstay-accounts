@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3-multiple-ciphers";
 
-export const LATEST_SCHEMA_VERSION = 1;
+export const LATEST_SCHEMA_VERSION = 2;
 
 interface Migration {
   readonly version: number;
@@ -405,6 +405,63 @@ const CREATE_VERSION_ONE_SCHEMA = `
   END;
 `;
 
+const CREATE_VERSION_TWO_SCHEMA = `
+  ALTER TABLE units ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+
+  CREATE TABLE referral_rates (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    rate_basis_points INTEGER NOT NULL CHECK (rate_basis_points BETWEEN 0 AND 10000),
+    effective_from TEXT NOT NULL,
+    reason TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    archived_at TEXT,
+    UNIQUE (business_id, effective_from)
+  );
+
+  CREATE TABLE tax_provision_rates (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    amount_per_unit INTEGER NOT NULL CHECK (amount_per_unit >= 0),
+    effective_from TEXT NOT NULL,
+    reason TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    archived_at TEXT,
+    UNIQUE (business_id, effective_from)
+  );
+
+  CREATE INDEX referral_rates_business_id_idx ON referral_rates(business_id);
+  CREATE INDEX tax_provision_rates_business_id_idx ON tax_provision_rates(business_id);
+
+  CREATE TRIGGER referral_rates_touch_updated_at
+  AFTER UPDATE ON referral_rates
+  WHEN NEW.updated_at = OLD.updated_at
+  BEGIN
+    UPDATE referral_rates
+    SET updated_at = CASE
+      WHEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now') > OLD.updated_at
+        THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      ELSE strftime('%Y-%m-%dT%H:%M:%fZ', OLD.updated_at, '+0.001 seconds')
+    END
+    WHERE id = NEW.id;
+  END;
+
+  CREATE TRIGGER tax_provision_rates_touch_updated_at
+  AFTER UPDATE ON tax_provision_rates
+  WHEN NEW.updated_at = OLD.updated_at
+  BEGIN
+    UPDATE tax_provision_rates
+    SET updated_at = CASE
+      WHEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now') > OLD.updated_at
+        THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      ELSE strftime('%Y-%m-%dT%H:%M:%fZ', OLD.updated_at, '+0.001 seconds')
+    END
+    WHERE id = NEW.id;
+  END;
+`;
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -412,6 +469,15 @@ const migrations: readonly Migration[] = [
       database.exec(CREATE_VERSION_ONE_SCHEMA);
       database
         .prepare("insert into app_meta(key, value) values ('schema_version', ?)")
+        .run(String(LATEST_SCHEMA_VERSION));
+    },
+  },
+  {
+    version: 2,
+    up(database) {
+      database.exec(CREATE_VERSION_TWO_SCHEMA);
+      database
+        .prepare("update app_meta set value = ? where key = 'schema_version'")
         .run(String(LATEST_SCHEMA_VERSION));
     },
   },

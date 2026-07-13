@@ -59,7 +59,15 @@ describe("IPC contract", () => {
   it("registers only named channels", () => {
     const handlers = captureHandlers();
 
-    expect([...handlers.keys()]).toEqual([IPC_CHANNELS.APP_READY]);
+    expect([...handlers.keys()]).toEqual([
+      IPC_CHANNELS.APP_READY,
+      IPC_CHANNELS.BUSINESS_STATUS,
+      IPC_CHANNELS.BUSINESS_CREATE,
+      IPC_CHANNELS.BUSINESS_UNLOCK,
+      IPC_CHANNELS.BUSINESS_LOCK,
+      IPC_CHANNELS.BUSINESS_RENAME_UNITS,
+      IPC_CHANNELS.BUSINESS_SET_RATE,
+    ]);
     expect(handlers.has("database:query")).toBe(false);
   });
 
@@ -105,6 +113,25 @@ describe("IPC contract", () => {
     });
     expect(serialized).not.toContain(secret);
     expect(serialized).not.toContain("stack");
+  });
+
+  it("keeps create and unlock passwords inside strict named payloads", () => {
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.BUSINESS_CREATE,
+        payload: {
+          name: "Client Business",
+          unitNames: ["Unit 1", "Unit 2"],
+          password: "long local password",
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.BUSINESS_UNLOCK,
+        payload: { password: "wrong", databaseKey: "must-not-pass" },
+      }).success,
+    ).toBe(false);
   });
 });
 

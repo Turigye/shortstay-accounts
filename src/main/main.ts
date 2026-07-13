@@ -1,14 +1,18 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 
-import { registerIpcHandlers } from "./ipc/register-handlers";
+import { createBusinessSession, type BusinessSession } from "./business-session";
+import {
+  createBusinessIpcHandlers,
+  registerIpcHandlers,
+} from "./ipc/register-handlers";
 import { applySecurityGuards } from "./security";
 import { createBrowserWindowOptions } from "./windowOptions";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
-registerIpcHandlers(ipcMain);
+let businessSession: BusinessSession | undefined;
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow(
@@ -30,12 +34,18 @@ function createWindow(): BrowserWindow {
 }
 
 void app.whenReady().then(() => {
+  businessSession = createBusinessSession({
+    databasePath: path.join(app.getPath("userData"), "business.db"),
+  });
+  registerIpcHandlers(ipcMain, createBusinessIpcHandlers(businessSession));
   createWindow();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+app.on("before-quit", () => businessSession?.lock());
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

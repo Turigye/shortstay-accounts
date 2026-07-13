@@ -3,12 +3,17 @@ import {
   internalFailure,
   ipcRequestSchema,
   isValidIpcResponse,
+  publicFailure,
   validationFailure,
   type IpcChannel,
   type IpcData,
   type IpcPayload,
   type IpcResult,
 } from "../../shared/ipc";
+import {
+  BusinessSessionError,
+  type BusinessSession,
+} from "../business-session";
 
 type RegisteredListener = (
   event: unknown,
@@ -27,9 +32,47 @@ export type IpcHandlers = {
 
 const defaultHandlers: IpcHandlers = {
   [IPC_CHANNELS.APP_READY]: () => ({ ready: true }),
+  [IPC_CHANNELS.BUSINESS_STATUS]: () => ({ state: "setup" }),
+  [IPC_CHANNELS.BUSINESS_CREATE]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.BUSINESS_UNLOCK]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.BUSINESS_LOCK]: () => ({ state: "locked" }),
+  [IPC_CHANNELS.BUSINESS_RENAME_UNITS]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.BUSINESS_SET_RATE]: () => {
+    throw new Error("Business session is unavailable");
+  },
 };
 
-const registeredChannels = [IPC_CHANNELS.APP_READY] as const;
+const registeredChannels = [
+  IPC_CHANNELS.APP_READY,
+  IPC_CHANNELS.BUSINESS_STATUS,
+  IPC_CHANNELS.BUSINESS_CREATE,
+  IPC_CHANNELS.BUSINESS_UNLOCK,
+  IPC_CHANNELS.BUSINESS_LOCK,
+  IPC_CHANNELS.BUSINESS_RENAME_UNITS,
+  IPC_CHANNELS.BUSINESS_SET_RATE,
+] as const;
+
+export function createBusinessIpcHandlers(
+  session: BusinessSession,
+): Partial<IpcHandlers> {
+  return {
+    [IPC_CHANNELS.BUSINESS_STATUS]: () => session.getStatus(),
+    [IPC_CHANNELS.BUSINESS_CREATE]: (payload) => session.create(payload),
+    [IPC_CHANNELS.BUSINESS_UNLOCK]: ({ password }) => session.unlock(password),
+    [IPC_CHANNELS.BUSINESS_LOCK]: () => {
+      session.lock();
+      return { state: "locked" };
+    },
+    [IPC_CHANNELS.BUSINESS_RENAME_UNITS]: (payload) => session.renameUnits(payload),
+    [IPC_CHANNELS.BUSINESS_SET_RATE]: (payload) => session.setRate(payload),
+  };
+}
 
 export function registerIpcHandlers(
   ipcMain: IpcMainRegistrar,
@@ -54,7 +97,10 @@ export function registerIpcHandlers(
         return isValidIpcResponse(channel, result)
           ? result
           : internalFailure("INVALID_RESPONSE");
-      } catch {
+      } catch (error) {
+        if (error instanceof BusinessSessionError) {
+          return publicFailure(error.code, error.message);
+        }
         return internalFailure();
       }
     });
