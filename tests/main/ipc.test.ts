@@ -194,6 +194,68 @@ describe("IPC contract", () => {
       },
     });
   });
+
+  it("returns field validation for invalid rate values and calendar dates", async () => {
+    const handler = captureHandlers().get(IPC_CHANNELS.BUSINESS_SET_RATE);
+    const invalidPayloads = [
+      {
+        payload: { kind: "referral", value: 100.01, effectiveFrom: "2026-07-14" },
+        field: "payload.value",
+      },
+      {
+        payload: { kind: "referral", value: Number.POSITIVE_INFINITY, effectiveFrom: "2026-07-14" },
+        field: "payload.value",
+      },
+      {
+        payload: { kind: "taxProvision", value: 600_000.5, effectiveFrom: "2026-07-14" },
+        field: "payload.value",
+      },
+      {
+        payload: {
+          kind: "taxProvision",
+          value: Number.MAX_SAFE_INTEGER + 1,
+          effectiveFrom: "2026-07-14",
+        },
+        field: "payload.value",
+      },
+      {
+        payload: { kind: "taxProvision", value: 600_000, effectiveFrom: "2026-02-30" },
+        field: "payload.effectiveFrom",
+      },
+    ] as const;
+
+    for (const { payload, field } of invalidPayloads) {
+      const result = (await handler?.(undefined, payload)) as IpcFailure;
+      expect(result.code, JSON.stringify(payload)).toBe("VALIDATION_ERROR");
+      expect(result.code).not.toBe("INTERNAL_ERROR");
+      expect(result.fieldErrors[field]).toEqual([expect.any(String)]);
+    }
+
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.BUSINESS_SET_RATE,
+        payload: {
+          kind: "referral",
+          value: 10,
+          effectiveFrom: "2028-02-29",
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("returns field validation for duplicate initial unit names", async () => {
+    const handler = captureHandlers().get(IPC_CHANNELS.BUSINESS_CREATE);
+    const result = (await handler?.(undefined, {
+      name: "Client Business",
+      unitNames: ["Lake View", " lake view "],
+      password: "long local password",
+    })) as IpcFailure;
+
+    expect(result.code).toBe("VALIDATION_ERROR");
+    expect(result.fieldErrors["payload.unitNames.1"]).toEqual([
+      expect.stringContaining("different"),
+    ]);
+  });
 });
 
 describe("preload API", () => {

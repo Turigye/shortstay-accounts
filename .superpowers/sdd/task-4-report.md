@@ -43,3 +43,16 @@ Resolved deterministic unit ordering and correct retrieval of an effective 0% re
 - Full suite: 72 tests passed in 13 files.
 - Typecheck: `tsc --noEmit` passed.
 - Self-review and `git diff --check`: clean; no unresolved Task 4 findings.
+
+## Final Review Fix Evidence - 2026-07-14
+
+- Referral and tax history mutations now run one shared latest-applicable recomputation inside the same transaction as mutation and audit.
+- Backdated history no longer displaces a later applicable rate; future rows remain in history without changing today's denormalized business values.
+- IPC rate schemas are split by type: referral is finite 0..100 and tax provision is nonnegative whole safe-integer UGX.
+- Effective dates must be real ISO calendar dates. Impossible dates fail at `payload.effectiveFrom` before handler execution.
+- First-run unit names receive semantic duplicate-name validation; managed active-unit names use the same case-insensitive rule.
+- Invalid Task 4 payloads return field-level `VALIDATION_ERROR`, never `INTERNAL_ERROR`.
+- Focused Task 4 suite: 28 tests passed in 3 files.
+- Full suite: 75 tests passed in 13 files.
+- Typecheck: `tsc --noEmit` passed.
+- Self-review and `git diff --check`: clean; no remaining Task 4 findings.

@@ -192,6 +192,32 @@ export function createBusinessRepository(
 ): BusinessRepository {
   const now = options.now ?? (() => new Date());
   const audit = createAuditRepository(database);
+  const synchronizeCurrentValues = database.prepare<{
+    asOf: string;
+    businessId: string;
+  }>(`
+    UPDATE businesses
+    SET
+      referral_rate_basis_points = COALESCE((
+        SELECT rate_basis_points
+        FROM referral_rates
+        WHERE business_id = @businessId
+          AND effective_from <= @asOf
+          AND archived_at IS NULL
+        ORDER BY effective_from DESC, created_at DESC, id DESC
+        LIMIT 1
+      ), referral_rate_basis_points),
+      tax_provision_per_unit = COALESCE((
+        SELECT amount_per_unit
+        FROM tax_provision_rates
+        WHERE business_id = @businessId
+          AND effective_from <= @asOf
+          AND archived_at IS NULL
+        ORDER BY effective_from DESC, created_at DESC, id DESC
+        LIMIT 1
+      ), tax_provision_per_unit)
+    WHERE id = @businessId
+  `);
 
   function businessRow(): BusinessRow | undefined {
     return database
@@ -531,11 +557,6 @@ export function createBusinessRepository(
             effectiveFrom,
             reason,
           };
-          if (effectiveFrom <= formatDate(now())) {
-            database
-              .prepare("UPDATE businesses SET referral_rate_basis_points = ? WHERE id = ?")
-              .run(basisPoints, business.businessId);
-          }
         } else {
           if (!Number.isSafeInteger(input.value) || input.value < 0) {
             throw new TypeError("Tax provision must be a whole non-negative UGX amount");
@@ -575,11 +596,12 @@ export function createBusinessRepository(
             effectiveFrom,
             reason,
           };
-          if (effectiveFrom <= formatDate(now())) {
-            database
-              .prepare("UPDATE businesses SET tax_provision_per_unit = ? WHERE id = ?")
-              .run(input.value, business.businessId);
-          }
+        }
+        if (input.kind === "referral" || input.kind === "taxProvision") {
+          synchronizeCurrentValues.run({
+            asOf: formatDate(now()),
+            businessId: business.businessId,
+          });
         }
         audit.append({
           entityType: `${input.kind}_rate`,

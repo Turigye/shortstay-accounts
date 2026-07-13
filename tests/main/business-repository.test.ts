@@ -188,6 +188,77 @@ describe("business repository", () => {
     database.close();
   });
 
+  it("keeps denormalized referral and tax values on the latest applicable history", () => {
+    const database = createDatabase();
+    const repository = createBusinessRepository(database, {
+      now: () => new Date("2026-07-14T09:00:00.000Z"),
+    });
+    repository.create({ name: "Client Business", password: "long local password" });
+
+    repository.setRate({
+      kind: "referral",
+      value: 12,
+      effectiveFrom: "2026-07-14",
+    });
+    repository.setRate({
+      kind: "taxProvision",
+      value: 700_000,
+      effectiveFrom: "2026-07-14",
+    });
+    repository.setRate({
+      kind: "referral",
+      value: 18,
+      effectiveFrom: "2026-08-01",
+    });
+    repository.setRate({
+      kind: "taxProvision",
+      value: 900_000,
+      effectiveFrom: "2026-08-01",
+    });
+    const afterBackfill = repository.setRate({
+      kind: "referral",
+      value: 7,
+      effectiveFrom: "2026-06-01",
+      reason: "Record the earlier approved rate",
+    });
+    const afterTaxBackfill = repository.setRate({
+      kind: "taxProvision",
+      value: 500_000,
+      effectiveFrom: "2026-06-01",
+      reason: "Record the earlier planning amount",
+    });
+
+    expect(afterBackfill.referralRate).toBe(12);
+    expect(afterTaxBackfill.taxProvisionPerUnit).toBe(700_000);
+    expect(
+      database
+        .prepare<[], {
+          referral_rate_basis_points: number;
+          tax_provision_per_unit: number;
+        }>(`
+          SELECT referral_rate_basis_points, tax_provision_per_unit
+          FROM businesses
+          LIMIT 1
+        `)
+        .get(),
+    ).toEqual({
+      referral_rate_basis_points: 1_200,
+      tax_provision_per_unit: 700_000,
+    });
+    expect(afterTaxBackfill.rateHistory.referral.map(({ effectiveFrom }) => effectiveFrom)).toEqual([
+      "2026-06-01",
+      "2026-07-14",
+      "2026-08-01",
+    ]);
+    expect(afterTaxBackfill.rateHistory.taxProvision.map(({ effectiveFrom }) => effectiveFrom)).toEqual([
+      "2026-06-01",
+      "2026-07-14",
+      "2026-08-01",
+    ]);
+
+    database.close();
+  });
+
   it("requires a reason for historical and closed-period rate changes", () => {
     const database = createDatabase();
     const repository = createBusinessRepository(database, {

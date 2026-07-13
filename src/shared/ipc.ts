@@ -20,12 +20,28 @@ const roleSchema = z.enum([
   "security",
   "ceo",
 ]);
-const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+function isIsoCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+const dateSchema = z.string().refine(isIsoCalendarDate, {
+  message: "Enter a valid calendar date in YYYY-MM-DD format.",
+});
 const passwordSchema = z.string().min(1).max(1024);
-const unitNamesSchema = z.tuple([
-  z.string().trim().min(1).max(120),
-  z.string().trim().min(1).max(120),
-]);
+const unitNameSchema = z.string().trim().min(1).max(120);
+const unitNamesSchema = z
+  .tuple([unitNameSchema, unitNameSchema])
+  .superRefine((unitNames, context) => {
+    if (unitNames[0].toLocaleLowerCase() === unitNames[1].toLocaleLowerCase()) {
+      context.addIssue({
+        code: "custom",
+        message: "Initial unit names must be different.",
+        path: [1],
+      });
+    }
+  });
 
 const appReadyRequestSchema = z
   .object({ channel: z.literal(IPC_CHANNELS.APP_READY), payload: z.object({}).strict() })
@@ -64,11 +80,25 @@ const manageUnitsRequestSchema = z
             z
               .object({
                 id: z.string().min(1).optional(),
-                name: z.string().trim().min(1).max(120),
+                name: unitNameSchema,
               })
               .strict(),
           )
-          .min(1),
+          .min(1)
+          .superRefine((units, context) => {
+            const seen = new Set<string>();
+            units.forEach(({ name }, index) => {
+              const normalized = name.toLocaleLowerCase();
+              if (seen.has(normalized)) {
+                context.addIssue({
+                  code: "custom",
+                  message: "Active unit names must be different.",
+                  path: [index, "name"],
+                });
+              }
+              seen.add(normalized);
+            });
+          }),
       })
       .strict(),
   })
@@ -82,10 +112,27 @@ const staffRateRequestSchema = z
     reason: z.string().trim().max(500).optional(),
   })
   .strict();
-const generalRateRequestSchema = z
+const referralRateRequestSchema = z
   .object({
-    kind: z.enum(["referral", "taxProvision"]),
-    value: z.number().nonnegative(),
+    kind: z.literal("referral"),
+    value: z
+      .number()
+      .refine(Number.isFinite, { message: "Referral rate must be finite." })
+      .min(0)
+      .max(100),
+    effectiveFrom: dateSchema,
+    reason: z.string().trim().max(500).optional(),
+  })
+  .strict();
+const taxProvisionRateRequestSchema = z
+  .object({
+    kind: z.literal("taxProvision"),
+    value: z
+      .number()
+      .nonnegative()
+      .refine(Number.isSafeInteger, {
+        message: "Tax provision must be a whole safe-integer UGX amount.",
+      }),
     effectiveFrom: dateSchema,
     reason: z.string().trim().max(500).optional(),
   })
@@ -93,7 +140,11 @@ const generalRateRequestSchema = z
 const setRateRequestSchema = z
   .object({
     channel: z.literal(IPC_CHANNELS.BUSINESS_SET_RATE),
-    payload: z.discriminatedUnion("kind", [staffRateRequestSchema, generalRateRequestSchema]),
+    payload: z.discriminatedUnion("kind", [
+      staffRateRequestSchema,
+      referralRateRequestSchema,
+      taxProvisionRateRequestSchema,
+    ]),
   })
   .strict();
 
