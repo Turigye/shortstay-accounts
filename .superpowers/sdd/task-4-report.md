@@ -30,3 +30,16 @@ Complete. Business setup, exactly two editable initial units, local encrypted cr
 ## Self-Review
 
 Resolved deterministic unit ordering and correct retrieval of an effective 0% referral rate. No unresolved Task 4 concerns.
+
+## Review Fix Evidence - 2026-07-14
+
+- Same-effective-date rate saves now update the existing row deterministically; different effective dates remain separate history records.
+- Historical and closed-period updates still require a reason. Rate audit events include the effective rate row ID, before/after snapshots, and reason.
+- Repository validation and conflicts cross strict IPC as allowlisted structured failures with field errors.
+- First-run setup remains exactly two units. Post-setup settings reconcile any non-empty active-unit list, add units, rename all retained units, and archive omitted units without changing retained IDs.
+- Failed unlocks close a database handle opened before settings loading fails and leave the session locked. Successful unlocks retain one handle until lock.
+- Password fields and renderer action variables remain cleared around create/unlock requests; no password persistence was added.
+- Focused review suite: 25 tests passed in 3 files.
+- Full suite: 72 tests passed in 13 files.
+- Typecheck: `tsc --noEmit` passed.
+- Self-review and `git diff --check`: clean; no unresolved Task 4 findings.

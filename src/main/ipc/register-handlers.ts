@@ -1,4 +1,7 @@
 import {
+  BusinessRepositoryError,
+} from "../db/repositories/business-repository";
+import {
   IPC_CHANNELS,
   internalFailure,
   ipcRequestSchema,
@@ -40,7 +43,7 @@ const defaultHandlers: IpcHandlers = {
     throw new Error("Business session is unavailable");
   },
   [IPC_CHANNELS.BUSINESS_LOCK]: () => ({ state: "locked" }),
-  [IPC_CHANNELS.BUSINESS_RENAME_UNITS]: () => {
+  [IPC_CHANNELS.BUSINESS_MANAGE_UNITS]: () => {
     throw new Error("Business session is unavailable");
   },
   [IPC_CHANNELS.BUSINESS_SET_RATE]: () => {
@@ -54,7 +57,7 @@ const registeredChannels = [
   IPC_CHANNELS.BUSINESS_CREATE,
   IPC_CHANNELS.BUSINESS_UNLOCK,
   IPC_CHANNELS.BUSINESS_LOCK,
-  IPC_CHANNELS.BUSINESS_RENAME_UNITS,
+  IPC_CHANNELS.BUSINESS_MANAGE_UNITS,
   IPC_CHANNELS.BUSINESS_SET_RATE,
 ] as const;
 
@@ -69,7 +72,7 @@ export function createBusinessIpcHandlers(
       session.lock();
       return { state: "locked" };
     },
-    [IPC_CHANNELS.BUSINESS_RENAME_UNITS]: (payload) => session.renameUnits(payload),
+    [IPC_CHANNELS.BUSINESS_MANAGE_UNITS]: (payload) => session.manageUnits(payload),
     [IPC_CHANNELS.BUSINESS_SET_RATE]: (payload) => session.setRate(payload),
   };
 }
@@ -100,6 +103,9 @@ export function registerIpcHandlers(
       } catch (error) {
         if (error instanceof BusinessSessionError) {
           return publicFailure(error.code, error.message);
+        }
+        if (error instanceof BusinessRepositoryError) {
+          return publicFailure(error.code, error.message, error.fieldErrors);
         }
         return internalFailure();
       }

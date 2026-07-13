@@ -5,8 +5,10 @@ import {
   KeyRound,
   Landmark,
   ListTree,
+  Plus,
   Percent,
   ShieldCheck,
+  ArchiveX,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -26,8 +28,8 @@ type SettingsTab =
 
 interface SettingsScreenProps {
   business: BusinessSettings;
-  onRenameUnits: (payload: {
-    units: [{ id: string; name: string }, { id: string; name: string }];
+  onManageUnits: (payload: {
+    units: { id?: string; name: string }[];
   }) => Promise<void> | void;
   onSetRate: (payload: SetRatePayload) => Promise<void> | void;
   onLock: () => Promise<void> | void;
@@ -181,7 +183,7 @@ function RateEditor({
 
 export function SettingsScreen({
   business,
-  onRenameUnits,
+  onManageUnits,
   onSetRate,
   onLock,
   busy = false,
@@ -189,14 +191,13 @@ export function SettingsScreen({
   today = todayDate(),
 }: SettingsScreenProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("units");
-  const [unitNames, setUnitNames] = useState<[string, string]>([
-    business.units[0]?.name ?? "",
-    business.units[1]?.name ?? "",
-  ]);
+  const [units, setUnits] = useState<{ id?: string; name: string }[]>(
+    business.units.map(({ id, name }) => ({ id, name })),
+  );
   const [selectedRole, setSelectedRole] = useState<RoleKey>("operations");
 
   useEffect(() => {
-    setUnitNames([business.units[0]?.name ?? "", business.units[1]?.name ?? ""]);
+    setUnits(business.units.map(({ id, name }) => ({ id, name })));
   }, [business.units]);
 
   const staffTotal = useMemo(
@@ -204,14 +205,13 @@ export function SettingsScreen({
     [business.staffRates],
   );
 
-  async function handleRenameUnits(event: FormEvent<HTMLFormElement>) {
+  async function handleManageUnits(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (business.units.length !== 2) return;
-    await onRenameUnits({
-      units: [
-        { id: business.units[0].id, name: unitNames[0].trim() },
-        { id: business.units[1].id, name: unitNames[1].trim() },
-      ],
+    await onManageUnits({
+      units: units.map(({ id, name }) => ({
+        ...(id ? { id } : {}),
+        name: name.trim(),
+      })),
     });
   }
 
@@ -249,30 +249,59 @@ export function SettingsScreen({
             <>
               <div className="panel-heading">
                 <h2>Units</h2>
-                <p>Two active accommodation units</p>
+                <p>{units.length} active accommodation {units.length === 1 ? "unit" : "units"}</p>
               </div>
-              <form className="unit-settings-form" onSubmit={handleRenameUnits}>
-                {unitNames.map((name, index) => (
-                  <div className="unit-setting-row" key={business.units[index]?.id}>
+              <form className="unit-settings-form" onSubmit={handleManageUnits}>
+                {units.map((unit, index) => (
+                  <div className="unit-setting-row" key={unit.id ?? `new-${index}`}>
                     <span className="unit-index">{index + 1}</span>
                     <div className="field-group">
                       <label htmlFor={`settings-unit-${index}`}>Unit {index + 1} name</label>
                       <input
                         id={`settings-unit-${index}`}
                         onChange={(event) => {
-                          const next = [...unitNames] as [string, string];
-                          next[index] = event.target.value;
-                          setUnitNames(next);
+                          setUnits((current) =>
+                            current.map((candidate, candidateIndex) =>
+                              candidateIndex === index
+                                ? { ...candidate, name: event.target.value }
+                                : candidate,
+                            ),
+                          );
                         }}
-                        value={name}
+                        value={unit.name}
                       />
                     </div>
-                    <span className="status-badge" data-tone="success">Active</span>
+                    <div className="unit-row-actions">
+                      {unit.id ? <span className="status-badge" data-tone="success">Active</span> : null}
+                      <button
+                        aria-label={`${unit.id ? "Archive" : "Remove"} ${unit.name || `Unit ${index + 1}`}`}
+                        className="icon-button"
+                        disabled={units.length === 1}
+                        onClick={() =>
+                          setUnits((current) =>
+                            current.filter((_, candidateIndex) => candidateIndex !== index),
+                          )
+                        }
+                        title={unit.id ? "Archive unit" : "Remove unit"}
+                        type="button"
+                      >
+                        <ArchiveX aria-hidden="true" size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))}
-                <button className="primary-button compact-button" disabled={busy} type="submit">
-                  Save unit names
-                </button>
+                <div className="unit-form-actions">
+                  <button
+                    className="secondary-button compact-button"
+                    onClick={() => setUnits((current) => [...current, { name: "" }])}
+                    type="button"
+                  >
+                    <Plus aria-hidden="true" size={16} /> Add unit
+                  </button>
+                  <button className="primary-button compact-button" disabled={busy} type="submit">
+                    Save units
+                  </button>
+                </div>
               </form>
             </>
           ) : null}

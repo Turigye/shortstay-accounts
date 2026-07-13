@@ -8,7 +8,7 @@ export const IPC_CHANNELS = {
   BUSINESS_CREATE: "business:create",
   BUSINESS_UNLOCK: "business:unlock",
   BUSINESS_LOCK: "business:lock",
-  BUSINESS_RENAME_UNITS: "business:rename-units",
+  BUSINESS_MANAGE_UNITS: "business:manage-units",
   BUSINESS_SET_RATE: "business:set-rate",
 } as const;
 
@@ -54,15 +54,21 @@ const businessUnlockRequestSchema = z
 const businessLockRequestSchema = z
   .object({ channel: z.literal(IPC_CHANNELS.BUSINESS_LOCK), payload: z.object({}).strict() })
   .strict();
-const renameUnitsRequestSchema = z
+const manageUnitsRequestSchema = z
   .object({
-    channel: z.literal(IPC_CHANNELS.BUSINESS_RENAME_UNITS),
+    channel: z.literal(IPC_CHANNELS.BUSINESS_MANAGE_UNITS),
     payload: z
       .object({
-        units: z.tuple([
-          z.object({ id: z.string().min(1), name: z.string().trim().min(1).max(120) }).strict(),
-          z.object({ id: z.string().min(1), name: z.string().trim().min(1).max(120) }).strict(),
-        ]),
+        units: z
+          .array(
+            z
+              .object({
+                id: z.string().min(1).optional(),
+                name: z.string().trim().min(1).max(120),
+              })
+              .strict(),
+          )
+          .min(1),
       })
       .strict(),
   })
@@ -97,7 +103,7 @@ export const ipcRequestSchema = z.discriminatedUnion("channel", [
   businessCreateRequestSchema,
   businessUnlockRequestSchema,
   businessLockRequestSchema,
-  renameUnitsRequestSchema,
+  manageUnitsRequestSchema,
   setRateRequestSchema,
 ]);
 
@@ -109,6 +115,7 @@ export const IPC_FAILURE_CODES = [
   "LOCKED",
   "NOT_FOUND",
   "ALREADY_EXISTS",
+  "CONFLICT",
 ] as const;
 export type IpcFailureCode = (typeof IPC_FAILURE_CODES)[number];
 
@@ -172,7 +179,7 @@ const responseSchemas = {
   [IPC_CHANNELS.BUSINESS_CREATE]: responseSchema(businessSettingsSchema),
   [IPC_CHANNELS.BUSINESS_UNLOCK]: responseSchema(businessSettingsSchema),
   [IPC_CHANNELS.BUSINESS_LOCK]: responseSchema(z.object({ state: z.literal("locked") }).strict()),
-  [IPC_CHANNELS.BUSINESS_RENAME_UNITS]: responseSchema(businessSettingsSchema),
+  [IPC_CHANNELS.BUSINESS_MANAGE_UNITS]: responseSchema(businessSettingsSchema),
   [IPC_CHANNELS.BUSINESS_SET_RATE]: responseSchema(businessSettingsSchema),
 } as const;
 
@@ -196,7 +203,7 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.BUSINESS_CREATE]: BusinessSettings;
   [IPC_CHANNELS.BUSINESS_UNLOCK]: BusinessSettings;
   [IPC_CHANNELS.BUSINESS_LOCK]: { readonly state: "locked" };
-  [IPC_CHANNELS.BUSINESS_RENAME_UNITS]: BusinessSettings;
+  [IPC_CHANNELS.BUSINESS_MANAGE_UNITS]: BusinessSettings;
   [IPC_CHANNELS.BUSINESS_SET_RATE]: BusinessSettings;
 }
 
@@ -224,14 +231,15 @@ export function validationFailure(error: z.ZodError): IpcFailure {
 }
 
 export function publicFailure(
-  code: Exclude<IpcFailureCode, "VALIDATION_ERROR">,
+  code: IpcFailureCode,
   message?: string,
+  fieldErrors: Readonly<Record<string, readonly string[]>> = {},
 ): IpcFailure {
   return {
     ok: false,
     code,
     message: message ?? "The request could not be completed.",
-    fieldErrors: {},
+    fieldErrors,
   };
 }
 

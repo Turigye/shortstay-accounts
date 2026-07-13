@@ -3,11 +3,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import Database from "better-sqlite3-multiple-ciphers";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBusinessSession } from "../../src/main/business-session";
 import { migrateDatabase } from "../../src/main/db/migrations";
-import { createBusinessRepository } from "../../src/main/db/repositories/business-repository";
+import {
+  BusinessRepositoryError,
+  createBusinessRepository,
+  type BusinessRepository,
+} from "../../src/main/db/repositories/business-repository";
 
 const temporaryDirectories: string[] = [];
 
@@ -131,6 +135,59 @@ describe("business repository", () => {
     database.close();
   });
 
+  it("updates a rate on the baseline effective date and audits before and after", () => {
+    const database = createDatabase();
+    const repository = createBusinessRepository(database, {
+      now: () => new Date("2026-07-14T09:00:00.000Z"),
+    });
+    repository.create({ name: "Client Business", password: "long local password" });
+
+    const updated = repository.setRate({
+      kind: "staff",
+      role: "operations",
+      value: 8,
+      effectiveFrom: "2026-07-14",
+    });
+
+    expect(
+      updated.rateHistory.staff.filter(({ role }) => role === "operations"),
+    ).toEqual([
+      expect.objectContaining({
+        value: 8,
+        effectiveFrom: "2026-07-14",
+        reason: null,
+      }),
+    ]);
+    const audit = database
+      .prepare<[], { reason: string | null; before_json: string; after_json: string }>(`
+        SELECT reason, before_json, after_json
+        FROM audit_events
+        WHERE entity_type = 'staff_rate'
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      `)
+      .get();
+    expect(audit).toEqual({
+      reason: null,
+      before_json: JSON.stringify({
+        kind: "staff",
+        role: "operations",
+        value: 5,
+        effectiveFrom: "2026-07-14",
+        reason: null,
+      }),
+      after_json: JSON.stringify({
+        kind: "staff",
+        role: "operations",
+        value: 8,
+        effectiveFrom: "2026-07-14",
+        reason: null,
+      }),
+    });
+
+    database.close();
+  });
+
   it("requires a reason for historical and closed-period rate changes", () => {
     const database = createDatabase();
     const repository = createBusinessRepository(database, {
@@ -147,7 +204,15 @@ describe("business repository", () => {
         value: 12,
         effectiveFrom: "2026-06-01",
       }),
-    ).toThrow("reason");
+    ).toThrowError(
+      expect.objectContaining<Partial<BusinessRepositoryError>>({
+        code: "VALIDATION_ERROR",
+        message: "A reason is required for historical or closed-period changes.",
+        fieldErrors: {
+          effectiveFrom: ["Enter a reason for this historical or closed period."],
+        },
+      }),
+    );
 
     database
       .prepare(
@@ -173,6 +238,58 @@ describe("business repository", () => {
       value: 650_000,
       reason: "Approved correction after month-end review",
     });
+
+    database.close();
+  });
+
+  it("adds, renames, and archives units without losing existing units", () => {
+    const database = createDatabase();
+    const repository = createBusinessRepository(database);
+    const created = repository.create({
+      name: "Client Business",
+      password: "long local password",
+      unitNames: ["Lake View", "Garden Suite"],
+    });
+
+    const withThird = repository.manageUnits({
+      units: [
+        { id: created.units[0].id, name: "Lake View" },
+        { id: created.units[1].id, name: "Garden Suite" },
+        { name: "Pool House" },
+      ],
+    });
+    expect(withThird.units.map(({ name }) => name)).toEqual([
+      "Lake View",
+      "Garden Suite",
+      "Pool House",
+    ]);
+    expect(withThird.unitIds.slice(0, 2)).toEqual(created.unitIds);
+
+    const managed = repository.manageUnits({
+      units: withThird.units.map(({ id, name }) => ({
+        id,
+        name: name === "Pool House" ? "Pool Cottage" : name,
+      })),
+    });
+    expect(managed.units.map(({ name }) => name)).toEqual([
+      "Lake View",
+      "Garden Suite",
+      "Pool Cottage",
+    ]);
+    expect(managed.unitIds.slice(0, 2)).toEqual(created.unitIds);
+
+    const archivedId = managed.units[2].id;
+    const afterArchive = repository.manageUnits({
+      units: managed.units.slice(0, 2).map(({ id, name }) => ({ id, name })),
+    });
+    expect(afterArchive.unitIds).toEqual(created.unitIds);
+    expect(
+      database
+        .prepare<[string], { status: string; archived_at: string | null }>(
+          "SELECT status, archived_at FROM units WHERE id = ?",
+        )
+        .get(archivedId),
+    ).toMatchObject({ status: "inactive", archived_at: expect.any(String) });
 
     database.close();
   });
@@ -202,5 +319,55 @@ describe("local business session", () => {
     session.lock();
     const rawFile = readFileSync(databasePath);
     expect(rawFile.subarray(0, 16).toString()).not.toBe("SQLite format 3\0");
+  });
+
+  it("closes a post-open failure and leaves the session locked", () => {
+    const databasePath = temporaryDatabasePath();
+    const seed = createBusinessSession({ databasePath });
+    const business = seed.create({
+      name: "Private Stays",
+      password: "correct local password",
+    });
+    seed.lock();
+
+    const close = vi.fn();
+    const openDatabase = vi.fn(() => ({ close }) as unknown as Database.Database);
+    const failingRepository = {
+      getSettings: vi.fn(() => {
+        throw new Error("settings read failed");
+      }),
+    } as unknown as BusinessRepository;
+    const failedSession = createBusinessSession({
+      databasePath,
+      openDatabase,
+      createRepository: () => failingRepository,
+    });
+
+    expect(() => failedSession.unlock("correct local password")).toThrow(
+      "not recognized",
+    );
+    expect(close).toHaveBeenCalledOnce();
+    expect(failedSession.getStatus()).toEqual({ state: "locked" });
+
+    const successfulClose = vi.fn();
+    const successfulOpen = vi.fn(
+      () => ({ close: successfulClose }) as unknown as Database.Database,
+    );
+    const successfulRepository = {
+      getSettings: vi.fn(() => business),
+    } as unknown as BusinessRepository;
+    const successfulSession = createBusinessSession({
+      databasePath,
+      openDatabase: successfulOpen,
+      createRepository: () => successfulRepository,
+    });
+
+    expect(successfulSession.unlock("correct local password")).toEqual(business);
+    expect(successfulOpen).toHaveBeenCalledOnce();
+    expect(successfulClose).not.toHaveBeenCalled();
+    expect(successfulSession.getStatus()).toEqual({ state: "ready", business });
+    expect(successfulOpen).toHaveBeenCalledOnce();
+    successfulSession.lock();
+    expect(successfulClose).toHaveBeenCalledOnce();
   });
 });

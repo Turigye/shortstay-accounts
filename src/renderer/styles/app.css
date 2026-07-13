@@ -720,7 +720,7 @@ textarea:focus-visible {
 
 .unit-setting-row {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 62px;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
   padding-bottom: var(--space-3);
@@ -740,8 +740,37 @@ textarea:focus-visible {
   font-weight: 700;
 }
 
-.unit-settings-form > .primary-button {
-  justify-self: start;
+.unit-row-actions,
+.unit-form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.unit-form-actions {
+  justify-content: flex-start;
+}
+
+.icon-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.icon-button:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .rate-summary-grid {

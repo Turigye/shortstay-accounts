@@ -11,6 +11,7 @@ vi.mock("electron", () => ({
 }));
 
 import { registerIpcHandlers } from "../../src/main/ipc/register-handlers";
+import { BusinessRepositoryError } from "../../src/main/db/repositories/business-repository";
 import { createStayBooksApi } from "../../src/preload";
 import {
   IPC_CHANNELS,
@@ -65,7 +66,7 @@ describe("IPC contract", () => {
       IPC_CHANNELS.BUSINESS_CREATE,
       IPC_CHANNELS.BUSINESS_UNLOCK,
       IPC_CHANNELS.BUSINESS_LOCK,
-      IPC_CHANNELS.BUSINESS_RENAME_UNITS,
+      IPC_CHANNELS.BUSINESS_MANAGE_UNITS,
       IPC_CHANNELS.BUSINESS_SET_RATE,
     ]);
     expect(handlers.has("database:query")).toBe(false);
@@ -132,6 +133,66 @@ describe("IPC contract", () => {
         payload: { password: "wrong", databaseKey: "must-not-pass" },
       }).success,
     ).toBe(false);
+  });
+
+  it("accepts arbitrary non-empty unit lists after setup", () => {
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.BUSINESS_MANAGE_UNITS,
+        payload: {
+          units: [
+            { id: "unit-1", name: "Lake View" },
+            { id: "unit-2", name: "Garden Suite" },
+            { name: "Pool House" },
+          ],
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.BUSINESS_MANAGE_UNITS,
+        payload: { units: [] },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("returns useful structured repository validation errors", async () => {
+    const handlers = new Map<string, RegisteredHandler>();
+    registerIpcHandlers(
+      {
+        handle(channel, handler) {
+          handlers.set(channel, handler);
+        },
+      },
+      {
+        [IPC_CHANNELS.BUSINESS_SET_RATE]: () => {
+          throw new BusinessRepositoryError(
+            "VALIDATION_ERROR",
+            "A reason is required for historical or closed-period changes.",
+            {
+              effectiveFrom: [
+                "Enter a reason for this historical or closed period.",
+              ],
+            },
+          );
+        },
+      },
+    );
+
+    expect(
+      await handlers.get(IPC_CHANNELS.BUSINESS_SET_RATE)?.(undefined, {
+        kind: "referral",
+        value: 12,
+        effectiveFrom: "2026-06-01",
+      }),
+    ).toEqual({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "A reason is required for historical or closed-period changes.",
+      fieldErrors: {
+        effectiveFrom: ["Enter a reason for this historical or closed period."],
+      },
+    });
   });
 });
 

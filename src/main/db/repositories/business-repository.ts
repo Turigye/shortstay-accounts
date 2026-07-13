@@ -30,11 +30,8 @@ export interface CreateBusinessInput {
   unitNames?: readonly [string, string];
 }
 
-export interface RenameUnitsInput {
-  units: readonly [
-    { readonly id: string; readonly name: string },
-    { readonly id: string; readonly name: string },
-  ];
+export interface ManageUnitsInput {
+  units: readonly { readonly id?: string; readonly name: string }[];
 }
 
 export type SetRateInput =
@@ -55,8 +52,19 @@ export type SetRateInput =
 export interface BusinessRepository {
   create(input: CreateBusinessInput): BusinessSettings;
   getSettings(): BusinessSettings | null;
-  renameUnits(input: RenameUnitsInput): BusinessSettings;
+  manageUnits(input: ManageUnitsInput): BusinessSettings;
   setRate(input: SetRateInput): BusinessSettings;
+}
+
+export class BusinessRepositoryError extends Error {
+  constructor(
+    readonly code: "VALIDATION_ERROR" | "CONFLICT",
+    message: string,
+    readonly fieldErrors: Readonly<Record<string, readonly string[]>> = {},
+  ) {
+    super(message);
+    this.name = "BusinessRepositoryError";
+  }
 }
 
 interface RepositoryOptions {
@@ -123,6 +131,39 @@ function validateUnitNames(unitNames: readonly string[]): [string, string] {
   return names;
 }
 
+function validateManagedUnits(
+  units: ManageUnitsInput["units"],
+): { id?: string; name: string }[] {
+  if (units.length === 0) {
+    throw new BusinessRepositoryError(
+      "VALIDATION_ERROR",
+      "At least one active unit is required.",
+      { units: ["Keep or add at least one active unit."] },
+    );
+  }
+  const normalized = units.map(({ id, name }) => ({
+    ...(id ? { id } : {}),
+    name: requiredText(name, "Unit name"),
+  }));
+  const names = normalized.map(({ name }) => name.toLocaleLowerCase());
+  if (new Set(names).size !== names.length) {
+    throw new BusinessRepositoryError(
+      "CONFLICT",
+      "Unit names must be different.",
+      { units: ["Give every active unit a different name."] },
+    );
+  }
+  const ids = normalized.flatMap(({ id }) => (id ? [id] : []));
+  if (new Set(ids).size !== ids.length) {
+    throw new BusinessRepositoryError(
+      "CONFLICT",
+      "A unit was included more than once.",
+      { units: ["Each existing unit can appear only once."] },
+    );
+  }
+  return normalized;
+}
+
 function validateDate(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new TypeError("Effective date must use YYYY-MM-DD");
@@ -166,7 +207,7 @@ export function createBusinessRepository(
 
     const units = database
       .prepare<[string], UnitRow>(
-        "SELECT id, name, status FROM units WHERE business_id = ? AND archived_at IS NULL ORDER BY sort_order, created_at, id",
+        "SELECT id, name, status FROM units WHERE business_id = ? AND status = 'active' AND archived_at IS NULL ORDER BY sort_order, created_at, id",
       )
       .all(business.id);
     const staffRows = database
@@ -321,30 +362,74 @@ export function createBusinessRepository(
 
     getSettings,
 
-    renameUnits(input: RenameUnitsInput): BusinessSettings {
+    manageUnits(input: ManageUnitsInput): BusinessSettings {
       const business = requireBusiness();
-      const names = validateUnitNames(input.units.map(({ name }) => name));
-      const expectedIds = [...business.unitIds].sort();
-      const suppliedIds = input.units.map(({ id }) => id).sort();
-      if (JSON.stringify(expectedIds) !== JSON.stringify(suppliedIds)) {
-        throw new TypeError("Both current units must be provided");
+      const units = validateManagedUnits(input.units);
+      const activeIds = new Set(business.unitIds);
+      const unknownId = units.find(({ id }) => id && !activeIds.has(id));
+      if (unknownId?.id) {
+        throw new BusinessRepositoryError(
+          "CONFLICT",
+          "The unit list is out of date.",
+          { units: ["Reload settings before saving unit changes."] },
+        );
       }
 
-      database.transaction(() => {
-        const update = database.prepare(
-          "UPDATE units SET name = ? WHERE id = ? AND business_id = ? AND archived_at IS NULL",
-        );
-        input.units.forEach((unit, index) => {
-          update.run(names[index], unit.id, business.businessId);
-        });
-        audit.append({
-          entityType: "business",
-          entityId: business.businessId,
-          action: "update",
-          before: { units: business.units },
-          after: { units: input.units },
-        });
-      }).immediate();
+      try {
+        database.transaction(() => {
+          const suppliedIds = new Set(
+            units.flatMap(({ id }) => (id ? [id] : [])),
+          );
+          const archive = database.prepare(`
+            UPDATE units
+            SET status = 'inactive', archived_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            WHERE id = ? AND business_id = ? AND status = 'active' AND archived_at IS NULL
+          `);
+          for (const id of business.unitIds) {
+            if (!suppliedIds.has(id)) archive.run(id, business.businessId);
+          }
+
+          const temporaryRename = database.prepare(
+            "UPDATE units SET name = ? WHERE id = ? AND business_id = ?",
+          );
+          for (const { id } of units) {
+            if (id) temporaryRename.run(`__updating_${id}`, id, business.businessId);
+          }
+
+          const update = database.prepare(`
+            UPDATE units
+            SET name = ?, sort_order = ?, status = 'active', archived_at = NULL
+            WHERE id = ? AND business_id = ?
+          `);
+          const insert = database.prepare(
+            "INSERT INTO units (business_id, name, sort_order) VALUES (?, ?, ?)",
+          );
+          units.forEach((unit, index) => {
+            if (unit.id) {
+              update.run(unit.name, index, unit.id, business.businessId);
+            } else {
+              insert.run(business.businessId, unit.name, index);
+            }
+          });
+          audit.append({
+            entityType: "business",
+            entityId: business.businessId,
+            action: "update",
+            before: { units: business.units },
+            after: { units },
+          });
+        }).immediate();
+      } catch (error) {
+        if (error instanceof BusinessRepositoryError) throw error;
+        if (error instanceof Error && error.message.includes("UNIQUE constraint")) {
+          throw new BusinessRepositoryError(
+            "CONFLICT",
+            "A unit with that name already exists.",
+            { units: ["Use a different name for each unit."] },
+          );
+        }
+        throw error;
+      }
 
       return requireBusiness();
     },
@@ -354,30 +439,98 @@ export function createBusinessRepository(
       const effectiveFrom = validateDate(input.effectiveFrom);
       const reason = input.reason?.trim() || null;
       if (requiresReason(business.businessId, effectiveFrom) && !reason) {
-        throw new TypeError("A reason is required for historical or closed-period changes");
+        throw new BusinessRepositoryError(
+          "VALIDATION_ERROR",
+          "A reason is required for historical or closed-period changes.",
+          {
+            effectiveFrom: [
+              "Enter a reason for this historical or closed period.",
+            ],
+          },
+        );
       }
 
       database.transaction(() => {
+        let entityId: string;
+        let before: Record<string, unknown> | null = null;
+        let after: Record<string, unknown>;
         if (input.kind === "staff") {
           if (!ROLE_KEYS.includes(input.role)) throw new TypeError("Staff role is invalid");
-          database
-            .prepare(
-              "INSERT INTO staff_roles (business_id, role, rate_basis_points, effective_from, reason) VALUES (?, ?, ?, ?, ?)",
-            )
-            .run(
-              business.businessId,
-              input.role,
-              toBasisPoints(input.value),
-              effectiveFrom,
-              reason,
-            );
+          const existing = database
+            .prepare<[string, RoleKey, string], StaffRateRow>(`
+              SELECT id, role, rate_basis_points, effective_from, reason
+              FROM staff_roles
+              WHERE business_id = ? AND role = ? AND effective_from = ? AND archived_at IS NULL
+            `)
+            .get(business.businessId, input.role, effectiveFrom);
+          const basisPoints = toBasisPoints(input.value);
+          if (existing) {
+            entityId = existing.id;
+            before = {
+              kind: "staff",
+              role: input.role,
+              value: existing.rate_basis_points / 100,
+              effectiveFrom: existing.effective_from,
+              reason: existing.reason,
+            };
+            database
+              .prepare(
+                "UPDATE staff_roles SET rate_basis_points = ?, reason = ? WHERE id = ?",
+              )
+              .run(basisPoints, reason, existing.id);
+          } else {
+            const inserted = database
+              .prepare<[string, RoleKey, number, string, string | null], { id: string }>(
+                "INSERT INTO staff_roles (business_id, role, rate_basis_points, effective_from, reason) VALUES (?, ?, ?, ?, ?) RETURNING id",
+              )
+              .get(business.businessId, input.role, basisPoints, effectiveFrom, reason);
+            if (!inserted) throw new Error("Staff rate could not be saved");
+            entityId = inserted.id;
+          }
+          after = {
+            kind: "staff",
+            role: input.role,
+            value: input.value,
+            effectiveFrom,
+            reason,
+          };
         } else if (input.kind === "referral") {
           const basisPoints = toBasisPoints(input.value);
-          database
-            .prepare(
-              "INSERT INTO referral_rates (business_id, rate_basis_points, effective_from, reason) VALUES (?, ?, ?, ?)",
-            )
-            .run(business.businessId, basisPoints, effectiveFrom, reason);
+          const existing = database
+            .prepare<[string, string], ReferralRateRow>(`
+              SELECT id, rate_basis_points, effective_from, reason
+              FROM referral_rates
+              WHERE business_id = ? AND effective_from = ? AND archived_at IS NULL
+            `)
+            .get(business.businessId, effectiveFrom);
+          if (existing) {
+            entityId = existing.id;
+            before = {
+              kind: "referral",
+              value: existing.rate_basis_points / 100,
+              effectiveFrom: existing.effective_from,
+              reason: existing.reason,
+            };
+            database
+              .prepare(
+                "UPDATE referral_rates SET rate_basis_points = ?, reason = ? WHERE id = ?",
+              )
+              .run(basisPoints, reason, existing.id);
+          } else {
+            const inserted = database
+              .prepare<[string, number, string, string | null], { id: string }>(
+                "INSERT INTO referral_rates (business_id, rate_basis_points, effective_from, reason) VALUES (?, ?, ?, ?) RETURNING id",
+              )
+              .get(business.businessId, basisPoints, effectiveFrom, reason);
+            if (!inserted) throw new Error("Referral rate could not be saved");
+            entityId = inserted.id;
+          }
+          after = {
+            kind: "referral",
+            value: input.value,
+            effectiveFrom,
+            reason,
+          };
           if (effectiveFrom <= formatDate(now())) {
             database
               .prepare("UPDATE businesses SET referral_rate_basis_points = ? WHERE id = ?")
@@ -387,11 +540,41 @@ export function createBusinessRepository(
           if (!Number.isSafeInteger(input.value) || input.value < 0) {
             throw new TypeError("Tax provision must be a whole non-negative UGX amount");
           }
-          database
-            .prepare(
-              "INSERT INTO tax_provision_rates (business_id, amount_per_unit, effective_from, reason) VALUES (?, ?, ?, ?)",
-            )
-            .run(business.businessId, input.value, effectiveFrom, reason);
+          const existing = database
+            .prepare<[string, string], TaxRateRow>(`
+              SELECT id, amount_per_unit, effective_from, reason
+              FROM tax_provision_rates
+              WHERE business_id = ? AND effective_from = ? AND archived_at IS NULL
+            `)
+            .get(business.businessId, effectiveFrom);
+          if (existing) {
+            entityId = existing.id;
+            before = {
+              kind: "taxProvision",
+              value: existing.amount_per_unit,
+              effectiveFrom: existing.effective_from,
+              reason: existing.reason,
+            };
+            database
+              .prepare(
+                "UPDATE tax_provision_rates SET amount_per_unit = ?, reason = ? WHERE id = ?",
+              )
+              .run(input.value, reason, existing.id);
+          } else {
+            const inserted = database
+              .prepare<[string, number, string, string | null], { id: string }>(
+                "INSERT INTO tax_provision_rates (business_id, amount_per_unit, effective_from, reason) VALUES (?, ?, ?, ?) RETURNING id",
+              )
+              .get(business.businessId, input.value, effectiveFrom, reason);
+            if (!inserted) throw new Error("Tax provision could not be saved");
+            entityId = inserted.id;
+          }
+          after = {
+            kind: "taxProvision",
+            value: input.value,
+            effectiveFrom,
+            reason,
+          };
           if (effectiveFrom <= formatDate(now())) {
             database
               .prepare("UPDATE businesses SET tax_provision_per_unit = ? WHERE id = ?")
@@ -400,10 +583,11 @@ export function createBusinessRepository(
         }
         audit.append({
           entityType: `${input.kind}_rate`,
-          entityId: business.businessId,
+          entityId,
           action: "update",
           reason: reason ?? undefined,
-          after: input,
+          before,
+          after,
         });
       }).immediate();
 

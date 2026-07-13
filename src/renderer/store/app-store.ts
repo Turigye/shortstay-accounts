@@ -10,7 +10,7 @@ import {
 
 type AppPhase = "booting" | "setup" | "locked" | "ready";
 type CreatePayload = IpcPayload<typeof IPC_CHANNELS.BUSINESS_CREATE>;
-type RenameUnitsPayload = IpcPayload<typeof IPC_CHANNELS.BUSINESS_RENAME_UNITS>;
+type ManageUnitsPayload = IpcPayload<typeof IPC_CHANNELS.BUSINESS_MANAGE_UNITS>;
 
 interface AppState {
   phase: AppPhase;
@@ -21,7 +21,7 @@ interface AppState {
   createBusiness(payload: CreatePayload): Promise<void>;
   unlock(password: string): Promise<void>;
   lock(): Promise<void>;
-  renameUnits(payload: RenameUnitsPayload): Promise<void>;
+  manageUnits(payload: ManageUnitsPayload): Promise<void>;
   setRate(payload: SetRatePayload): Promise<void>;
   clearError(): void;
 }
@@ -91,10 +91,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ busy: false, phase: "locked", business: null });
   },
 
-  async renameUnits(payload) {
+  async manageUnits(payload) {
     set({ busy: true, error: null });
     const result = await window.stayBooks.invoke(
-      IPC_CHANNELS.BUSINESS_RENAME_UNITS,
+      IPC_CHANNELS.BUSINESS_MANAGE_UNITS,
       payload,
     );
     if (!result.ok) {

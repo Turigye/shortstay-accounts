@@ -19,7 +19,7 @@ const screenContent: Record<Exclude<AppScreen, "settings">, { title: string; des
 
 export function App() {
   const [activeScreen, setActiveScreen] = useState<AppScreen>("today");
-  const { phase, business, error, busy, hydrate, createBusiness, unlock, lock, renameUnits, setRate } = useAppStore();
+  const { phase, business, error, busy, hydrate, createBusiness, unlock, lock, manageUnits, setRate } = useAppStore();
 
   useEffect(() => { void hydrate(); }, [hydrate]);
 
@@ -48,7 +48,7 @@ export function App() {
           busy={busy}
           error={error}
           onLock={lock}
-          onRenameUnits={renameUnits}
+          onManageUnits={manageUnits}
           onSetRate={setRate}
         />
       ) : (

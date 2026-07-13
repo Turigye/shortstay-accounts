@@ -6,8 +6,9 @@ import type { BusinessSettings } from "../domain/types";
 import { openEncryptedDatabase } from "./db/connection";
 import {
   createBusinessRepository,
+  type BusinessRepository,
   type CreateBusinessInput,
-  type RenameUnitsInput,
+  type ManageUnitsInput,
   type SetRateInput,
 } from "./db/repositories/business-repository";
 
@@ -29,6 +30,7 @@ export class BusinessSessionError extends Error {
 interface BusinessSessionOptions {
   databasePath: string;
   openDatabase?: typeof openEncryptedDatabase;
+  createRepository?: (database: Database.Database) => BusinessRepository;
 }
 
 export interface BusinessSession {
@@ -37,19 +39,20 @@ export interface BusinessSession {
   unlock(password: string): BusinessSettings;
   lock(): void;
   getSettings(): BusinessSettings;
-  renameUnits(input: RenameUnitsInput): BusinessSettings;
+  manageUnits(input: ManageUnitsInput): BusinessSettings;
   setRate(input: SetRateInput): BusinessSettings;
 }
 
 export function createBusinessSession(options: BusinessSessionOptions): BusinessSession {
   const openDatabase = options.openDatabase ?? openEncryptedDatabase;
+  const createRepository = options.createRepository ?? createBusinessRepository;
   let database: Database.Database | undefined;
 
   function repository() {
     if (!database) {
       throw new BusinessSessionError("LOCKED", "The business file is locked.");
     }
-    return createBusinessRepository(database);
+    return createRepository(database);
   }
 
   function removeIncompleteFile(): void {
@@ -87,17 +90,19 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
       if (!existsSync(options.databasePath)) {
         throw new BusinessSessionError("NOT_FOUND", "No local business file was found.");
       }
+      let opened: Database.Database | undefined;
       try {
-        const opened = openDatabase(options.databasePath, password);
-        const unlockedRepository = createBusinessRepository(opened);
+        opened = openDatabase(options.databasePath, password);
+        const unlockedRepository = createRepository(opened);
         const business = unlockedRepository.getSettings();
         if (!business) {
-          opened.close();
           throw new Error("Business settings are missing");
         }
         database = opened;
+        opened = undefined;
         return business;
       } catch {
+        opened?.close();
         database = undefined;
         throw new BusinessSessionError(
           "WRONG_PASSWORD",
@@ -115,8 +120,8 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
       return repository().getSettings() as BusinessSettings;
     },
 
-    renameUnits(input: RenameUnitsInput): BusinessSettings {
-      return repository().renameUnits(input);
+    manageUnits(input: ManageUnitsInput): BusinessSettings {
+      return repository().manageUnits(input);
     },
 
     setRate(input: SetRateInput): BusinessSettings {

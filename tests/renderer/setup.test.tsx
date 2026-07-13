@@ -99,7 +99,7 @@ describe("settings", () => {
       <SettingsScreen
         business={business}
         onLock={vi.fn()}
-        onRenameUnits={vi.fn()}
+        onManageUnits={vi.fn()}
         onSetRate={vi.fn()}
       />,
     );
@@ -125,7 +125,7 @@ describe("settings", () => {
       <SettingsScreen
         business={business}
         onLock={vi.fn()}
-        onRenameUnits={vi.fn()}
+        onManageUnits={vi.fn()}
         onSetRate={vi.fn()}
         today="2026-07-14"
       />,
@@ -139,5 +139,79 @@ describe("settings", () => {
 
     expect(screen.getByLabelText<HTMLInputElement>("Reason for historical change").required).toBe(true);
     expect(screen.getByText(/required because this date is in a historical period/i)).toBeTruthy();
+  });
+
+  it("saves a rate on today's default effective date", async () => {
+    const onSetRate = vi.fn();
+    render(
+      <SettingsScreen
+        business={business}
+        onLock={vi.fn()}
+        onManageUnits={vi.fn()}
+        onSetRate={onSetRate}
+        today="2026-07-14"
+      />,
+    );
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("tab", { name: "Referral" }));
+    await user.clear(screen.getByLabelText("Rate"));
+    await user.type(screen.getByLabelText("Rate"), "12");
+    await user.click(screen.getByRole("button", { name: "Save rate" }));
+
+    expect(onSetRate).toHaveBeenCalledWith({
+      kind: "referral",
+      value: 12,
+      effectiveFrom: "2026-07-14",
+    });
+  });
+
+  it("adds and archives units while preserving every existing unit", async () => {
+    const onManageUnits = vi.fn();
+    const { rerender } = render(
+      <SettingsScreen
+        business={business}
+        onLock={vi.fn()}
+        onManageUnits={onManageUnits}
+        onSetRate={vi.fn()}
+      />,
+    );
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Add unit" }));
+    await user.type(screen.getByLabelText("Unit 3 name"), "Pool House");
+    await user.click(screen.getByRole("button", { name: "Save units" }));
+    expect(onManageUnits).toHaveBeenLastCalledWith({
+      units: [
+        { id: "unit-1", name: "Lake View" },
+        { id: "unit-2", name: "Garden Suite" },
+        { name: "Pool House" },
+      ],
+    });
+
+    const withThird = {
+      ...business,
+      unitIds: ["unit-1", "unit-2", "unit-3"],
+      units: [
+        ...business.units,
+        { id: "unit-3", name: "Pool House", status: "active" as const },
+      ],
+    };
+    rerender(
+      <SettingsScreen
+        business={withThird}
+        onLock={vi.fn()}
+        onManageUnits={onManageUnits}
+        onSetRate={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Archive Pool House" }));
+    await user.click(screen.getByRole("button", { name: "Save units" }));
+    expect(onManageUnits).toHaveBeenLastCalledWith({
+      units: [
+        { id: "unit-1", name: "Lake View" },
+        { id: "unit-2", name: "Garden Suite" },
+      ],
+    });
   });
 });
