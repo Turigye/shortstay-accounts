@@ -56,3 +56,13 @@ Resolved deterministic unit ordering and correct retrieval of an effective 0% re
 - Full suite: 75 tests passed in 13 files.
 - Typecheck: `tsc --noEmit` passed.
 - Self-review and `git diff --check`: clean; no remaining Task 4 findings.
+
+## Time Activation Evidence - 2026-07-14
+
+- Settings reads now reconcile denormalized referral and tax columns from the latest history rows effective on or before the injected current date.
+- A deterministic clock test proves future referral and tax rows remain inactive before their date, then activate in both returned settings and business columns without another write.
+- Time-based activation is idempotent and does not append duplicate audit events.
+- Focused Task 4 suite: 29 tests passed in 3 files.
+- Full suite: 76 tests passed in 13 files.
+- Typecheck: `tsc --noEmit` passed.
+- Self-review and `git diff --check`: clean; no unresolved Task 4 concerns.

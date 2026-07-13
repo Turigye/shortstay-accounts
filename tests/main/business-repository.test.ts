@@ -259,6 +259,79 @@ describe("business repository", () => {
     database.close();
   });
 
+  it("activates future referral and tax history on read without another write", () => {
+    const database = createDatabase();
+    let currentTime = new Date("2026-07-14T09:00:00.000Z");
+    const repository = createBusinessRepository(database, {
+      now: () => currentTime,
+    });
+    repository.create({ name: "Client Business", password: "long local password" });
+    repository.setRate({
+      kind: "referral",
+      value: 18,
+      effectiveFrom: "2026-08-01",
+    });
+    repository.setRate({
+      kind: "taxProvision",
+      value: 900_000,
+      effectiveFrom: "2026-08-01",
+    });
+
+    const beforeEffective = repository.getSettings();
+    expect(beforeEffective).toMatchObject({
+      referralRate: 10,
+      taxProvisionPerUnit: 600_000,
+    });
+    expect(
+      database
+        .prepare<[], {
+          referral_rate_basis_points: number;
+          tax_provision_per_unit: number;
+        }>(`
+          SELECT referral_rate_basis_points, tax_provision_per_unit
+          FROM businesses
+          LIMIT 1
+        `)
+        .get(),
+    ).toEqual({
+      referral_rate_basis_points: 1_000,
+      tax_provision_per_unit: 600_000,
+    });
+    const auditCountBeforeActivation = database
+      .prepare<[], { count: number }>("SELECT count(*) AS count FROM audit_events")
+      .get()?.count;
+
+    currentTime = new Date("2026-08-01T00:00:00.000Z");
+    const afterEffective = repository.getSettings();
+
+    expect(afterEffective).toMatchObject({
+      referralRate: 18,
+      taxProvisionPerUnit: 900_000,
+    });
+    expect(
+      database
+        .prepare<[], {
+          referral_rate_basis_points: number;
+          tax_provision_per_unit: number;
+        }>(`
+          SELECT referral_rate_basis_points, tax_provision_per_unit
+          FROM businesses
+          LIMIT 1
+        `)
+        .get(),
+    ).toEqual({
+      referral_rate_basis_points: 1_800,
+      tax_provision_per_unit: 900_000,
+    });
+    expect(
+      database
+        .prepare<[], { count: number }>("SELECT count(*) AS count FROM audit_events")
+        .get()?.count,
+    ).toBe(auditCountBeforeActivation);
+
+    database.close();
+  });
+
   it("requires a reason for historical and closed-period rate changes", () => {
     const database = createDatabase();
     const repository = createBusinessRepository(database, {

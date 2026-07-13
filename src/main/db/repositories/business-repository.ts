@@ -196,27 +196,46 @@ export function createBusinessRepository(
     asOf: string;
     businessId: string;
   }>(`
+    WITH applicable AS (
+      SELECT
+        COALESCE((
+          SELECT rate_basis_points
+          FROM referral_rates
+          WHERE business_id = @businessId
+            AND effective_from <= @asOf
+            AND archived_at IS NULL
+          ORDER BY effective_from DESC, created_at DESC, id DESC
+          LIMIT 1
+        ), referral_rate_basis_points) AS referral_rate_basis_points,
+        COALESCE((
+          SELECT amount_per_unit
+          FROM tax_provision_rates
+          WHERE business_id = @businessId
+            AND effective_from <= @asOf
+            AND archived_at IS NULL
+          ORDER BY effective_from DESC, created_at DESC, id DESC
+          LIMIT 1
+        ), tax_provision_per_unit) AS tax_provision_per_unit
+      FROM businesses
+      WHERE id = @businessId
+    )
     UPDATE businesses
     SET
-      referral_rate_basis_points = COALESCE((
-        SELECT rate_basis_points
-        FROM referral_rates
-        WHERE business_id = @businessId
-          AND effective_from <= @asOf
-          AND archived_at IS NULL
-        ORDER BY effective_from DESC, created_at DESC, id DESC
-        LIMIT 1
-      ), referral_rate_basis_points),
-      tax_provision_per_unit = COALESCE((
-        SELECT amount_per_unit
-        FROM tax_provision_rates
-        WHERE business_id = @businessId
-          AND effective_from <= @asOf
-          AND archived_at IS NULL
-        ORDER BY effective_from DESC, created_at DESC, id DESC
-        LIMIT 1
-      ), tax_provision_per_unit)
+      referral_rate_basis_points = (
+        SELECT referral_rate_basis_points FROM applicable
+      ),
+      tax_provision_per_unit = (
+        SELECT tax_provision_per_unit FROM applicable
+      )
     WHERE id = @businessId
+      AND (
+        referral_rate_basis_points IS NOT (
+          SELECT referral_rate_basis_points FROM applicable
+        )
+        OR tax_provision_per_unit IS NOT (
+          SELECT tax_provision_per_unit FROM applicable
+        )
+      )
   `);
 
   function businessRow(): BusinessRow | undefined {
@@ -230,6 +249,10 @@ export function createBusinessRepository(
   function getSettings(): BusinessSettings | null {
     const business = businessRow();
     if (!business) return null;
+    synchronizeCurrentValues.run({
+      asOf: formatDate(now()),
+      businessId: business.id,
+    });
 
     const units = database
       .prepare<[string], UnitRow>(
