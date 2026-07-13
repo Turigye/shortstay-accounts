@@ -1,6 +1,7 @@
 .superpowers/
 .worktrees/
 node_modules/
+.vite/
 dist/
 out/
 coverage/

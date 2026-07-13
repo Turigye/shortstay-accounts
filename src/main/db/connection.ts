@@ -20,11 +20,11 @@ export function openEncryptedDatabase(
     database.pragma("cipher = 'sqlcipher'");
     database.pragma("legacy = 4");
     database.pragma(`key = ${quotePragmaValue(key)}`);
-
-    // The first read authenticates an existing file before any migrations run.
-    database.prepare("select count(*) from sqlite_master").get();
     database.pragma("foreign_keys = ON");
     database.pragma("journal_mode = WAL");
+
+    // The first explicit schema read authenticates before migrations run.
+    database.prepare("select count(*) from sqlite_master").get();
     migrateDatabase(database);
     return database;
   } catch (error) {

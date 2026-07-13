@@ -7,6 +7,90 @@ interface Migration {
   readonly up: (database: Database.Database) => void;
 }
 
+const MUTABLE_TABLES = [
+  "accounts",
+  "assets",
+  "balance_snapshots",
+  "booking_months",
+  "bookings",
+  "businesses",
+  "customers",
+  "expenses",
+  "inventory_snapshots",
+  "loans",
+  "period_closes",
+  "recurring_expenses",
+  "referral_earnings",
+  "referrers",
+  "staff_earnings",
+  "staff_roles",
+  "suppliers",
+  "units",
+] as const;
+
+const FOREIGN_KEY_COLUMNS = [
+  ["accounts", "business_id"],
+  ["assets", "business_id"],
+  ["assets", "supplier_id"],
+  ["assets", "unit_id"],
+  ["balance_snapshots", "account_id"],
+  ["balance_snapshots", "business_id"],
+  ["balance_snapshots", "unit_id"],
+  ["booking_months", "booking_id"],
+  ["bookings", "business_id"],
+  ["bookings", "customer_id"],
+  ["bookings", "referrer_id"],
+  ["bookings", "unit_id"],
+  ["customers", "business_id"],
+  ["expenses", "account_id"],
+  ["expenses", "business_id"],
+  ["expenses", "supplier_id"],
+  ["expenses", "unit_id"],
+  ["inventory_snapshots", "business_id"],
+  ["inventory_snapshots", "unit_id"],
+  ["loans", "business_id"],
+  ["payments", "account_id"],
+  ["payments", "booking_id"],
+  ["payments", "business_id"],
+  ["payments", "reversal_of_id"],
+  ["period_closes", "business_id"],
+  ["recurring_expenses", "business_id"],
+  ["recurring_expenses", "supplier_id"],
+  ["recurring_expenses", "unit_id"],
+  ["referral_earnings", "booking_id"],
+  ["referral_earnings", "business_id"],
+  ["referral_earnings", "referrer_id"],
+  ["referrers", "business_id"],
+  ["staff_earnings", "booking_id"],
+  ["staff_earnings", "business_id"],
+  ["staff_earnings", "staff_role_id"],
+  ["staff_roles", "business_id"],
+  ["suppliers", "business_id"],
+  ["units", "business_id"],
+] as const;
+
+const FOREIGN_KEY_INDEX_SQL = FOREIGN_KEY_COLUMNS.map(
+  ([table, column]) =>
+    `CREATE INDEX ${table}_${column}_idx ON ${table}(${column});`,
+).join("\n");
+
+const UPDATED_AT_TRIGGER_SQL = MUTABLE_TABLES.map(
+  (table) => `
+    CREATE TRIGGER ${table}_touch_updated_at
+    AFTER UPDATE ON ${table}
+    WHEN NEW.updated_at = OLD.updated_at
+    BEGIN
+      UPDATE ${table}
+      SET updated_at = CASE
+        WHEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now') > OLD.updated_at
+          THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        ELSE strftime('%Y-%m-%dT%H:%M:%fZ', OLD.updated_at, '+0.001 seconds')
+      END
+      WHERE id = NEW.id;
+    END;
+  `,
+).join("\n");
+
 const CREATE_VERSION_ONE_SCHEMA = `
   CREATE TABLE app_meta (
     key TEXT PRIMARY KEY,
@@ -83,8 +167,6 @@ const CREATE_VERSION_ONE_SCHEMA = `
     CHECK (check_out > check_in)
   );
 
-  CREATE INDEX bookings_unit_dates_idx ON bookings(unit_id, check_in, check_out);
-
   CREATE TABLE booking_months (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     booking_id TEXT NOT NULL REFERENCES bookings(id),
@@ -126,8 +208,6 @@ const CREATE_VERSION_ONE_SCHEMA = `
     reason TEXT,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
-
-  CREATE INDEX payments_booking_idx ON payments(booking_id, paid_at);
 
   CREATE TABLE suppliers (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
@@ -307,6 +387,10 @@ const CREATE_VERSION_ONE_SCHEMA = `
   );
 
   CREATE INDEX audit_events_entity_idx ON audit_events(entity_type, entity_id, created_at);
+
+  ${FOREIGN_KEY_INDEX_SQL}
+
+  ${UPDATED_AT_TRIGGER_SQL}
 
   CREATE TRIGGER audit_events_prevent_update
   BEFORE UPDATE ON audit_events

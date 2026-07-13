@@ -2,9 +2,11 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import Database from "better-sqlite3-multiple-ciphers";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { openEncryptedDatabase } from "../../src/main/db/connection";
+import { migrateDatabase } from "../../src/main/db/migrations";
 import { createAuditRepository } from "../../src/main/db/repositories/audit-repository";
 
 const REQUIRED_TABLES = [
@@ -44,6 +46,16 @@ const MUTABLE_ARCHIVABLE_TABLES = [
   "staff_roles",
   "suppliers",
   "units",
+] as const;
+
+const MUTABLE_TABLES = [
+  ...MUTABLE_ARCHIVABLE_TABLES,
+  "balance_snapshots",
+  "booking_months",
+  "inventory_snapshots",
+  "period_closes",
+  "referral_earnings",
+  "staff_earnings",
 ] as const;
 
 const temporaryDirectories: string[] = [];
@@ -91,6 +103,24 @@ describe("encrypted database", () => {
     );
   });
 
+  it("reopens a database with an apostrophe-containing key", () => {
+    const databasePath = temporaryDatabasePath();
+    const key = "owner's long private key";
+    const database = openEncryptedDatabase(databasePath, key);
+    database.exec("insert into app_meta(key,value) values ('quote','safe')");
+    database.close();
+
+    const reopened = openEncryptedDatabase(databasePath, key);
+    expect(
+      reopened
+        .prepare<[], { value: string }>(
+          "select value from app_meta where key = 'quote'",
+        )
+        .get()?.value,
+    ).toBe("safe");
+    reopened.close();
+  });
+
   it("applies the complete version-one schema and connection safeguards", () => {
     const database = openEncryptedDatabase(temporaryDatabasePath(), "test key");
     const tableRows = database
@@ -115,6 +145,133 @@ describe("encrypted database", () => {
       );
     }
 
+    database.close();
+  });
+
+  it("updates timestamps automatically for every mutable entity table", () => {
+    const database = openEncryptedDatabase(temporaryDatabasePath(), "test key");
+    const triggerNames = database
+      .prepare<[], { name: string }>(
+        "select name from sqlite_master where type = 'trigger'",
+      )
+      .all()
+      .map(({ name }) => name);
+
+    for (const table of MUTABLE_TABLES) {
+      expect(triggerNames, table).toContain(`${table}_touch_updated_at`);
+    }
+
+    const businessId = "business-1";
+    database
+      .prepare("insert into businesses(id, name, updated_at) values (?, ?, ?)")
+      .run(businessId, "Before", "2000-01-01T00:00:00.000Z");
+    database
+      .prepare("update businesses set name = ? where id = ?")
+      .run("After", businessId);
+    const updated = database
+      .prepare<[], { updated_at: string }>(
+        `select updated_at from businesses where id = '${businessId}'`,
+      )
+      .get();
+
+    expect(updated?.updated_at).not.toBe("2000-01-01T00:00:00.000Z");
+    database.close();
+  });
+
+  it("indexes every foreign-key child column", () => {
+    const database = openEncryptedDatabase(temporaryDatabasePath(), "index key");
+
+    for (const table of REQUIRED_TABLES) {
+      const foreignKeys = database
+        .prepare<[], { from: string }>(`pragma foreign_key_list(${table})`)
+        .all();
+      if (foreignKeys.length === 0) continue;
+
+      const indexedFirstColumns = database
+        .prepare<[], { name: string }>(`pragma index_list(${table})`)
+        .all()
+        .flatMap(({ name }) =>
+          database
+            .prepare<[], { name: string; seqno: number }>(
+              `pragma index_info('${name.replaceAll("'", "''")}')`,
+            )
+            .all()
+            .filter(({ seqno }) => seqno === 0)
+            .map(({ name: column }) => column),
+        );
+
+      for (const foreignKey of foreignKeys) {
+        expect(indexedFirstColumns, `${table}.${foreignKey.from}`).toContain(
+          foreignKey.from,
+        );
+      }
+    }
+
+    database.close();
+  });
+
+  it("enforces foreign keys on every opened connection", () => {
+    const database = openEncryptedDatabase(temporaryDatabasePath(), "fk key");
+
+    expect(() =>
+      database
+        .prepare("insert into units(business_id, name) values (?, ?)")
+        .run("missing-business", "Unit 1"),
+    ).toThrow("FOREIGN KEY");
+
+    database.close();
+  });
+
+  it("is idempotent when migrations are run again", () => {
+    const database = openEncryptedDatabase(
+      temporaryDatabasePath(),
+      "migration key",
+    );
+    const before = database
+      .prepare<[], { count: number }>(
+        "select count(*) as count from sqlite_master",
+      )
+      .get()?.count;
+
+    migrateDatabase(database);
+
+    expect(
+      database
+        .prepare<[], { count: number }>(
+          "select count(*) as count from sqlite_master",
+        )
+        .get()?.count,
+    ).toBe(before);
+    expect(
+      database
+        .prepare<[], { count: number }>(
+          "select count(*) as count from app_meta where key = 'schema_version'",
+        )
+        .get()?.count,
+    ).toBe(1);
+    database.close();
+  });
+
+  it("rolls back a migration if a later schema statement fails", () => {
+    const database = new Database(":memory:");
+    database.exec("create table units (marker text)");
+
+    expect(() => migrateDatabase(database)).toThrow("units already exists");
+    expect(database.pragma("user_version", { simple: true })).toBe(0);
+    expect(
+      database
+        .prepare<[], { name: string }>(
+          "select name from sqlite_master where type = 'table' and name in ('app_meta', 'businesses')",
+        )
+        .all(),
+    ).toEqual([]);
+    expect(
+      database
+        .prepare<[], { name: string }>(
+          "select name from sqlite_master where type = 'table' and name = 'units'",
+        )
+        .get()?.name,
+    ).toBe("units");
     database.close();
   });
 });

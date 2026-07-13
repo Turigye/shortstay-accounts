@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "package": "electron-forge package",
+    "package:probe": "node scripts/run-packaged-db-probe.mjs",
     "make": "electron-forge make"
   },
   "dependencies": {

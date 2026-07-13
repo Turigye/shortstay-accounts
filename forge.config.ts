@@ -4,17 +4,24 @@ import { MakerZIP } from "@electron-forge/maker-zip";
 import { AutoUnpackNativesPlugin } from "@electron-forge/plugin-auto-unpack-natives";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 
+const PACKAGED_RUNTIME_ROOTS = [
+  "/.vite",
+  "/node_modules/better-sqlite3-multiple-ciphers",
+  "/node_modules/bindings",
+  "/node_modules/file-uri-to-path",
+] as const;
+
+function ignorePackagedFile(file: string): boolean {
+  if (!file || file === "/node_modules") return false;
+  return !PACKAGED_RUNTIME_ROOTS.some(
+    (root) => file === root || file.startsWith(`${root}/`),
+  );
+}
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    ignore: (file) => {
-      if (!file) return false;
-      return !(
-        file.startsWith("/.vite") ||
-        file === "/node_modules" ||
-        file.startsWith("/node_modules/xlsx")
-      );
-    },
+    ignore: ignorePackagedFile,
   },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ["darwin"])],
@@ -24,6 +31,11 @@ const config: ForgeConfig = {
       build: [
         {
           entry: "src/main/main.ts",
+          config: "vite.main.config.ts",
+          target: "main",
+        },
+        {
+          entry: "src/main/db/packaged-probe.ts",
           config: "vite.main.config.ts",
           target: "main",
         },
