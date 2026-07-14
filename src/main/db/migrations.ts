@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3-multiple-ciphers";
 
-export const LATEST_SCHEMA_VERSION = 6;
+export const LATEST_SCHEMA_VERSION = 7;
 
 interface Migration {
   readonly version: number;
@@ -636,6 +636,45 @@ const CREATE_VERSION_SIX_SCHEMA = `
   BEGIN SELECT RAISE(ABORT, 'supplier payments are append-only'); END;
 `;
 
+const CREATE_VERSION_SEVEN_SCHEMA = `
+  CREATE TRIGGER expenses_block_closed_month_insert BEFORE INSERT ON expenses
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=NEW.business_id AND month=substr(NEW.expense_date,1,7) AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER expenses_block_closed_month_update BEFORE UPDATE ON expenses
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=OLD.business_id AND month=substr(OLD.expense_date,1,7) AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER bookings_block_closed_month_insert BEFORE INSERT ON bookings
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=NEW.business_id AND month=substr(NEW.check_in,1,7) AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER bookings_block_closed_month_update BEFORE UPDATE ON bookings
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=OLD.business_id AND month=substr(OLD.check_in,1,7) AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER payments_block_closed_month_insert BEFORE INSERT ON payments
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=NEW.business_id AND month=substr(NEW.paid_at,1,7) AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER supplier_payments_block_closed_month_insert BEFORE INSERT ON supplier_payments
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=NEW.business_id AND month=substr(NEW.paid_at,1,7) AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER balances_block_closed_month_insert BEFORE INSERT ON balance_snapshots
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=NEW.business_id AND month=NEW.month AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER balances_block_closed_month_update BEFORE UPDATE ON balance_snapshots
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=OLD.business_id AND month=OLD.month AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER inventory_block_closed_month_insert BEFORE INSERT ON inventory_snapshots
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=NEW.business_id AND month=NEW.month AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER inventory_block_closed_month_update BEFORE UPDATE ON inventory_snapshots
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=OLD.business_id AND month=OLD.month AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER assets_block_closed_month_insert BEFORE INSERT ON assets
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=NEW.business_id AND month=substr(NEW.purchase_date,1,7) AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER loans_block_closed_month_insert BEFORE INSERT ON loans
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=NEW.business_id AND month=substr(NEW.start_date,1,7) AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+`;
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -686,6 +725,14 @@ const migrations: readonly Migration[] = [
     version: 6,
     up(database) {
       database.exec(CREATE_VERSION_SIX_SCHEMA);
+      database.prepare("update app_meta set value = ? where key = 'schema_version'")
+        .run(String(LATEST_SCHEMA_VERSION));
+    },
+  },
+  {
+    version: 7,
+    up(database) {
+      database.exec(CREATE_VERSION_SEVEN_SCHEMA);
       database.prepare("update app_meta set value = ? where key = 'schema_version'")
         .run(String(LATEST_SCHEMA_VERSION));
     },

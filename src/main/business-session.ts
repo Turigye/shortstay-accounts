@@ -37,8 +37,10 @@ import {
   type MonthlyCompensationReport,
 } from "./db/repositories/compensation-repository";
 import { createExpenseRepository, type ExpenseRecord, type Supplier, type RecurringExpenseTemplate } from "./db/repositories/expense-repository";
+import { createFinanceRepository, type AssetRecord, type FinancialPosition, type LoanRecord, type PeriodClose } from "./db/repositories/finance-repository";
 
 type ExpenseRepository = ReturnType<typeof createExpenseRepository>;
+type FinanceRepository = ReturnType<typeof createFinanceRepository>;
 
 export type BusinessSessionStatus =
   | { state: "setup" }
@@ -63,6 +65,7 @@ interface BusinessSessionOptions {
   createPaymentRepository?: (database: Database.Database, businessId: string) => PaymentRepository;
   createCompensationRepository?: (database: Database.Database, businessId: string) => CompensationRepository;
   createExpenseRepository?: (database: Database.Database, businessId: string) => ExpenseRepository;
+  createFinanceRepository?: (database: Database.Database, businessId: string) => FinanceRepository;
 }
 
 export interface BusinessSession {
@@ -100,6 +103,13 @@ export interface BusinessSession {
   recordSupplierPayment(input: Parameters<ExpenseRepository["recordSupplierPayment"]>[0]): ExpenseRecord;
   listRecurringExpenses(month: string): RecurringExpenseTemplate[];
   createRecurringExpense(input: Parameters<ExpenseRepository["createRecurringTemplate"]>[0]): RecurringExpenseTemplate;
+  getFinanceOverview(month:string):{position:FinancialPosition;assets:AssetRecord[];loans:LoanRecord[];period:PeriodClose};
+  recordBalance(input:Parameters<FinanceRepository["recordBalance"]>[0]):FinancialPosition;
+  recordInventory(input:Parameters<FinanceRepository["recordInventory"]>[0]):FinancialPosition;
+  createAsset(input:Parameters<FinanceRepository["createAsset"]>[0]):AssetRecord;
+  createLoan(input:Parameters<FinanceRepository["createLoan"]>[0]):LoanRecord;
+  closeMonth(month:string):PeriodClose;
+  reopenMonth(month:string,reason:string):PeriodClose;
 }
 
 export function createBusinessSession(options: BusinessSessionOptions): BusinessSession {
@@ -109,6 +119,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
   const createPayments = options.createPaymentRepository ?? createPaymentRepository;
   const createCompensation = options.createCompensationRepository ?? createCompensationRepository;
   const createExpenses = options.createExpenseRepository ?? createExpenseRepository;
+  const createFinance = options.createFinanceRepository ?? createFinanceRepository;
   let database: Database.Database | undefined;
 
   function repository() {
@@ -149,6 +160,12 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     const business = repository().getSettings();
     if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
     return createExpenses(database, business.businessId);
+  }
+  function finance(): FinanceRepository {
+    if (!database) throw new BusinessSessionError("LOCKED", "The business file is locked.");
+    const business = repository().getSettings();
+    if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
+    return createFinance(database, business.businessId);
   }
 
   function removeIncompleteFile(): void {
@@ -310,5 +327,12 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     recordSupplierPayment: (input: Parameters<ExpenseRepository["recordSupplierPayment"]>[0]) => expenses().recordSupplierPayment(input),
     listRecurringExpenses: (month: string) => expenses().listRecurringForReview(month),
     createRecurringExpense: (input: Parameters<ExpenseRepository["createRecurringTemplate"]>[0]) => expenses().createRecurringTemplate(input),
+    getFinanceOverview:(month:string)=>({position:finance().getPosition(month),assets:finance().listAssets(),loans:finance().listLoans(),period:finance().getPeriodStatus(month)}),
+    recordBalance:(input:Parameters<FinanceRepository["recordBalance"]>[0])=>finance().recordBalance(input),
+    recordInventory:(input:Parameters<FinanceRepository["recordInventory"]>[0])=>finance().recordInventory(input),
+    createAsset:(input:Parameters<FinanceRepository["createAsset"]>[0])=>finance().createAsset(input),
+    createLoan:(input:Parameters<FinanceRepository["createLoan"]>[0])=>finance().createLoan(input),
+    closeMonth:(month:string)=>finance().closeMonth(month),
+    reopenMonth:(month:string,reason:string)=>finance().reopenMonth(month,reason),
   });
 }
