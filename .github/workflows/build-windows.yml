@@ -7,7 +7,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-windows:
@@ -20,7 +20,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Install pinned Windows TypeScript binary
+      - name: Install Windows build binaries
         run: npm install --no-save --ignore-scripts @typescript/typescript-win32-x64@7.0.2 @rolldown/binding-win32-x64-msvc@1.1.5 lightningcss-win32-x64-msvc@1.32.0
       - run: npm run typecheck
       - run: npm test
@@ -35,3 +35,8 @@ jobs:
             out/make/squirrel.windows/x64/RELEASES
           if-no-files-found: error
           retention-days: 30
+      - name: Publish Windows installer to tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload $env:GITHUB_REF_NAME "out/make/squirrel.windows/x64/*.exe" --clobber
