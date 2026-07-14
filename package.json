@@ -7,7 +7,7 @@
   "author": "Turigye",
   "main": ".vite/build/main.js",
   "scripts": {
-    "postinstall": "electron-forge install-app-deps",
+    "postinstall": "electron-rebuild -f -w better-sqlite3-multiple-ciphers",
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3-multiple-ciphers",
     "prestart": "npm run rebuild:electron",
     "start": "electron-forge start",
