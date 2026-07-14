@@ -21,7 +21,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Install pinned Windows TypeScript binary
-        run: npm install --no-save --ignore-scripts @typescript/typescript-win32-x64@7.0.2 @rolldown/binding-win32-x64-msvc@1.1.5
+        run: npm install --no-save --ignore-scripts @typescript/typescript-win32-x64@7.0.2 @rolldown/binding-win32-x64-msvc@1.1.5 lightningcss-win32-x64-msvc@1.32.0
       - run: npm run typecheck
       - run: npm test
       - name: Build Windows x64 installer
