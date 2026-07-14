@@ -1,0 +1,4 @@
+import { LogIn,LogOut } from "lucide-react";
+import type { TodayOverview } from "../../main/db/repositories/dashboard-repository";
+const money=(value:number)=>`UGX ${new Intl.NumberFormat("en-UG").format(value)}`;
+export function TodayAgenda({items}:{items:TodayOverview["agenda"]}){return <section className="today-panel agenda-panel"><header><h2>Today</h2><span>{items.length} movement{items.length===1?"":"s"}</span></header>{items.length?<ul>{items.map((item)=><li key={`${item.type}:${item.id}`}>{item.type==="arrival"?<LogIn size={18}/>:<LogOut size={18}/>}<div><strong>{item.customerName}</strong><span>{item.unitName} · {item.type==="arrival"?"Arrives":"Departs"} {item.time}</span></div>{item.balance>0?<b>{money(item.balance)} due</b>:<b>Paid</b>}</li>)}</ul>:<div className="inline-message">No arrivals or departures today.</div>}</section>}

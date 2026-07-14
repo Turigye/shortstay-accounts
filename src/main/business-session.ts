@@ -38,9 +38,11 @@ import {
 } from "./db/repositories/compensation-repository";
 import { createExpenseRepository, type ExpenseRecord, type Supplier, type RecurringExpenseTemplate } from "./db/repositories/expense-repository";
 import { createFinanceRepository, type AssetRecord, type FinancialPosition, type LoanRecord, type PeriodClose } from "./db/repositories/finance-repository";
+import { createDashboardRepository, type TodayOverview } from "./db/repositories/dashboard-repository";
 
 type ExpenseRepository = ReturnType<typeof createExpenseRepository>;
 type FinanceRepository = ReturnType<typeof createFinanceRepository>;
+type DashboardRepository = ReturnType<typeof createDashboardRepository>;
 
 export type BusinessSessionStatus =
   | { state: "setup" }
@@ -66,6 +68,7 @@ interface BusinessSessionOptions {
   createCompensationRepository?: (database: Database.Database, businessId: string) => CompensationRepository;
   createExpenseRepository?: (database: Database.Database, businessId: string) => ExpenseRepository;
   createFinanceRepository?: (database: Database.Database, businessId: string) => FinanceRepository;
+  createDashboardRepository?: (database: Database.Database, businessId: string) => DashboardRepository;
 }
 
 export interface BusinessSession {
@@ -111,6 +114,7 @@ export interface BusinessSession {
   closeMonth(month:string):PeriodClose;
   reopenMonth(month:string,reason:string):PeriodClose;
   getMonthlyFinancialReport(month:string):ReturnType<FinanceRepository["getMonthlyReport"]>;
+  getTodayOverview(date:string):TodayOverview;
 }
 
 export function createBusinessSession(options: BusinessSessionOptions): BusinessSession {
@@ -121,6 +125,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
   const createCompensation = options.createCompensationRepository ?? createCompensationRepository;
   const createExpenses = options.createExpenseRepository ?? createExpenseRepository;
   const createFinance = options.createFinanceRepository ?? createFinanceRepository;
+  const createDashboard = options.createDashboardRepository ?? createDashboardRepository;
   let database: Database.Database | undefined;
 
   function repository() {
@@ -167,6 +172,10 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     const business = repository().getSettings();
     if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
     return createFinance(database, business.businessId);
+  }
+  function dashboard(): DashboardRepository {
+    if (!database) throw new BusinessSessionError("LOCKED", "The business file is locked.");
+    const business = repository().getSettings();if(!business)throw new BusinessSessionError("NOT_FOUND","Business settings are missing.");return createDashboard(database,business.businessId);
   }
 
   function removeIncompleteFile(): void {
@@ -336,5 +345,6 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     closeMonth:(month:string)=>finance().closeMonth(month),
     reopenMonth:(month:string,reason:string)=>finance().reopenMonth(month,reason),
     getMonthlyFinancialReport:(month:string)=>finance().getMonthlyReport(month),
+    getTodayOverview:(date:string)=>dashboard().getToday(date),
   });
 }

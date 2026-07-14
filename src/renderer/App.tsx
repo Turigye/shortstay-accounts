@@ -10,6 +10,7 @@ import { StaffScreen } from "./screens/StaffScreen";
 import { ExpensesScreen } from "./screens/ExpensesScreen";
 import { FinancialPositionScreen } from "./screens/FinancialPositionScreen";
 import { ReportsScreen } from "./screens/ReportsScreen";
+import { TodayScreen } from "./screens/TodayScreen";
 import { UnlockScreen } from "./screens/UnlockScreen";
 import { useAppStore } from "./store/app-store";
 
@@ -50,6 +51,8 @@ export function App() {
     >
       {activeScreen === "bookings" ? (
         <BookingsScreen units={business.units} />
+      ) : activeScreen === "today" ? (
+        <TodayScreen onNavigate={setActiveScreen} />
       ) : activeScreen === "payments" ? (
         <PaymentsScreen />
       ) : activeScreen === "staff" ? (

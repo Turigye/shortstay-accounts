@@ -10,6 +10,7 @@ import type { MonthlyCompensationReport } from "../main/db/repositories/compensa
 import type { ExpenseRecord, RecurringExpenseTemplate, Supplier } from "../main/db/repositories/expense-repository";
 import type { AssetRecord, FinancialPosition, LoanRecord, PeriodClose } from "../main/db/repositories/finance-repository";
 import type { FinancialReport } from "../domain/accounting";
+import type { TodayOverview } from "../main/db/repositories/dashboard-repository";
 
 export const IPC_CHANNELS = {
   APP_READY: "app:ready",
@@ -46,6 +47,7 @@ export const IPC_CHANNELS = {
   ASSET_CREATE: "finance:asset-create", LOAN_CREATE: "finance:loan-create",
   PERIOD_CLOSE: "finance:period-close", PERIOD_REOPEN: "finance:period-reopen",
   REPORT_MONTHLY: "reports:monthly",
+  TODAY_OVERVIEW: "today:overview",
 } as const;
 
 const roleSchema = z.enum([
@@ -482,6 +484,7 @@ const financeRequests=[
  z.object({channel:z.literal(IPC_CHANNELS.PERIOD_CLOSE),payload:z.object({month:monthSchema}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.PERIOD_REOPEN),payload:z.object({month:monthSchema,reason:z.string().trim().min(1).max(500)}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.REPORT_MONTHLY),payload:z.object({month:monthSchema}).strict()}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.TODAY_OVERVIEW),payload:z.object({date:dateSchema}).strict()}).strict(),
 ] as const;
 
 export const ipcRequestSchema = z.discriminatedUnion("channel", [
@@ -700,6 +703,7 @@ const loanSchema=z.object({id:z.string(),lender:z.string(),kind:z.enum(["bank","
 const periodSchema=z.object({month:monthSchema,status:z.enum(["open","closed","reopened"]),reason:z.string().nullable()}).strict();
 const metricSchema=z.discriminatedUnion("state",[z.object({state:z.literal("available"),value:z.number()}).strict(),z.object({state:z.literal("unavailable"),reason:z.string()}).strict()]);
 const reportSchema=z.object({incomeStatement:z.object({revenue:wholeUgxSchema,purchases:wholeUgxSchema,grossProfit:wholeUgxSchema,operatingExpenses:wholeUgxSchema,financialExpenses:wholeUgxSchema,profitBeforeTax:wholeUgxSchema,taxExpense:wholeUgxSchema,netIncome:wholeUgxSchema}).strict(),balanceSheet:z.object({currentAssets:wholeUgxSchema,fixedAssets:wholeUgxSchema,totalAssets:wholeUgxSchema,currentLiabilities:wholeUgxSchema,nonCurrentLiabilities:wholeUgxSchema,totalLiabilities:wholeUgxSchema,equity:wholeUgxSchema,totalLiabilitiesAndEquity:wholeUgxSchema,difference:wholeUgxSchema}).strict(),cashFlow:z.object({openingCash:wholeUgxSchema,cashReceipts:wholeUgxSchema,cashPayments:wholeUgxSchema,netChange:wholeUgxSchema,closingCash:wholeUgxSchema}).strict(),breakEven:metricSchema,ratios:z.object({inventoryTurnover:metricSchema,receivablesTurnover:metricSchema,currentRatio:metricSchema,quickRatio:metricSchema,debtToAssets:metricSchema,debtToEquity:metricSchema,returnOnAssets:metricSchema,returnOnEquity:metricSchema,workingCapital:metricSchema,netProfitMargin:metricSchema}).strict()}).strict();
+const todaySchema=z.object({date:dateSchema,month:monthSchema,occupancyPercent:z.number().min(0).max(100),collected:wholeUgxSchema,outstanding:wholeUgxSchema.nonnegative(),netPosition:wholeUgxSchema,expenses:wholeUgxSchema.nonnegative(),staffDue:wholeUgxSchema.nonnegative(),taxProvision:wholeUgxSchema.nonnegative(),agenda:z.array(z.object({id:z.string(),type:z.enum(["arrival","departure"]),customerName:z.string(),unitName:z.string(),time:timeSchema,balance:wholeUgxSchema.nonnegative()}).strict()),units:z.array(z.object({id:z.string(),name:z.string(),status:z.enum(["occupied","arriving","checkoutDue","available"]),guestName:z.string().nullable()}).strict()),warnings:z.array(z.object({id:z.string(),label:z.string(),detail:z.string(),target:z.enum(["bookings","payments","expenses","staff","financial-position"])}).strict())}).strict();
 
 function responseSchema<T extends z.ZodType>(data: T) {
   return z.discriminatedUnion("ok", [
@@ -744,6 +748,7 @@ const responseSchemas = {
   [IPC_CHANNELS.ASSET_CREATE]:responseSchema(assetSchema),[IPC_CHANNELS.LOAN_CREATE]:responseSchema(loanSchema),
   [IPC_CHANNELS.PERIOD_CLOSE]:responseSchema(periodSchema),[IPC_CHANNELS.PERIOD_REOPEN]:responseSchema(periodSchema),
   [IPC_CHANNELS.REPORT_MONTHLY]:responseSchema(reportSchema),
+  [IPC_CHANNELS.TODAY_OVERVIEW]:responseSchema(todaySchema),
 } as const;
 
 export type IpcRequest = z.infer<typeof ipcRequestSchema>;
@@ -796,6 +801,7 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.ASSET_CREATE]:AssetRecord;[IPC_CHANNELS.LOAN_CREATE]:LoanRecord;
   [IPC_CHANNELS.PERIOD_CLOSE]:PeriodClose;[IPC_CHANNELS.PERIOD_REOPEN]:PeriodClose;
   [IPC_CHANNELS.REPORT_MONTHLY]:FinancialReport;
+  [IPC_CHANNELS.TODAY_OVERVIEW]:TodayOverview;
 }
 
 export type IpcData<C extends IpcChannel> = IpcDataByChannel[C];

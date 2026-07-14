@@ -1,0 +1,3 @@
+import { AlertTriangle,ChevronRight } from "lucide-react";
+import type { TodayOverview,DashboardTarget } from "../../main/db/repositories/dashboard-repository";
+export function ActionCenter({warnings,onNavigate}:{warnings:TodayOverview["warnings"];onNavigate:(target:DashboardTarget)=>void}){return <section className="today-panel action-center"><header><h2>Needs attention</h2><span>{warnings.length}</span></header>{warnings.length?<ul>{warnings.map((warning)=><li key={warning.id}><AlertTriangle size={17}/><button onClick={()=>onNavigate(warning.target)} type="button"><span><strong>{warning.label}</strong><small>{warning.detail}</small></span><ChevronRight size={17}/></button></li>)}</ul>:<div className="inline-message">Nothing needs attention.</div>}</section>}

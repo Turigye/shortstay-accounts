@@ -2,6 +2,7 @@ import {
   BarChart3,
   BedDouble,
   Building2,
+  CalendarPlus,
   CalendarDays,
   CreditCard,
   LayoutDashboard,
@@ -93,12 +94,17 @@ export function AppShell({
       <div className="workspace">
         <header className="command-bar" aria-label="Quick actions">
           {businessName ? <strong className="command-business-name">{businessName}</strong> : null}
+          <div className="command-actions">
+            <button className="command-quick-action" onClick={() => onScreenChange("bookings")} type="button"><CalendarPlus aria-hidden="true" size={15}/>Booking</button>
+            <button className="command-quick-action" onClick={() => onScreenChange("payments")} type="button"><CreditCard aria-hidden="true" size={15}/>Payment</button>
+            <button className="command-quick-action" onClick={() => onScreenChange("expenses")} type="button"><ReceiptText aria-hidden="true" size={15}/>Expense</button>
           {onLock ? (
             <button className="command-button" onClick={onLock} type="button">
               <LockKeyhole aria-hidden="true" size={16} strokeWidth={1.9} />
               Lock
             </button>
           ) : null}
+          </div>
         </header>
 
         <main className="main-content">{children}</main>
