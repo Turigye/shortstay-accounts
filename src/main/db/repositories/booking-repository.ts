@@ -9,8 +9,13 @@ import {
   type Booking,
   type Customer,
 } from "../../../domain/bookings";
+import { summarizeBookingBalance } from "../../../domain/payments";
 import type { BookingStatus, Ugx } from "../../../domain/types";
 import { createAuditRepository } from "./audit-repository";
+import {
+  createPaymentRepository,
+  type InitialPaymentInput,
+} from "./payment-repository";
 
 export interface CustomerInput {
   readonly name: string;
@@ -33,6 +38,7 @@ export interface BookingInput {
   readonly referrerId?: string | null;
   readonly referrerName?: string | null;
   readonly notes?: string | null;
+  readonly initialPayment?: InitialPaymentInput;
 }
 
 export interface BookingListFilter {
@@ -197,16 +203,10 @@ function bookingFromRow(row: BookingRow): Booking {
   const status = STATUS_FROM_DATABASE[row.status];
   if (!status) throw new Error(`Unknown booking status: ${row.status}`);
   const nights = calculateNights({ checkIn: row.check_in, checkOut: row.check_out });
-  const netReceived = row.received - row.refunded;
-  const balance = row.total_amount - netReceived;
-  const paymentState =
-    netReceived <= 0
-      ? "unpaid"
-      : balance > 0
-        ? "partiallyPaid"
-        : balance === 0
-          ? "fullyPaid"
-          : "overpaid";
+  const summary = summarizeBookingBalance(row.total_amount, [
+    ...(row.received > 0 ? [{ direction: "receipt" as const, amount: row.received }] : []),
+    ...(row.refunded > 0 ? [{ direction: "refund" as const, amount: row.refunded }] : []),
+  ]);
   return {
     id: row.id,
     businessId: row.business_id,
@@ -227,9 +227,12 @@ function bookingFromRow(row: BookingRow): Booking {
     adjustment: row.adjustment as Ugx,
     total: row.total_amount as Ugx,
     status,
-    paymentState,
-    received: netReceived as Ugx,
-    balance: balance as Ugx,
+    paymentState: summary.state,
+    received: summary.received,
+    refunded: summary.refunded,
+    netReceived: summary.netReceived,
+    due: summary.due,
+    balance: summary.due,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -242,6 +245,7 @@ export function createBookingRepository(
 ): BookingRepository {
   const scopedBusinessId = requiredText(businessId, "businessId", "Business");
   const audit = createAuditRepository(database);
+  const payments = createPaymentRepository(database, scopedBusinessId);
 
   const bookingSelect = `
     SELECT
@@ -565,6 +569,9 @@ export function createBookingRepository(
             status: STATUS_TO_DATABASE[status],
           });
         if (!inserted) throw new Error("Booking could not be created");
+        if (input.initialPayment) {
+          payments.recordReceipt({ ...input.initialPayment, bookingId: inserted.id });
+        }
         const result = bookingFromRow(getBookingRow(inserted.id));
         audit.append({ entityType: "booking", entityId: result.id, action: "create", after: result });
         return result;
@@ -712,7 +719,7 @@ export function createBookingRepository(
         .all(parameters)
         .map(bookingFromRow);
       if (filter.balance === "paid") return rows.filter(({ balance }) => balance <= 0);
-      if (filter.balance === "unpaid") return rows.filter(({ received }) => received === 0);
+      if (filter.balance === "unpaid") return rows.filter(({ paymentState }) => paymentState === "unpaid");
       if (filter.balance === "outstanding") return rows.filter(({ balance }) => balance > 0);
       return rows;
     },

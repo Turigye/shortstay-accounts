@@ -1,4 +1,4 @@
-import type { BookingStatus, Ugx } from "./types";
+import type { BookingStatus, PaymentState, Ugx } from "./types";
 
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1_000;
 
@@ -43,8 +43,11 @@ export interface Booking {
   readonly adjustment: Ugx;
   readonly total: Ugx;
   readonly status: BookingStatus;
-  readonly paymentState: "unpaid" | "partiallyPaid" | "fullyPaid" | "overpaid";
+  readonly paymentState: PaymentState;
   readonly received: Ugx;
+  readonly refunded: Ugx;
+  readonly netReceived: Ugx;
+  readonly due: Ugx;
   readonly balance: Ugx;
   readonly notes: string | null;
   readonly createdAt: string;

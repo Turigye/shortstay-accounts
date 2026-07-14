@@ -6,6 +6,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Booking, Customer } from "../../src/domain/bookings";
 import type { BusinessUnit, Ugx } from "../../src/domain/types";
+import type {
+  PaymentAccount,
+  PaymentMovement,
+} from "../../src/main/db/repositories/payment-repository";
 import { BookingEditor } from "../../src/renderer/components/BookingEditor";
 import { UnitSchedule } from "../../src/renderer/components/UnitSchedule";
 import { BookingsScreen } from "../../src/renderer/screens/BookingsScreen";
@@ -25,6 +29,19 @@ const customers: Customer[] = [
     email: "amina@example.com",
     notes: null,
     archived: false,
+  },
+];
+
+const accounts: PaymentAccount[] = [
+  {
+    id: "account-1",
+    businessId: "business-1",
+    name: "Main Mobile Money",
+    type: "mobileMoney",
+    currency: "UGX",
+    archived: false,
+    createdAt: "2026-07-14T09:00:00.000Z",
+    updatedAt: "2026-07-14T09:00:00.000Z",
   },
 ];
 
@@ -51,6 +68,9 @@ function booking(overrides: Partial<Booking> = {}): Booking {
     status: "confirmed",
     paymentState: "unpaid",
     received: 0 as Ugx,
+    refunded: 0 as Ugx,
+    netReceived: 0 as Ugx,
+    due: 360_000 as Ugx,
     balance: 360_000 as Ugx,
     notes: null,
     createdAt: "2026-07-14T09:00:00.000Z",
@@ -91,10 +111,10 @@ describe("BookingEditor", () => {
     expect(within(summary).getByText("UGX 520,000")).toBeTruthy();
   });
 
-  it("keeps a nonzero initial payment visible and returns field-level validation", async () => {
-    const onSave = vi.fn();
+  it("persists a nonzero initial payment with account, method, date, and reference", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <BookingEditor customers={customers} onCancel={vi.fn()} onSave={onSave} units={units} />,
+      <BookingEditor accounts={accounts} customers={customers} onCancel={vi.fn()} onSave={onSave} units={units} />,
     );
     const user = userEvent.setup();
 
@@ -110,13 +130,103 @@ describe("BookingEditor", () => {
     await user.click(screen.getByText("Advanced booking details"));
     await user.clear(screen.getByLabelText("Initial payment"));
     await user.type(screen.getByLabelText("Initial payment"), "100000");
+    fireEvent.change(screen.getByLabelText("Payment date and time"), {
+      target: { value: "2026-07-14T12:30" },
+    });
+    await user.selectOptions(screen.getByLabelText("Payment account"), "account-1");
     await user.type(screen.getByLabelText("Payment reference"), "MM-4421");
     await user.click(screen.getByRole("button", { name: "Save booking" }));
 
-    expect(onSave).not.toHaveBeenCalled();
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialPayment: expect.objectContaining({
+          amount: 100_000,
+          accountId: "account-1",
+          method: "mobileMoney",
+          reference: "MM-4421",
+          confirmOverpayment: false,
+        }),
+      }),
+    );
     expect(screen.getByLabelText<HTMLInputElement>("Initial payment").value).toBe("100000");
     expect(screen.getByLabelText<HTMLInputElement>("Payment reference").value).toBe("MM-4421");
-    expect(screen.getByText(/record this payment after saving the booking/i)).toBeTruthy();
+  });
+
+  it("warns and requires confirmation before an initial overpayment", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <BookingEditor accounts={accounts} customers={customers} onCancel={vi.fn()} onSave={onSave} units={units} />,
+    );
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Unit"), "unit-1");
+    await user.selectOptions(screen.getByLabelText("Customer"), "customer-1");
+    fireEvent.change(screen.getByLabelText("Check-in date"), { target: { value: "2026-07-20" } });
+    fireEvent.change(screen.getByLabelText("Check-out date"), { target: { value: "2026-07-22" } });
+    await user.type(screen.getByLabelText("Nightly rate"), "180000");
+    await user.click(screen.getByText("Advanced booking details"));
+    await user.clear(screen.getByLabelText("Initial payment"));
+    await user.type(screen.getByLabelText("Initial payment"), "400000");
+    fireEvent.change(screen.getByLabelText("Payment date and time"), { target: { value: "2026-07-14T12:30" } });
+    await user.selectOptions(screen.getByLabelText("Payment account"), "account-1");
+    await user.click(screen.getByRole("button", { name: "Save booking" }));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByText(/overpay this booking by UGX 40,000/i)).toBeTruthy();
+    await user.click(screen.getByRole("checkbox", { name: /confirm initial overpayment/i }));
+    await user.click(screen.getByRole("button", { name: "Save booking" }));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ initialPayment: expect.objectContaining({ confirmOverpayment: true }) }),
+    );
+  });
+
+  it("shows the complete booking balance and chronological payment history", () => {
+    const paidBooking = booking({
+      received: 300_000 as Ugx,
+      netReceived: 300_000 as Ugx,
+      due: 60_000 as Ugx,
+      balance: 60_000 as Ugx,
+      paymentState: "partiallyPaid",
+    });
+    const movements: PaymentMovement[] = [
+      {
+        id: "payment-1",
+        businessId: "business-1",
+        bookingId: paidBooking.id,
+        customerName: paidBooking.customerName,
+        bookingTotal: paidBooking.total,
+        accountId: "account-1",
+        accountName: "Main Mobile Money",
+        recordType: "receipt",
+        direction: "receipt",
+        amount: 300_000 as Ugx,
+        paidAt: "2026-07-14T09:30:00.000Z",
+        method: "mobileMoney",
+        reference: "MM-4421",
+        note: null,
+        reversalOfId: null,
+        correctionOfId: null,
+        additionalSettlement: false,
+        reason: null,
+        createdAt: "2026-07-14T09:30:01.000Z",
+      },
+    ];
+
+    render(
+      <BookingEditor
+        accounts={accounts}
+        booking={paidBooking}
+        customers={customers}
+        movements={movements}
+        onCancel={vi.fn()}
+        onSave={vi.fn()}
+        units={units}
+      />,
+    );
+    const balance = screen.getByLabelText("Booking balance");
+    expect(within(balance).getByText("Refunded")).toBeTruthy();
+    expect(within(balance).getByText("Net received")).toBeTruthy();
+    expect(within(balance).getByText("Due")).toBeTruthy();
+    expect(screen.getByText(/MM-4421/)).toBeTruthy();
   });
 
   it("saves a booking without payment as confirmed", async () => {
@@ -145,6 +255,7 @@ describe("BookingEditor", () => {
         checkOut: "2026-07-22",
         nightlyRate: 180_000,
         status: "confirmed",
+        initialPayment: undefined,
       }),
     );
   });

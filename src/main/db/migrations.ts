@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3-multiple-ciphers";
 
-export const LATEST_SCHEMA_VERSION = 3;
+export const LATEST_SCHEMA_VERSION = 4;
 
 interface Migration {
   readonly version: number;
@@ -473,6 +473,114 @@ const CREATE_VERSION_THREE_SCHEMA = `
     WHERE archived_at IS NULL;
 `;
 
+const CREATE_VERSION_FOUR_SCHEMA = `
+  ALTER TABLE payments ADD COLUMN record_type TEXT NOT NULL DEFAULT 'receipt'
+    CHECK (record_type IN ('receipt', 'refund', 'reversal', 'correction'));
+  ALTER TABLE payments ADD COLUMN correction_of_id TEXT REFERENCES payments(id);
+  ALTER TABLE payments ADD COLUMN additional_settlement INTEGER NOT NULL DEFAULT 0
+    CHECK (additional_settlement IN (0, 1));
+  ALTER TABLE payments ADD COLUMN note TEXT;
+
+  UPDATE payments
+  SET record_type = CASE
+    WHEN direction = 'refund' THEN 'refund'
+    WHEN direction = 'reversal' THEN 'reversal'
+    ELSE 'receipt'
+  END;
+
+  UPDATE payments
+  SET direction = CASE
+    WHEN direction = 'payment' THEN 'receipt'
+    WHEN direction = 'reversal' THEN CASE
+      WHEN (SELECT original.direction FROM payments original WHERE original.id = payments.reversal_of_id) = 'refund'
+        THEN 'receipt'
+      ELSE 'refund'
+    END
+    ELSE direction
+  END;
+
+  CREATE UNIQUE INDEX payments_one_reversal_idx
+    ON payments(reversal_of_id)
+    WHERE reversal_of_id IS NOT NULL;
+  CREATE INDEX payments_correction_of_id_idx ON payments(correction_of_id);
+  CREATE INDEX payments_booking_timeline_idx
+    ON payments(business_id, booking_id, paid_at, created_at, id);
+
+  CREATE TRIGGER payments_validate_insert
+  BEFORE INSERT ON payments
+  WHEN
+    trim(NEW.paid_at) = ''
+    OR NEW.method NOT IN ('cash', 'mobile_money', 'bank_transfer', 'card')
+    OR NEW.direction NOT IN ('receipt', 'refund')
+    OR NOT EXISTS (
+      SELECT 1 FROM businesses business
+      WHERE business.id = NEW.business_id AND business.archived_at IS NULL
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM bookings booking
+      WHERE booking.id = NEW.booking_id
+        AND booking.business_id = NEW.business_id
+        AND booking.archived_at IS NULL
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM accounts account
+      WHERE account.id = NEW.account_id
+        AND account.business_id = NEW.business_id
+        AND account.archived_at IS NULL
+    )
+    OR (NEW.record_type = 'receipt' AND NEW.direction <> 'receipt')
+    OR (NEW.record_type = 'refund' AND NEW.direction <> 'refund')
+    OR (
+      NEW.record_type IN ('receipt', 'refund')
+      AND (NEW.reversal_of_id IS NOT NULL OR NEW.correction_of_id IS NOT NULL)
+    )
+    OR (
+      NEW.record_type = 'reversal'
+      AND (
+        NEW.reversal_of_id IS NULL
+        OR trim(COALESCE(NEW.reason, '')) = ''
+        OR NOT EXISTS (
+          SELECT 1 FROM payments original
+          WHERE original.id = NEW.reversal_of_id
+            AND original.business_id = NEW.business_id
+            AND original.booking_id = NEW.booking_id
+        )
+      )
+    )
+    OR (
+      NEW.record_type = 'correction'
+      AND (
+        NEW.correction_of_id IS NULL
+        OR trim(COALESCE(NEW.reason, '')) = ''
+        OR NOT EXISTS (
+          SELECT 1 FROM payments original
+          WHERE original.id = NEW.correction_of_id
+            AND original.business_id = NEW.business_id
+            AND original.booking_id = NEW.booking_id
+        )
+      )
+    )
+    OR (
+      NEW.additional_settlement = 1
+      AND (NEW.direction <> 'refund' OR trim(COALESCE(NEW.reason, '')) = '')
+    )
+  BEGIN
+    SELECT RAISE(ABORT, 'invalid payment movement');
+  END;
+
+  CREATE TRIGGER payments_prevent_update
+  BEFORE UPDATE ON payments
+  BEGIN
+    SELECT RAISE(ABORT, 'payment movements are append-only');
+  END;
+
+  CREATE TRIGGER payments_prevent_delete
+  BEFORE DELETE ON payments
+  BEGIN
+    SELECT RAISE(ABORT, 'payment movements are append-only');
+  END;
+`;
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -496,6 +604,15 @@ const migrations: readonly Migration[] = [
     version: 3,
     up(database) {
       database.exec(CREATE_VERSION_THREE_SCHEMA);
+      database
+        .prepare("update app_meta set value = ? where key = 'schema_version'")
+        .run(String(LATEST_SCHEMA_VERSION));
+    },
+  },
+  {
+    version: 4,
+    up(database) {
+      database.exec(CREATE_VERSION_FOUR_SCHEMA);
       database
         .prepare("update app_meta set value = ? where key = 'schema_version'")
         .run(String(LATEST_SCHEMA_VERSION));

@@ -2,6 +2,10 @@ import { z } from "zod";
 
 import type { Booking, Customer } from "../domain/bookings";
 import type { BusinessSettings, RoleKey } from "../domain/types";
+import type {
+  PaymentAccount,
+  PaymentMovement,
+} from "../main/db/repositories/payment-repository";
 
 export const IPC_CHANNELS = {
   APP_READY: "app:ready",
@@ -21,6 +25,15 @@ export const IPC_CHANNELS = {
   BOOKING_UPDATE: "bookings:update",
   BOOKING_TRANSITION: "bookings:transition",
   BOOKING_ARCHIVE: "bookings:archive",
+  ACCOUNTS_LIST: "accounts:list",
+  ACCOUNT_CREATE: "accounts:create",
+  ACCOUNT_UPDATE: "accounts:update",
+  ACCOUNT_ARCHIVE: "accounts:archive",
+  PAYMENTS_LIST: "payments:list",
+  PAYMENT_RECEIPT: "payments:receipt",
+  PAYMENT_REFUND: "payments:refund",
+  PAYMENT_CORRECTION: "payments:correction",
+  PAYMENT_REVERSE: "payments:reverse",
 } as const;
 
 const roleSchema = z.enum([
@@ -172,6 +185,48 @@ const timeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, {
 const wholeUgxSchema = z.number().refine(Number.isSafeInteger, {
   message: "Enter a whole safe-integer UGX amount.",
 });
+const positiveWholeUgxSchema = wholeUgxSchema.positive();
+const idSchema = z.string().trim().min(1).max(160);
+const paymentMethodSchema = z.enum(["cash", "mobileMoney", "bankTransfer", "card"]);
+const paymentAccountTypeSchema = z.enum(["cash", "bank", "mobileMoney", "card"]);
+const paymentDirectionSchema = z.enum(["receipt", "refund"]);
+const paymentRecordTypeSchema = z.enum(["receipt", "refund", "reversal", "correction"]);
+const paymentStateSchema = z.enum([
+  "unpaid",
+  "partiallyPaid",
+  "fullyPaid",
+  "overpaid",
+  "partiallyRefunded",
+  "fullyRefunded",
+]);
+const dateTimeSchema = z.string().refine((value) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match) return false;
+  const [, year, month, day, hour, minute, second = "0"] = match;
+  const calendarDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  return (
+    calendarDate.getUTCFullYear() === Number(year) &&
+    calendarDate.getUTCMonth() === Number(month) - 1 &&
+    calendarDate.getUTCDate() === Number(day) &&
+    Number(hour) <= 23 &&
+    Number(minute) <= 59 &&
+    Number(second) <= 59 &&
+    Number.isFinite(Date.parse(value))
+  );
+}, { message: "Enter a valid ISO payment date and time." });
+const paymentDraftSchema = z
+  .object({
+    amount: positiveWholeUgxSchema,
+    paidAt: dateTimeSchema,
+    method: paymentMethodSchema,
+    accountId: idSchema,
+    reference: z.string().trim().max(500).nullable().optional(),
+    note: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict();
+const initialPaymentSchema = paymentDraftSchema
+  .extend({ confirmOverpayment: z.boolean().optional() })
+  .strict();
 const customerInputSchema = z
   .object({
     name: z.string().trim().min(1).max(160),
@@ -198,8 +253,7 @@ const customerArchiveRequestSchema = z
     payload: z.object({ id: z.string().min(1) }).strict(),
   })
   .strict();
-const bookingInputSchema = z
-  .object({
+const bookingInputShape = {
     unitId: z.string().min(1),
     customerId: z.string().min(1),
     checkIn: dateSchema,
@@ -213,9 +267,12 @@ const bookingInputSchema = z
     referrerId: z.string().min(1).nullable().optional(),
     referrerName: z.string().trim().max(160).nullable().optional(),
     notes: z.string().trim().max(2_000).nullable().optional(),
-  })
-  .strict()
-  .superRefine((input, context) => {
+} as const;
+
+function validateReferralInput(
+  input: { referred?: boolean; referrerId?: string | null; referrerName?: string | null },
+  context: z.RefinementCtx,
+): void {
     const hasReferrerId = Boolean(input.referrerId);
     const hasReferrerName = Boolean(input.referrerName?.trim());
 
@@ -246,7 +303,16 @@ const bookingInputSchema = z
         path: ["referrerName"],
       });
     }
-  });
+}
+
+const bookingInputSchema = z
+  .object({ ...bookingInputShape, initialPayment: initialPaymentSchema.optional() })
+  .strict()
+  .superRefine(validateReferralInput);
+const bookingUpdateInputSchema = z
+  .object({ ...bookingInputShape, id: z.string().min(1) })
+  .strict()
+  .superRefine(validateReferralInput);
 const bookingsListRequestSchema = z
   .object({
     channel: z.literal(IPC_CHANNELS.BOOKINGS_LIST),
@@ -275,7 +341,7 @@ const bookingCreateRequestSchema = z
 const bookingUpdateRequestSchema = z
   .object({
     channel: z.literal(IPC_CHANNELS.BOOKING_UPDATE),
-    payload: bookingInputSchema.extend({ id: z.string().min(1) }).strict(),
+    payload: bookingUpdateInputSchema,
   })
   .strict();
 const bookingTransitionRequestSchema = z
@@ -288,6 +354,90 @@ const bookingArchiveRequestSchema = z
   .object({
     channel: z.literal(IPC_CHANNELS.BOOKING_ARCHIVE),
     payload: z.object({ id: z.string().min(1) }).strict(),
+  })
+  .strict();
+
+const accountInputSchema = z
+  .object({ name: z.string().trim().min(1).max(160), type: paymentAccountTypeSchema })
+  .strict();
+const accountsListRequestSchema = z
+  .object({ channel: z.literal(IPC_CHANNELS.ACCOUNTS_LIST), payload: z.object({}).strict() })
+  .strict();
+const accountCreateRequestSchema = z
+  .object({ channel: z.literal(IPC_CHANNELS.ACCOUNT_CREATE), payload: accountInputSchema })
+  .strict();
+const accountUpdateRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.ACCOUNT_UPDATE),
+    payload: accountInputSchema.extend({ id: idSchema }).strict(),
+  })
+  .strict();
+const accountArchiveRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.ACCOUNT_ARCHIVE),
+    payload: z.object({ id: idSchema }).strict(),
+  })
+  .strict();
+const paymentsListRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.PAYMENTS_LIST),
+    payload: z.object({ bookingId: idSchema.optional() }).strict(),
+  })
+  .strict();
+const paymentReceiptRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.PAYMENT_RECEIPT),
+    payload: paymentDraftSchema
+      .extend({ bookingId: idSchema, confirmOverpayment: z.boolean().optional() })
+      .strict(),
+  })
+  .strict();
+const paymentRefundPayloadSchema = paymentDraftSchema
+  .extend({
+    bookingId: idSchema,
+    additionalSettlement: z.boolean().optional(),
+    reason: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (input.additionalSettlement === true && !input.reason?.trim()) {
+      context.addIssue({
+        code: "custom",
+        message: "A reason is required for an additional settlement.",
+        path: ["reason"],
+      });
+    }
+  });
+const paymentRefundRequestSchema = z
+  .object({ channel: z.literal(IPC_CHANNELS.PAYMENT_REFUND), payload: paymentRefundPayloadSchema })
+  .strict();
+const paymentCorrectionPayloadSchema = paymentDraftSchema
+  .extend({
+    bookingId: idSchema,
+    originalPaymentId: idSchema,
+    direction: paymentDirectionSchema,
+    reason: z.string().trim().min(1).max(500),
+    confirmOverpayment: z.boolean().optional(),
+    additionalSettlement: z.boolean().optional(),
+  })
+  .strict();
+const paymentCorrectionRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.PAYMENT_CORRECTION),
+    payload: paymentCorrectionPayloadSchema,
+  })
+  .strict();
+const paymentReverseRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.PAYMENT_REVERSE),
+    payload: z
+      .object({
+        paymentId: idSchema,
+        paidAt: dateTimeSchema,
+        reason: z.string().trim().min(1).max(500),
+        confirmOverpayment: z.boolean().optional(),
+      })
+      .strict(),
   })
   .strict();
 
@@ -309,6 +459,15 @@ export const ipcRequestSchema = z.discriminatedUnion("channel", [
   bookingUpdateRequestSchema,
   bookingTransitionRequestSchema,
   bookingArchiveRequestSchema,
+  accountsListRequestSchema,
+  accountCreateRequestSchema,
+  accountUpdateRequestSchema,
+  accountArchiveRequestSchema,
+  paymentsListRequestSchema,
+  paymentReceiptRequestSchema,
+  paymentRefundRequestSchema,
+  paymentCorrectionRequestSchema,
+  paymentReverseRequestSchema,
 ]);
 
 export const IPC_FAILURE_CODES = [
@@ -321,6 +480,8 @@ export const IPC_FAILURE_CODES = [
   "ALREADY_EXISTS",
   "CONFLICT",
   "INVALID_TRANSITION",
+  "OVER_REFUND",
+  "OVERPAYMENT_CONFIRMATION_REQUIRED",
 ] as const;
 export type IpcFailureCode = (typeof IPC_FAILURE_CODES)[number];
 
@@ -402,12 +563,50 @@ const bookingSchema = z
     adjustment: wholeUgxSchema,
     total: wholeUgxSchema.nonnegative(),
     status: bookingStatusSchema,
-    paymentState: z.enum(["unpaid", "partiallyPaid", "fullyPaid", "overpaid"]),
-    received: wholeUgxSchema,
-    balance: wholeUgxSchema,
+    paymentState: paymentStateSchema,
+    received: wholeUgxSchema.nonnegative(),
+    refunded: wholeUgxSchema.nonnegative(),
+    netReceived: wholeUgxSchema,
+    due: wholeUgxSchema.nonnegative(),
+    balance: wholeUgxSchema.nonnegative(),
     notes: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
+  })
+  .strict();
+const paymentAccountSchema = z
+  .object({
+    id: z.string(),
+    businessId: z.string(),
+    name: z.string(),
+    type: paymentAccountTypeSchema,
+    currency: z.literal("UGX"),
+    archived: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .strict();
+const paymentMovementSchema = z
+  .object({
+    id: z.string(),
+    businessId: z.string(),
+    bookingId: z.string(),
+    customerName: z.string(),
+    bookingTotal: wholeUgxSchema.nonnegative(),
+    accountId: z.string(),
+    accountName: z.string(),
+    recordType: paymentRecordTypeSchema,
+    direction: paymentDirectionSchema,
+    amount: positiveWholeUgxSchema,
+    paidAt: dateTimeSchema,
+    method: paymentMethodSchema,
+    reference: z.string().nullable(),
+    note: z.string().nullable(),
+    reversalOfId: z.string().nullable(),
+    correctionOfId: z.string().nullable(),
+    additionalSettlement: z.boolean(),
+    reason: z.string().nullable(),
+    createdAt: z.string(),
   })
   .strict();
 
@@ -436,6 +635,15 @@ const responseSchemas = {
   [IPC_CHANNELS.BOOKING_UPDATE]: responseSchema(bookingSchema),
   [IPC_CHANNELS.BOOKING_TRANSITION]: responseSchema(bookingSchema),
   [IPC_CHANNELS.BOOKING_ARCHIVE]: responseSchema(z.object({ archived: z.literal(true) }).strict()),
+  [IPC_CHANNELS.ACCOUNTS_LIST]: responseSchema(z.array(paymentAccountSchema)),
+  [IPC_CHANNELS.ACCOUNT_CREATE]: responseSchema(paymentAccountSchema),
+  [IPC_CHANNELS.ACCOUNT_UPDATE]: responseSchema(paymentAccountSchema),
+  [IPC_CHANNELS.ACCOUNT_ARCHIVE]: responseSchema(z.object({ archived: z.literal(true) }).strict()),
+  [IPC_CHANNELS.PAYMENTS_LIST]: responseSchema(z.array(paymentMovementSchema)),
+  [IPC_CHANNELS.PAYMENT_RECEIPT]: responseSchema(paymentMovementSchema),
+  [IPC_CHANNELS.PAYMENT_REFUND]: responseSchema(paymentMovementSchema),
+  [IPC_CHANNELS.PAYMENT_CORRECTION]: responseSchema(paymentMovementSchema),
+  [IPC_CHANNELS.PAYMENT_REVERSE]: responseSchema(paymentMovementSchema),
 } as const;
 
 export type IpcRequest = z.infer<typeof ipcRequestSchema>;
@@ -470,6 +678,15 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.BOOKING_UPDATE]: Booking;
   [IPC_CHANNELS.BOOKING_TRANSITION]: Booking;
   [IPC_CHANNELS.BOOKING_ARCHIVE]: { readonly archived: true };
+  [IPC_CHANNELS.ACCOUNTS_LIST]: PaymentAccount[];
+  [IPC_CHANNELS.ACCOUNT_CREATE]: PaymentAccount;
+  [IPC_CHANNELS.ACCOUNT_UPDATE]: PaymentAccount;
+  [IPC_CHANNELS.ACCOUNT_ARCHIVE]: { readonly archived: true };
+  [IPC_CHANNELS.PAYMENTS_LIST]: PaymentMovement[];
+  [IPC_CHANNELS.PAYMENT_RECEIPT]: PaymentMovement;
+  [IPC_CHANNELS.PAYMENT_REFUND]: PaymentMovement;
+  [IPC_CHANNELS.PAYMENT_CORRECTION]: PaymentMovement;
+  [IPC_CHANNELS.PAYMENT_REVERSE]: PaymentMovement;
 }
 
 export type IpcData<C extends IpcChannel> = IpcDataByChannel[C];

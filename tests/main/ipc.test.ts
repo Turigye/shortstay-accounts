@@ -13,6 +13,7 @@ vi.mock("electron", () => ({
 import { registerIpcHandlers } from "../../src/main/ipc/register-handlers";
 import { BusinessRepositoryError } from "../../src/main/db/repositories/business-repository";
 import { BookingRepositoryError } from "../../src/main/db/repositories/booking-repository";
+import { PaymentRepositoryError } from "../../src/main/db/repositories/payment-repository";
 import { createStayBooksApi } from "../../src/preload";
 import {
   IPC_CHANNELS,
@@ -79,6 +80,15 @@ describe("IPC contract", () => {
       IPC_CHANNELS.BOOKING_UPDATE,
       IPC_CHANNELS.BOOKING_TRANSITION,
       IPC_CHANNELS.BOOKING_ARCHIVE,
+      IPC_CHANNELS.ACCOUNTS_LIST,
+      IPC_CHANNELS.ACCOUNT_CREATE,
+      IPC_CHANNELS.ACCOUNT_UPDATE,
+      IPC_CHANNELS.ACCOUNT_ARCHIVE,
+      IPC_CHANNELS.PAYMENTS_LIST,
+      IPC_CHANNELS.PAYMENT_RECEIPT,
+      IPC_CHANNELS.PAYMENT_REFUND,
+      IPC_CHANNELS.PAYMENT_CORRECTION,
+      IPC_CHANNELS.PAYMENT_REVERSE,
     ]);
     expect(handlers.has("database:query")).toBe(false);
   });
@@ -268,7 +278,7 @@ describe("IPC contract", () => {
     ]);
   });
 
-  it("accepts strict manual booking fields and rejects unimplemented payment persistence", () => {
+  it("accepts a complete initial receipt and rejects incomplete payment persistence", () => {
     const payload = {
       unitId: "unit-1",
       customerId: "customer-1",
@@ -290,9 +300,123 @@ describe("IPC contract", () => {
     expect(
       ipcRequestSchema.safeParse({
         channel: IPC_CHANNELS.BOOKING_CREATE,
-        payload: { ...payload, initialPayment: 100_000 },
+        payload: {
+          ...payload,
+          initialPayment: {
+            amount: 100_000,
+            paidAt: "2026-07-14T09:30:00.000Z",
+            method: "mobileMoney",
+            accountId: "account-1",
+            reference: "MM-4421",
+          },
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.BOOKING_CREATE,
+        payload: { ...payload, initialPayment: { amount: 100_000 } },
       }).success,
     ).toBe(false);
+  });
+
+  it("strictly validates payment accounts and movement commands", () => {
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.ACCOUNT_CREATE,
+        payload: { name: "Main Mobile Money", type: "mobileMoney" },
+      }).success,
+    ).toBe(true);
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.ACCOUNT_CREATE,
+        payload: { name: "Cheque Account", type: "cheque" },
+      }).success,
+    ).toBe(false);
+
+    const receipt = {
+      bookingId: "booking-1",
+      amount: 100_000,
+      paidAt: "2026-07-14T09:30:00.000Z",
+      method: "bankTransfer",
+      accountId: "account-1",
+      reference: "BANK-1",
+    };
+    expect(
+      ipcRequestSchema.safeParse({ channel: IPC_CHANNELS.PAYMENT_RECEIPT, payload: receipt })
+        .success,
+    ).toBe(true);
+
+    for (const invalid of [
+      { ...receipt, amount: 0 },
+      { ...receipt, amount: 1.5 },
+      { ...receipt, method: "cheque" },
+      { ...receipt, paidAt: "2026-02-30T09:30:00.000Z" },
+      { ...receipt, injected: true },
+    ]) {
+      expect(
+        ipcRequestSchema.safeParse({
+          channel: IPC_CHANNELS.PAYMENT_RECEIPT,
+          payload: invalid,
+        }).success,
+      ).toBe(false);
+    }
+
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.PAYMENT_REFUND,
+        payload: {
+          ...receipt,
+          additionalSettlement: true,
+          reason: "Goodwill settlement",
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.PAYMENT_REVERSE,
+        payload: {
+          paymentId: "payment-1",
+          paidAt: "2026-07-15T09:30:00.000Z",
+          reason: "Duplicate receipt",
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("preserves structured payment repository errors", async () => {
+    const handlers = new Map<string, RegisteredHandler>();
+    registerIpcHandlers(
+      {
+        handle(channel, handler) {
+          handlers.set(channel, handler);
+        },
+      },
+      {
+        [IPC_CHANNELS.PAYMENT_RECEIPT]: () => {
+          throw new PaymentRepositoryError(
+            "OVERPAYMENT_CONFIRMATION_REQUIRED",
+            "This receipt would overpay the booking.",
+            { confirmOverpayment: ["Confirm the overpayment."] },
+          );
+        },
+      },
+    );
+
+    expect(
+      await handlers.get(IPC_CHANNELS.PAYMENT_RECEIPT)?.(undefined, {
+        bookingId: "booking-1",
+        amount: 900_001,
+        paidAt: "2026-07-14T09:30:00.000Z",
+        method: "cash",
+        accountId: "account-1",
+      }),
+    ).toEqual({
+      ok: false,
+      code: "OVERPAYMENT_CONFIRMATION_REQUIRED",
+      message: "This receipt would overpay the booking.",
+      fieldErrors: { confirmOverpayment: ["Confirm the overpayment."] },
+    });
   });
 
   it.each([

@@ -2,6 +2,7 @@ import {
   BusinessRepositoryError,
 } from "../db/repositories/business-repository";
 import { BookingRepositoryError } from "../db/repositories/booking-repository";
+import { PaymentRepositoryError } from "../db/repositories/payment-repository";
 import {
   IPC_CHANNELS,
   internalFailure,
@@ -76,6 +77,29 @@ const defaultHandlers: IpcHandlers = {
   [IPC_CHANNELS.BOOKING_ARCHIVE]: () => {
     throw new Error("Business session is unavailable");
   },
+  [IPC_CHANNELS.ACCOUNTS_LIST]: () => [],
+  [IPC_CHANNELS.ACCOUNT_CREATE]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.ACCOUNT_UPDATE]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.ACCOUNT_ARCHIVE]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.PAYMENTS_LIST]: () => [],
+  [IPC_CHANNELS.PAYMENT_RECEIPT]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.PAYMENT_REFUND]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.PAYMENT_CORRECTION]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.PAYMENT_REVERSE]: () => {
+    throw new Error("Business session is unavailable");
+  },
 };
 
 const registeredChannels = [
@@ -96,6 +120,15 @@ const registeredChannels = [
   IPC_CHANNELS.BOOKING_UPDATE,
   IPC_CHANNELS.BOOKING_TRANSITION,
   IPC_CHANNELS.BOOKING_ARCHIVE,
+  IPC_CHANNELS.ACCOUNTS_LIST,
+  IPC_CHANNELS.ACCOUNT_CREATE,
+  IPC_CHANNELS.ACCOUNT_UPDATE,
+  IPC_CHANNELS.ACCOUNT_ARCHIVE,
+  IPC_CHANNELS.PAYMENTS_LIST,
+  IPC_CHANNELS.PAYMENT_RECEIPT,
+  IPC_CHANNELS.PAYMENT_REFUND,
+  IPC_CHANNELS.PAYMENT_CORRECTION,
+  IPC_CHANNELS.PAYMENT_REVERSE,
 ] as const;
 
 export function createBusinessIpcHandlers(
@@ -130,6 +163,18 @@ export function createBusinessIpcHandlers(
       session.archiveBooking(id);
       return { archived: true };
     },
+    [IPC_CHANNELS.ACCOUNTS_LIST]: () => session.listAccounts(),
+    [IPC_CHANNELS.ACCOUNT_CREATE]: (payload) => session.createAccount(payload),
+    [IPC_CHANNELS.ACCOUNT_UPDATE]: ({ id, ...payload }) => session.updateAccount(id, payload),
+    [IPC_CHANNELS.ACCOUNT_ARCHIVE]: ({ id }) => {
+      session.archiveAccount(id);
+      return { archived: true };
+    },
+    [IPC_CHANNELS.PAYMENTS_LIST]: (payload) => session.listPayments(payload),
+    [IPC_CHANNELS.PAYMENT_RECEIPT]: (payload) => session.recordReceipt(payload),
+    [IPC_CHANNELS.PAYMENT_REFUND]: (payload) => session.recordRefund(payload),
+    [IPC_CHANNELS.PAYMENT_CORRECTION]: (payload) => session.recordCorrection(payload),
+    [IPC_CHANNELS.PAYMENT_REVERSE]: (payload) => session.reversePayment(payload),
   };
 }
 
@@ -164,6 +209,9 @@ export function registerIpcHandlers(
           return publicFailure(error.code, error.message, error.fieldErrors);
         }
         if (error instanceof BookingRepositoryError) {
+          return publicFailure(error.code, error.message, error.fieldErrors);
+        }
+        if (error instanceof PaymentRepositoryError) {
           return publicFailure(error.code, error.message, error.fieldErrors);
         }
         return internalFailure();

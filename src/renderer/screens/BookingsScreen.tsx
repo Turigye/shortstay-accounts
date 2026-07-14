@@ -10,6 +10,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { Booking, Customer } from "../../domain/bookings";
 import type { BookingStatus, BusinessUnit } from "../../domain/types";
+import type {
+  PaymentAccount,
+  PaymentMovement,
+} from "../../main/db/repositories/payment-repository";
 import { IPC_CHANNELS, type IpcFailure } from "../../shared/ipc";
 import {
   BookingEditor,
@@ -83,6 +87,8 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
   const [startDate, setStartDate] = useState(today);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
+  const [movements, setMovements] = useState<PaymentMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +116,18 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
     else setBookings(bookingResult.data);
     if (!customerResult.ok) setError(firstError(customerResult));
     else setCustomers(customerResult.data);
+    try {
+      const [accountResult, movementResult] = await Promise.all([
+        window.stayBooks.invoke(IPC_CHANNELS.ACCOUNTS_LIST, {}),
+        window.stayBooks.invoke(IPC_CHANNELS.PAYMENTS_LIST, {}),
+      ]);
+      if (!accountResult.ok) setError(firstError(accountResult));
+      else setAccounts(accountResult.data);
+      if (!movementResult.ok) setError(firstError(movementResult));
+      else setMovements(movementResult.data);
+    } catch {
+      setError("Payment accounts and history could not be loaded. Refresh to try again.");
+    }
     setLoading(false);
   }, []);
 
@@ -133,7 +151,7 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
       if (dateFrom && booking.checkOut <= dateFrom) return false;
       if (dateTo && booking.checkIn >= dateTo) return false;
       if (minimum !== null && Number.isFinite(minimum) && booking.total < minimum) return false;
-      if (balanceFilter === "unpaid" && booking.received !== 0) return false;
+      if (balanceFilter === "unpaid" && booking.paymentState !== "unpaid") return false;
       if (balanceFilter === "outstanding" && booking.balance <= 0) return false;
       if (balanceFilter === "paid" && booking.balance > 0) return false;
       return true;
@@ -191,10 +209,10 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
     setFieldErrors({});
     try {
       const result = selectedBooking
-        ? await window.stayBooks.invoke(IPC_CHANNELS.BOOKING_UPDATE, {
-            id: selectedBooking.id,
-            ...input,
-          })
+        ? await window.stayBooks.invoke(IPC_CHANNELS.BOOKING_UPDATE, (() => {
+            const { initialPayment: _initialPayment, ...bookingInput } = input;
+            return { id: selectedBooking.id, ...bookingInput };
+          })())
         : await window.stayBooks.invoke(IPC_CHANNELS.BOOKING_CREATE, input);
       if (!result.ok) {
         setError(firstError(result));
@@ -352,6 +370,7 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
 
         {editorOpen ? (
           <BookingEditor
+            accounts={accounts}
             booking={selectedBooking}
             busy={busy}
             customers={customers}
@@ -363,6 +382,7 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
             onCreateCustomer={createCustomer}
             onSave={saveBooking}
             onTransition={transitionBooking}
+            movements={movements.filter(({ bookingId }) => bookingId === selectedBooking?.id)}
             units={units}
           />
         ) : null}

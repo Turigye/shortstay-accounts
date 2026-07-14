@@ -9,6 +9,12 @@ import {
   type Customer,
 } from "../../domain/bookings";
 import type { BookingStatus, BusinessUnit } from "../../domain/types";
+import type { PaymentMethod } from "../../domain/payments";
+import type {
+  PaymentAccount,
+  PaymentMovement,
+} from "../../main/db/repositories/payment-repository";
+import { BookingBalance } from "./BookingBalance";
 
 export interface BookingEditorValue {
   readonly unitId: string;
@@ -23,6 +29,15 @@ export interface BookingEditorValue {
   readonly referred: boolean;
   readonly referrerName: string | null;
   readonly notes: string | null;
+  readonly initialPayment?: {
+    readonly amount: number;
+    readonly paidAt: string;
+    readonly method: PaymentMethod;
+    readonly accountId: string;
+    readonly reference: string | null;
+    readonly note: string | null;
+    readonly confirmOverpayment: boolean;
+  };
 }
 
 export interface NewCustomerValue {
@@ -34,6 +49,8 @@ export interface NewCustomerValue {
 interface BookingEditorProps {
   units: readonly BusinessUnit[];
   customers: readonly Customer[];
+  accounts?: readonly PaymentAccount[];
+  movements?: readonly PaymentMovement[];
   booking?: Booking | null;
   initialUnitId?: string;
   initialCheckIn?: string;
@@ -63,8 +80,10 @@ interface FormState {
   referrerName: string;
   initialPayment: string;
   paymentDate: string;
-  paymentMethod: "cash" | "mobile_money" | "bank_transfer" | "card";
+  paymentMethod: PaymentMethod;
+  paymentAccountId: string;
   paymentReference: string;
+  confirmInitialOverpayment: boolean;
   notes: string;
 }
 
@@ -72,6 +91,12 @@ function addOneDay(date: string): string {
   const value = new Date(`${date}T00:00:00.000Z`);
   value.setUTCDate(value.getUTCDate() + 1);
   return value.toISOString().slice(0, 10);
+}
+
+function localDateTime(): string {
+  const now = new Date();
+  const local = new Date(now.valueOf() - now.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
 }
 
 function initialState(
@@ -95,9 +120,11 @@ function initialState(
     referred: booking?.referrerId !== null && booking?.referrerId !== undefined,
     referrerName: booking?.referrerName ?? "",
     initialPayment: "0",
-    paymentDate: booking?.checkIn ?? "",
+    paymentDate: localDateTime(),
     paymentMethod: "cash",
+    paymentAccountId: "",
     paymentReference: "",
+    confirmInitialOverpayment: false,
     notes: booking?.notes ?? "",
   };
 }
@@ -130,6 +157,8 @@ const transitionLabels: Readonly<Record<BookingStatus, string>> = {
 export function BookingEditor({
   units,
   customers,
+  accounts = [],
+  movements = [],
   booking,
   initialUnitId,
   initialCheckIn,
@@ -219,8 +248,13 @@ export function BookingEditor({
     if (initialPayment === null || initialPayment < 0) {
       errors.initialPayment = "Enter a whole UGX amount of zero or more.";
     } else if (initialPayment > 0) {
-      errors.initialPayment =
-        "Record this payment after saving the booking so it is posted to a payment account.";
+      if (!form.paymentDate || Number.isNaN(new Date(form.paymentDate).valueOf())) {
+        errors.paymentDate = "Choose a valid payment date and time.";
+      }
+      if (!form.paymentAccountId) errors.paymentAccountId = "Choose an active payment account.";
+      if (initialPayment > calculation.total && !form.confirmInitialOverpayment) {
+        errors.confirmInitialOverpayment = "Confirm the initial overpayment before saving.";
+      }
     }
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -251,6 +285,18 @@ export function BookingEditor({
         referred: form.referred,
         referrerName: form.referrerName.trim() || null,
         notes: form.notes.trim() || null,
+        initialPayment:
+          !booking && initialPayment! > 0
+            ? {
+                amount: initialPayment!,
+                paidAt: new Date(form.paymentDate).toISOString(),
+                method: form.paymentMethod,
+                accountId: form.paymentAccountId,
+                reference: form.paymentReference.trim() || null,
+                note: null,
+                confirmOverpayment: form.confirmInitialOverpayment,
+              }
+            : undefined,
       });
     } catch {
       setSubmissionError("The booking could not be saved. Review the details and try again.");
@@ -268,6 +314,8 @@ export function BookingEditor({
           <X aria-hidden="true" size={17} />
         </button>
       </header>
+
+      {booking ? <BookingBalance booking={booking} movements={movements} /> : null}
 
       <form className="booking-form" onSubmit={(event) => void handleSubmit(event)}>
         {error || submissionError ? (
@@ -392,33 +440,67 @@ export function BookingEditor({
                 {errorFor("referrerName") ? <small className="field-error">{errorFor("referrerName")}</small> : null}
               </div>
             ) : null}
-            <div className="field-group" data-invalid={Boolean(errorFor("initialPayment"))}>
+            {!booking ? <div className="field-group" data-invalid={Boolean(errorFor("initialPayment"))}>
               <label htmlFor="booking-initial-payment">Initial payment</label>
               <div className="money-input-wrap">
                 <span aria-hidden="true">UGX</span>
                 <input id="booking-initial-payment" inputMode="numeric" min={0} onChange={(event) => update("initialPayment", event.target.value)} step={1} type="number" value={form.initialPayment} />
               </div>
               {errorFor("initialPayment") ? <small className="field-error">{errorFor("initialPayment")}</small> : null}
-            </div>
-            {Number(form.initialPayment) > 0 ? (
+            </div> : null}
+            {!booking && Number(form.initialPayment) > 0 ? (
               <div className="payment-detail-grid">
-                <div className="field-group">
-                  <label htmlFor="booking-payment-date">Payment date</label>
-                  <input id="booking-payment-date" onChange={(event) => update("paymentDate", event.target.value)} type="date" value={form.paymentDate} />
+                <div className="field-group" data-invalid={Boolean(errorFor("paymentDate"))}>
+                  <label htmlFor="booking-payment-date">Payment date and time</label>
+                  <input id="booking-payment-date" onChange={(event) => update("paymentDate", event.target.value)} type="datetime-local" value={form.paymentDate} />
+                  {errorFor("paymentDate") ? <small className="field-error">{errorFor("paymentDate")}</small> : null}
                 </div>
                 <div className="field-group">
                   <label htmlFor="booking-payment-method">Payment method</label>
                   <select id="booking-payment-method" onChange={(event) => update("paymentMethod", event.target.value as FormState["paymentMethod"])} value={form.paymentMethod}>
                     <option value="cash">Cash</option>
-                    <option value="mobile_money">Mobile money</option>
-                    <option value="bank_transfer">Bank transfer</option>
+                    <option value="mobileMoney">Mobile money</option>
+                    <option value="bankTransfer">Bank transfer</option>
                     <option value="card">Card</option>
                   </select>
+                </div>
+                <div className="field-group" data-invalid={Boolean(errorFor("paymentAccountId"))}>
+                  <label htmlFor="booking-payment-account">Payment account</label>
+                  <select
+                    id="booking-payment-account"
+                    onChange={(event) => {
+                      const account = accounts.find(({ id }) => id === event.target.value);
+                      update("paymentAccountId", event.target.value);
+                      if (account?.type === "mobileMoney") update("paymentMethod", "mobileMoney");
+                      else if (account?.type === "bank") update("paymentMethod", "bankTransfer");
+                      else if (account?.type === "card") update("paymentMethod", "card");
+                      else if (account?.type === "cash") update("paymentMethod", "cash");
+                    }}
+                    value={form.paymentAccountId}
+                  >
+                    <option value="">Choose account</option>
+                    {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+                  </select>
+                  {errorFor("paymentAccountId") ? <small className="field-error">{errorFor("paymentAccountId")}</small> : null}
                 </div>
                 <div className="field-group payment-reference-field">
                   <label htmlFor="booking-payment-reference">Payment reference</label>
                   <input id="booking-payment-reference" onChange={(event) => update("paymentReference", event.target.value)} value={form.paymentReference} />
                 </div>
+                {Number(form.initialPayment) > calculation.total ? (
+                  <div className="payment-warning payment-reference-field">
+                    <strong>This will overpay this booking by {formatUgx(Number(form.initialPayment) - calculation.total)}.</strong>
+                    <label className="check-control">
+                      <input
+                        checked={form.confirmInitialOverpayment}
+                        onChange={(event) => update("confirmInitialOverpayment", event.target.checked)}
+                        type="checkbox"
+                      />
+                      Confirm initial overpayment
+                    </label>
+                    {errorFor("confirmInitialOverpayment") ? <small className="field-error">{errorFor("confirmInitialOverpayment")}</small> : null}
+                  </div>
+                ) : null}
               </div>
             ) : null}
             <div className="field-group">

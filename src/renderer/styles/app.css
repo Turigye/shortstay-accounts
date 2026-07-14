@@ -1830,6 +1830,440 @@ textarea:focus-visible {
   border: 0;
 }
 
+/* Payments */
+.payments-screen {
+  display: grid;
+  height: 100%;
+  min-width: 0;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.payments-header {
+  display: flex;
+  min-height: 54px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.payments-header h1,
+.payment-editor-header h2,
+.account-panel h2,
+.reversal-panel h2 {
+  margin: 0;
+  line-height: 1.25;
+}
+
+.payments-header h1 {
+  font-size: var(--text-2xl);
+}
+
+.payments-header p,
+.payment-editor-header p,
+.account-panel header p,
+.reversal-panel header p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.payments-header > div:last-child,
+.payments-toolbar,
+.account-form-actions,
+.payment-editor-footer,
+.reversal-panel footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.payments-toolbar {
+  min-height: 58px;
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.payments-toolbar .compact-select {
+  display: grid;
+  min-width: min(380px, 52vw);
+  grid-template-columns: auto minmax(220px, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.payments-toolbar .compact-select label {
+  font-size: var(--text-xs);
+}
+
+.payments-toolbar .compact-select select {
+  height: 34px;
+  padding-inline: var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.payments-toolbar > .icon-button {
+  margin-left: auto;
+}
+
+.payments-alert {
+  margin: var(--space-3) 0 0;
+}
+
+.payments-workspace {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: var(--space-4);
+  background: var(--color-surface);
+}
+
+.payments-workspace[data-panel="true"] {
+  grid-template-columns: minmax(0, 1fr) 392px;
+}
+
+.payments-content {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.selected-booking-heading {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.selected-booking-heading > div {
+  display: grid;
+}
+
+.selected-booking-heading span {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.booking-balance {
+  min-width: 0;
+}
+
+.balance-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(110px, 1fr));
+  margin: 0;
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.balance-summary > div {
+  display: grid;
+  min-width: 0;
+  min-height: 72px;
+  align-content: center;
+  padding: 0 var(--space-4);
+  border-right: 1px solid var(--color-border);
+}
+
+.balance-summary > div:last-child {
+  border-right: 0;
+  background: var(--color-surface-subtle);
+}
+
+.balance-summary dt {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.balance-summary dd {
+  margin: var(--space-1) 0 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.movement-heading {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.movement-heading h3 {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.movement-heading span {
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-surface-subtle);
+  color: var(--color-ink-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.movement-empty,
+.payments-empty {
+  color: var(--color-ink-muted);
+}
+
+.movement-empty {
+  margin: 0;
+  padding: var(--space-6) var(--space-4);
+}
+
+.movement-list,
+.account-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.movement-list > li {
+  display: grid;
+  min-height: 62px;
+  grid-template-columns: 10px minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.movement-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+.movement-marker[data-direction="refund"] {
+  background: var(--color-danger);
+}
+
+.movement-copy {
+  min-width: 0;
+}
+
+.movement-copy > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.movement-copy > div span,
+.movement-copy p,
+.movement-copy small {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.movement-copy p {
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.movement-copy small {
+  display: block;
+  margin-top: 2px;
+}
+
+.movement-amount {
+  font-family: var(--font-mono);
+  color: var(--color-success);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.movement-amount[data-direction="refund"] {
+  color: var(--color-danger);
+}
+
+.movement-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.payment-editor,
+.account-panel,
+.reversal-panel {
+  min-width: 0;
+  min-height: 0;
+  margin-left: var(--space-4);
+  overflow: auto;
+  border-left: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+}
+
+.payment-editor-header,
+.account-panel > header,
+.reversal-panel > header {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  min-height: 58px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 0 var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.payment-editor-header h2,
+.account-panel h2,
+.reversal-panel h2 {
+  font-size: var(--text-lg);
+}
+
+.payment-form,
+.account-form,
+.reversal-panel form {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) 0 var(--space-4) var(--space-4);
+}
+
+.payment-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.payment-form .field-group,
+.account-form .field-group,
+.reversal-panel .field-group {
+  gap: var(--space-1);
+}
+
+.payment-form .field-group > input,
+.payment-form .field-group > select,
+.account-form .field-group > input,
+.account-form .field-group > select,
+.reversal-panel .field-group > input {
+  height: 36px;
+  padding-inline: var(--space-2);
+}
+
+.payment-form .field-group > textarea,
+.reversal-panel .field-group > textarea {
+  height: auto;
+  min-height: 64px;
+  padding: var(--space-2);
+  resize: vertical;
+}
+
+.payment-form .money-input-wrap {
+  min-height: 36px;
+}
+
+.payment-form .money-input-wrap input {
+  height: 34px;
+}
+
+.payment-warning {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-surface);
+  color: var(--color-warning);
+  font-size: var(--text-xs);
+}
+
+.payment-editor-footer,
+.account-form-actions,
+.reversal-panel footer {
+  justify-content: flex-end;
+  padding-top: var(--space-2);
+}
+
+.account-form {
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.account-list > li {
+  display: grid;
+  min-height: 54px;
+  grid-template-columns: minmax(0, 1fr) 32px 32px;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 0 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.account-list > li > div {
+  display: grid;
+  min-width: 0;
+}
+
+.account-list > li span {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.payments-empty {
+  display: grid;
+  min-height: 260px;
+  align-content: center;
+  justify-items: start;
+  padding: var(--space-8);
+}
+
+.payments-empty h2 {
+  margin: var(--space-3) 0 0;
+  color: var(--color-ink);
+  font-size: var(--text-xl);
+}
+
+.payments-empty p {
+  margin: var(--space-1) 0 0;
+}
+
+.booking-editor > .booking-balance {
+  margin-left: var(--space-4);
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.booking-editor > .booking-balance .balance-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.booking-editor > .booking-balance .balance-summary > div {
+  min-height: 54px;
+  padding-inline: var(--space-3);
+}
+
+.booking-editor > .booking-balance .balance-summary > div:last-child {
+  grid-column: 1 / -1;
+}
+
+.booking-editor > .booking-balance .movement-list > li {
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  padding-inline: var(--space-3);
+}
+
+.booking-editor > .booking-balance .movement-actions {
+  display: none;
+}
+
 @media (max-width: 1100px) {
   :root {
     --sidebar-width: 208px;
@@ -1841,6 +2275,16 @@ textarea:focus-visible {
 
   .main-content {
     padding: var(--space-6);
+  }
+
+  .payments-workspace[data-panel="true"] {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+
+  .payment-editor,
+  .account-panel,
+  .reversal-panel {
+    margin-left: var(--space-3);
   }
 }
 

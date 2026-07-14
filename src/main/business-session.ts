@@ -20,6 +20,17 @@ import {
 } from "./db/repositories/booking-repository";
 import type { Booking, Customer } from "../domain/bookings";
 import type { BookingStatus } from "../domain/types";
+import {
+  createPaymentRepository,
+  type AccountInput,
+  type CorrectionInput,
+  type PaymentAccount,
+  type PaymentMovement,
+  type PaymentRepository,
+  type ReceiptInput,
+  type RefundInput,
+  type ReversalInput,
+} from "./db/repositories/payment-repository";
 
 export type BusinessSessionStatus =
   | { state: "setup" }
@@ -41,6 +52,7 @@ interface BusinessSessionOptions {
   openDatabase?: typeof openEncryptedDatabase;
   createRepository?: (database: Database.Database) => BusinessRepository;
   createBookingRepository?: (database: Database.Database, businessId: string) => BookingRepository;
+  createPaymentRepository?: (database: Database.Database, businessId: string) => PaymentRepository;
 }
 
 export interface BusinessSession {
@@ -61,12 +73,22 @@ export interface BusinessSession {
   updateBooking(id: string, input: BookingInput): Booking;
   transitionBooking(id: string, status: BookingStatus): Booking;
   archiveBooking(id: string): void;
+  listAccounts(): PaymentAccount[];
+  createAccount(input: AccountInput): PaymentAccount;
+  updateAccount(id: string, input: AccountInput): PaymentAccount;
+  archiveAccount(id: string): void;
+  listPayments(filter?: { readonly bookingId?: string }): PaymentMovement[];
+  recordReceipt(input: ReceiptInput): PaymentMovement;
+  recordRefund(input: RefundInput): PaymentMovement;
+  recordCorrection(input: CorrectionInput): PaymentMovement;
+  reversePayment(input: ReversalInput): PaymentMovement;
 }
 
 export function createBusinessSession(options: BusinessSessionOptions): BusinessSession {
   const openDatabase = options.openDatabase ?? openEncryptedDatabase;
   const createRepository = options.createRepository ?? createBusinessRepository;
   const createBookings = options.createBookingRepository ?? createBookingRepository;
+  const createPayments = options.createPaymentRepository ?? createPaymentRepository;
   let database: Database.Database | undefined;
 
   function repository() {
@@ -83,6 +105,15 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     const business = repository().getSettings();
     if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
     return createBookings(database, business.businessId);
+  }
+
+  function payments(): PaymentRepository {
+    if (!database) {
+      throw new BusinessSessionError("LOCKED", "The business file is locked.");
+    }
+    const business = repository().getSettings();
+    if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
+    return createPayments(database, business.businessId);
   }
 
   function removeIncompleteFile(): void {
@@ -196,6 +227,42 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
 
     archiveBooking(id: string): void {
       bookings().archiveBooking(id);
+    },
+
+    listAccounts(): PaymentAccount[] {
+      return payments().listAccounts();
+    },
+
+    createAccount(input: AccountInput): PaymentAccount {
+      return payments().createAccount(input);
+    },
+
+    updateAccount(id: string, input: AccountInput): PaymentAccount {
+      return payments().updateAccount(id, input);
+    },
+
+    archiveAccount(id: string): void {
+      payments().archiveAccount(id);
+    },
+
+    listPayments(filter = {}): PaymentMovement[] {
+      return payments().listMovements(filter);
+    },
+
+    recordReceipt(input: ReceiptInput): PaymentMovement {
+      return payments().recordReceipt(input);
+    },
+
+    recordRefund(input: RefundInput): PaymentMovement {
+      return payments().recordRefund(input);
+    },
+
+    recordCorrection(input: CorrectionInput): PaymentMovement {
+      return payments().recordCorrection(input);
+    },
+
+    reversePayment(input: ReversalInput): PaymentMovement {
+      return payments().reverseMovement(input);
     },
   });
 }

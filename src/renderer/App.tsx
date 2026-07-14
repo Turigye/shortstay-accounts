@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AppShell, type AppScreen } from "./components/AppShell";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { BookingsScreen } from "./screens/BookingsScreen";
+import { PaymentsScreen } from "./screens/PaymentsScreen";
 import { SetupScreen } from "./screens/SetupScreen";
 import { UnlockScreen } from "./screens/UnlockScreen";
 import { useAppStore } from "./store/app-store";
@@ -45,6 +46,8 @@ export function App() {
     >
       {activeScreen === "bookings" ? (
         <BookingsScreen units={business.units} />
+      ) : activeScreen === "payments" ? (
+        <PaymentsScreen />
       ) : activeScreen === "settings" ? (
         <SettingsScreen
           business={business}
