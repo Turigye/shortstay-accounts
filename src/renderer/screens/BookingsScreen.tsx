@@ -215,18 +215,24 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
     if (!selectedBooking) return;
     setBusy(true);
     setError(null);
-    const result = await window.stayBooks.invoke(IPC_CHANNELS.BOOKING_TRANSITION, {
-      id: selectedBooking.id,
-      status,
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(firstError(result));
-      setFieldErrors(result.fieldErrors);
-      return;
+    setFieldErrors({});
+    try {
+      const result = await window.stayBooks.invoke(IPC_CHANNELS.BOOKING_TRANSITION, {
+        id: selectedBooking.id,
+        status,
+      });
+      if (!result.ok) {
+        setError(firstError(result));
+        setFieldErrors(result.fieldErrors);
+        return;
+      }
+      setSelectedBooking(result.data);
+      setBookings((current) => current.map((item) => (item.id === result.data.id ? result.data : item)));
+    } catch {
+      setError("The booking status could not be updated. Try again.");
+    } finally {
+      setBusy(false);
     }
-    setSelectedBooking(result.data);
-    setBookings((current) => current.map((item) => (item.id === result.data.id ? result.data : item)));
   }
 
   return (

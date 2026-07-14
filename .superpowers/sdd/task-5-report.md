@@ -75,3 +75,10 @@ Complete. Task 5 is implemented and committed as one scoped feature change.
 - Full: `npm test` - 16 files, 139 tests passed.
 - Typecheck: `npm run typecheck` - passed.
 - Diff hygiene and self-review: passed; no behavior outside the booking save lifecycle changed.
+
+## Transition Busy-State Fix
+
+- Wrapped booking transition IPC handling in `try/catch/finally`, preserving structured failures, surfacing a safe error for rejected invocations, and always restoring transition/save controls for retry.
+- Audited both `setBusy(true)` paths in `BookingsScreen`; booking save and booking transition now both have guaranteed `finally` cleanup.
+- Added a production `BookingsScreen` integration regression covering a rejected transition followed by a successful immediate retry.
+- Focused: `npm test -- tests/renderer/booking-editor.test.tsx` - 1 file, 11 tests passed.

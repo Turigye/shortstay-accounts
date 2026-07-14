@@ -385,4 +385,45 @@ describe("BookingsScreen", () => {
     expect(bookingCalls[0]?.[1]).toEqual(expect.objectContaining({ customerId: newCustomer.id }));
     expect(bookingCalls[1]?.[1]).toEqual(expect.objectContaining({ customerId: newCustomer.id }));
   });
+
+  it("clears busy and permits retry after a rejected transition invoke", async () => {
+    let transitionAttempts = 0;
+    const invoke = vi.fn(async (channel: string) => {
+      if (channel === IPC_CHANNELS.CUSTOMERS_LIST) return { ok: true, data: customers };
+      if (channel === IPC_CHANNELS.BOOKINGS_LIST) return { ok: true, data: [booking()] };
+      if (channel === IPC_CHANNELS.BOOKING_TRANSITION) {
+        transitionAttempts += 1;
+        if (transitionAttempts === 1) throw new Error("database unavailable");
+        return { ok: true, data: booking({ status: "checkedIn" }) };
+      }
+      throw new Error(`Unexpected channel ${channel}`);
+    });
+    Object.defineProperty(window, "stayBooks", {
+      configurable: true,
+      value: { invoke },
+    });
+    render(<BookingsScreen today="2026-07-20" units={units} />);
+    const user = userEvent.setup();
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: /Amina N.*Lake View.*Jul 20.*Jul 22/i,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "Check in" }));
+
+    expect(await screen.findByText(/booking status could not be updated/i)).toBeTruthy();
+    const retryTransition = screen.getByRole<HTMLButtonElement>("button", {
+      name: "Check in",
+    });
+    const saveButton = screen.getByRole<HTMLButtonElement>("button", {
+      name: "Save booking",
+    });
+    expect(retryTransition.disabled).toBe(false);
+    expect(saveButton.disabled).toBe(false);
+
+    await user.click(retryTransition);
+    expect(await screen.findByRole("button", { name: "Complete" })).toBeTruthy();
+    expect(transitionAttempts).toBe(2);
+  });
 });
