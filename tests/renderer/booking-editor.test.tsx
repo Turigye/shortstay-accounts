@@ -323,4 +323,66 @@ describe("BookingsScreen", () => {
 
     await waitFor(() => expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.BOOKINGS_LIST, {}));
   });
+
+  it("clears busy after a rejected booking invoke and retries with the persisted customer", async () => {
+    const newCustomer = { ...customers[0], id: "customer-2", name: "Brian K." };
+    const savedBooking = booking({
+      id: "booking-2",
+      customerId: newCustomer.id,
+      customerName: newCustomer.name,
+      customerPhone: newCustomer.phone,
+    });
+    let bookingAttempts = 0;
+    const invoke = vi.fn(async (channel: string, _payload?: unknown) => {
+      if (channel === IPC_CHANNELS.CUSTOMERS_LIST) return { ok: true, data: customers };
+      if (channel === IPC_CHANNELS.BOOKINGS_LIST) return { ok: true, data: [] };
+      if (channel === IPC_CHANNELS.CUSTOMER_CREATE) {
+        return { ok: true, data: newCustomer };
+      }
+      if (channel === IPC_CHANNELS.BOOKING_CREATE) {
+        bookingAttempts += 1;
+        if (bookingAttempts === 1) throw new Error("database unavailable");
+        return { ok: true, data: savedBooking };
+      }
+      throw new Error(`Unexpected channel ${channel}`);
+    });
+    Object.defineProperty(window, "stayBooks", {
+      configurable: true,
+      value: { invoke },
+    });
+    render(<BookingsScreen today="2026-07-20" units={units} />);
+    const user = userEvent.setup();
+
+    await screen.findByRole("button", { name: "New booking" });
+    await user.click(screen.getByRole("button", { name: "New booking" }));
+    await user.selectOptions(screen.getByLabelText("Unit"), "unit-1");
+    await user.selectOptions(screen.getByLabelText("Customer"), "new");
+    await user.type(screen.getByLabelText("Customer name"), "Brian K.");
+    await user.type(screen.getByLabelText("Phone"), "+256 755 000111");
+    fireEvent.change(screen.getByLabelText("Check-in date"), {
+      target: { value: "2026-07-20" },
+    });
+    fireEvent.change(screen.getByLabelText("Check-out date"), {
+      target: { value: "2026-07-22" },
+    });
+    await user.type(screen.getByLabelText("Nightly rate"), "180000");
+
+    await user.click(screen.getByRole("button", { name: "Save booking" }));
+    expect(await screen.findByText(/booking could not be saved/i)).toBeTruthy();
+    const retryButton = screen.getByRole<HTMLButtonElement>("button", {
+      name: "Save booking",
+    });
+    expect(retryButton.disabled).toBe(false);
+
+    await user.click(retryButton);
+    await waitFor(() => expect(screen.queryByLabelText("Booking details")).toBeNull());
+
+    expect(invoke.mock.calls.filter(([channel]) => channel === IPC_CHANNELS.CUSTOMER_CREATE)).toHaveLength(1);
+    const bookingCalls = invoke.mock.calls.filter(
+      ([channel]) => channel === IPC_CHANNELS.BOOKING_CREATE,
+    );
+    expect(bookingCalls).toHaveLength(2);
+    expect(bookingCalls[0]?.[1]).toEqual(expect.objectContaining({ customerId: newCustomer.id }));
+    expect(bookingCalls[1]?.[1]).toEqual(expect.objectContaining({ customerId: newCustomer.id }));
+  });
 });

@@ -189,23 +189,26 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
     setBusy(true);
     setError(null);
     setFieldErrors({});
-    const result = selectedBooking
-      ? await window.stayBooks.invoke(IPC_CHANNELS.BOOKING_UPDATE, {
-          id: selectedBooking.id,
-          ...input,
-        })
-      : await window.stayBooks.invoke(IPC_CHANNELS.BOOKING_CREATE, input);
-    setBusy(false);
-    if (!result.ok) {
-      setError(firstError(result));
-      setFieldErrors(result.fieldErrors);
-      return;
+    try {
+      const result = selectedBooking
+        ? await window.stayBooks.invoke(IPC_CHANNELS.BOOKING_UPDATE, {
+            id: selectedBooking.id,
+            ...input,
+          })
+        : await window.stayBooks.invoke(IPC_CHANNELS.BOOKING_CREATE, input);
+      if (!result.ok) {
+        setError(firstError(result));
+        setFieldErrors(result.fieldErrors);
+        return;
+      }
+      setBookings((current) => {
+        const withoutSaved = current.filter(({ id }) => id !== result.data.id);
+        return [...withoutSaved, result.data].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+      });
+      closeEditor();
+    } finally {
+      setBusy(false);
     }
-    setBookings((current) => {
-      const withoutSaved = current.filter(({ id }) => id !== result.data.id);
-      return [...withoutSaved, result.data].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
-    });
-    closeEditor();
   }
 
   async function transitionBooking(status: BookingStatus) {

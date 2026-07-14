@@ -62,3 +62,16 @@ Complete. Task 5 is implemented and committed as one scoped feature change.
 - Full: `npm test` - 16 files, 138 tests passed.
 - Typecheck: `npm run typecheck` - passed.
 - Self-review: no additional Task 5 defects or scope expansion found.
+
+## Busy-State Review Fix
+
+- Wrapped booking create/update IPC handling in `try/finally`, so the controlled busy state clears after success, structured failure, or a rejected invocation.
+- Preserved structured field errors and the editor's safe fallback for unexpected failures, allowing immediate retry.
+- Added a production `BookingsScreen` renderer regression proving a rejected first save re-enables Save, the second attempt succeeds, and the persisted new customer ID is reused without another customer creation.
+
+## Busy-State Verification
+
+- Focused: `npm test -- tests/renderer/booking-editor.test.tsx` - 1 file, 10 tests passed.
+- Full: `npm test` - 16 files, 139 tests passed.
+- Typecheck: `npm run typecheck` - passed.
+- Diff hygiene and self-review: passed; no behavior outside the booking save lifecycle changed.
