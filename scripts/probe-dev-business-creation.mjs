@@ -19,7 +19,7 @@ try {
   await window.getByLabel("Confirm password").fill("correct local password");
   await window.getByRole("checkbox", { name: /approved defaults/i }).check();
   await window.getByRole("button", { name: "Create business" }).click();
-  await window.getByRole("heading", { name: "Today" }).waitFor({ timeout: 10_000 });
+  await window.getByRole("heading", { name: "Today", level: 1 }).waitFor({ timeout: 10_000 });
 
   if (!existsSync(databasePath)) throw new Error("Electron did not create business.db");
   if (readFileSync(databasePath).subarray(0, 16).toString() === "SQLite format 3\0") {

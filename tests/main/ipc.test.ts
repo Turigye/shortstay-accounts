@@ -106,6 +106,9 @@ describe("IPC contract", () => {
       IPC_CHANNELS.PERIOD_REOPEN,
       IPC_CHANNELS.REPORT_MONTHLY,
       IPC_CHANNELS.TODAY_OVERVIEW,
+      IPC_CHANNELS.BACKUP_CREATE,
+      IPC_CHANNELS.BACKUP_RESTORE,
+      IPC_CHANNELS.EXPORT_EXCEL,
     ]);
     expect(handlers.has("database:query")).toBe(false);
   });

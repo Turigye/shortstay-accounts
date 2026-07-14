@@ -110,6 +110,7 @@ const defaultHandlers: IpcHandlers = {
   [IPC_CHANNELS.ASSET_CREATE]:()=>{throw new Error("Business session is unavailable");},[IPC_CHANNELS.LOAN_CREATE]:()=>{throw new Error("Business session is unavailable");},[IPC_CHANNELS.PERIOD_CLOSE]:()=>{throw new Error("Business session is unavailable");},[IPC_CHANNELS.PERIOD_REOPEN]:()=>{throw new Error("Business session is unavailable");},
   [IPC_CHANNELS.REPORT_MONTHLY]:()=>{throw new Error("Business session is unavailable");},
   [IPC_CHANNELS.TODAY_OVERVIEW]:()=>{throw new Error("Business session is unavailable");},
+  [IPC_CHANNELS.BACKUP_CREATE]:()=>{throw new Error("Desktop file action is unavailable");},[IPC_CHANNELS.BACKUP_RESTORE]:()=>{throw new Error("Desktop file action is unavailable");},[IPC_CHANNELS.EXPORT_EXCEL]:()=>{throw new Error("Desktop file action is unavailable");},
 };
 
 const registeredChannels = [
@@ -144,6 +145,7 @@ const registeredChannels = [
   IPC_CHANNELS.FINANCE_OVERVIEW,IPC_CHANNELS.BALANCE_SAVE,IPC_CHANNELS.INVENTORY_SAVE,IPC_CHANNELS.ASSET_CREATE,IPC_CHANNELS.LOAN_CREATE,IPC_CHANNELS.PERIOD_CLOSE,IPC_CHANNELS.PERIOD_REOPEN,
   IPC_CHANNELS.REPORT_MONTHLY,
   IPC_CHANNELS.TODAY_OVERVIEW,
+  IPC_CHANNELS.BACKUP_CREATE,IPC_CHANNELS.BACKUP_RESTORE,IPC_CHANNELS.EXPORT_EXCEL,
 ] as const;
 
 export function createBusinessIpcHandlers(

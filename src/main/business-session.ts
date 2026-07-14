@@ -39,6 +39,8 @@ import {
 import { createExpenseRepository, type ExpenseRecord, type Supplier, type RecurringExpenseTemplate } from "./db/repositories/expense-repository";
 import { createFinanceRepository, type AssetRecord, type FinancialPosition, type LoanRecord, type PeriodClose } from "./db/repositories/finance-repository";
 import { createDashboardRepository, type TodayOverview } from "./db/repositories/dashboard-repository";
+import { backupEncryptedDatabase,restoreEncryptedDatabase,validateEncryptedBackup } from "./backup";
+import { exportBusinessWorkbook } from "./export";
 
 type ExpenseRepository = ReturnType<typeof createExpenseRepository>;
 type FinanceRepository = ReturnType<typeof createFinanceRepository>;
@@ -115,6 +117,9 @@ export interface BusinessSession {
   reopenMonth(month:string,reason:string):PeriodClose;
   getMonthlyFinancialReport(month:string):ReturnType<FinanceRepository["getMonthlyReport"]>;
   getTodayOverview(date:string):TodayOverview;
+  backupTo(destination:string,password:string):Promise<void>;
+  restoreFrom(source:string,password:string):BusinessSettings;
+  exportTo(destination:string,month:string):void;
 }
 
 export function createBusinessSession(options: BusinessSessionOptions): BusinessSession {
@@ -346,5 +351,8 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     reopenMonth:(month:string,reason:string)=>finance().reopenMonth(month,reason),
     getMonthlyFinancialReport:(month:string)=>finance().getMonthlyReport(month),
     getTodayOverview:(date:string)=>dashboard().getToday(date),
+    async backupTo(destination:string,password:string){if(!database)throw new BusinessSessionError("LOCKED","The business file is locked.");await backupEncryptedDatabase(database,destination,password);},
+    restoreFrom(source:string,password:string):BusinessSettings{validateEncryptedBackup(source,password);database?.close();database=undefined;restoreEncryptedDatabase(source,options.databasePath,password,{confirmOverwrite:true});database=openDatabase(options.databasePath,password);return repository().getSettings() as BusinessSettings;},
+    exportTo(destination:string,month:string):void{if(!database)throw new BusinessSessionError("LOCKED","The business file is locked.");const business=repository().getSettings();if(!business)throw new BusinessSessionError("NOT_FOUND","Business settings are missing.");exportBusinessWorkbook(database,business,month,destination);},
   });
 }

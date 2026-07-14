@@ -9,12 +9,16 @@ import {
   Percent,
   ShieldCheck,
   ArchiveX,
+  Download,
+  FileSpreadsheet,
+  Upload,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { EXPENSE_CATEGORIES } from "../../domain/categories";
 import type { BusinessSettings, RoleKey } from "../../domain/types";
 import type { SetRatePayload } from "../../shared/ipc";
+import { IPC_CHANNELS } from "../../shared/ipc";
 
 type SettingsTab =
   | "units"
@@ -195,6 +199,11 @@ export function SettingsScreen({
     business.units.map(({ id, name }) => ({ id, name })),
   );
   const [selectedRole, setSelectedRole] = useState<RoleKey>("operations");
+  const [filePassword,setFilePassword]=useState("");
+  const [restoreConfirmed,setRestoreConfirmed]=useState(false);
+  const [exportMonth,setExportMonth]=useState(today.slice(0,7));
+  const [fileBusy,setFileBusy]=useState(false);
+  const [fileMessage,setFileMessage]=useState<string|null>(null);
 
   useEffect(() => {
     setUnits(business.units.map(({ id, name }) => ({ id, name })));
@@ -214,6 +223,9 @@ export function SettingsScreen({
       })),
     });
   }
+  async function createBackup(){setFileBusy(true);setFileMessage(null);try{const result=await window.stayBooks.invoke(IPC_CHANNELS.BACKUP_CREATE,{password:filePassword});if(!result.ok)return setFileMessage(result.message);if(!result.data.cancelled)setFileMessage("Encrypted backup created.");}finally{setFileBusy(false);setFilePassword("");}}
+  async function restoreBackup(){if(!restoreConfirmed)return;setFileBusy(true);setFileMessage(null);try{const result=await window.stayBooks.invoke(IPC_CHANNELS.BACKUP_RESTORE,{password:filePassword,confirmOverwrite:true});if(!result.ok)return setFileMessage(result.message);if(!result.data.cancelled)window.location.reload();}finally{setFileBusy(false);setFilePassword("");}}
+  async function exportExcel(){setFileBusy(true);setFileMessage(null);const result=await window.stayBooks.invoke(IPC_CHANNELS.EXPORT_EXCEL,{month:exportMonth});setFileBusy(false);if(!result.ok)return setFileMessage(result.message);if(!result.data.cancelled)setFileMessage("Excel workbook exported.");}
 
   return (
     <div className="settings-screen">
@@ -400,12 +412,12 @@ export function SettingsScreen({
 
           {activeTab === "backup" ? (
             <>
-              <div className="panel-heading"><h2>Backup</h2><p>Local encrypted business file</p></div>
+              <div className="panel-heading"><h2>Backup and export</h2><p>Local files chosen by you</p></div>
               <dl className="settings-definition-list">
                 <div><dt>Encryption</dt><dd>On</dd></div>
                 <div><dt>Automatic upload</dt><dd>Off</dd></div>
-                <div><dt>Local schedule</dt><dd>Not configured</dd></div>
               </dl>
+              <div className="file-actions"><label className="field-group"><span>Local password</span><input type="password" value={filePassword} onChange={(event)=>setFilePassword(event.target.value)} autoComplete="current-password"/></label><div className="file-action-row"><div><strong>Encrypted backup</strong><span>Create a portable copy of the complete local business file.</span></div><button className="secondary-button" disabled={fileBusy||!filePassword} onClick={()=>void createBackup()} type="button"><Download size={16}/>Create backup</button></div><label className="restore-confirm"><input type="checkbox" checked={restoreConfirmed} onChange={(event)=>setRestoreConfirmed(event.target.checked)}/><span>I understand restore replaces the current local business file.</span></label><div className="file-action-row"><div><strong>Restore backup</strong><span>Validate an encrypted backup before replacing this file.</span></div><button className="secondary-button" disabled={fileBusy||!filePassword||!restoreConfirmed} onClick={()=>void restoreBackup()} type="button"><Upload size={16}/>Restore</button></div><div className="file-action-row"><label className="field-group"><span>Export month</span><input type="month" value={exportMonth} onChange={(event)=>setExportMonth(event.target.value)}/></label><button className="primary-button" disabled={fileBusy} onClick={()=>void exportExcel()} type="button"><FileSpreadsheet size={16}/>Export Excel</button></div>{fileMessage?<p className="inline-message" role="status">{fileMessage}</p>:null}</div>
             </>
           ) : null}
 

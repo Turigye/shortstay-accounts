@@ -48,6 +48,7 @@ export const IPC_CHANNELS = {
   PERIOD_CLOSE: "finance:period-close", PERIOD_REOPEN: "finance:period-reopen",
   REPORT_MONTHLY: "reports:monthly",
   TODAY_OVERVIEW: "today:overview",
+  BACKUP_CREATE:"files:backup-create",BACKUP_RESTORE:"files:backup-restore",EXPORT_EXCEL:"files:export-excel",
 } as const;
 
 const roleSchema = z.enum([
@@ -485,6 +486,9 @@ const financeRequests=[
  z.object({channel:z.literal(IPC_CHANNELS.PERIOD_REOPEN),payload:z.object({month:monthSchema,reason:z.string().trim().min(1).max(500)}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.REPORT_MONTHLY),payload:z.object({month:monthSchema}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.TODAY_OVERVIEW),payload:z.object({date:dateSchema}).strict()}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.BACKUP_CREATE),payload:z.object({password:passwordSchema}).strict()}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.BACKUP_RESTORE),payload:z.object({password:passwordSchema,confirmOverwrite:z.literal(true)}).strict()}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.EXPORT_EXCEL),payload:z.object({month:monthSchema}).strict()}).strict(),
 ] as const;
 
 export const ipcRequestSchema = z.discriminatedUnion("channel", [
@@ -749,6 +753,7 @@ const responseSchemas = {
   [IPC_CHANNELS.PERIOD_CLOSE]:responseSchema(periodSchema),[IPC_CHANNELS.PERIOD_REOPEN]:responseSchema(periodSchema),
   [IPC_CHANNELS.REPORT_MONTHLY]:responseSchema(reportSchema),
   [IPC_CHANNELS.TODAY_OVERVIEW]:responseSchema(todaySchema),
+  [IPC_CHANNELS.BACKUP_CREATE]:responseSchema(z.object({cancelled:z.boolean(),path:z.string().nullable()}).strict()),[IPC_CHANNELS.BACKUP_RESTORE]:responseSchema(z.object({cancelled:z.boolean(),path:z.string().nullable()}).strict()),[IPC_CHANNELS.EXPORT_EXCEL]:responseSchema(z.object({cancelled:z.boolean(),path:z.string().nullable()}).strict()),
 } as const;
 
 export type IpcRequest = z.infer<typeof ipcRequestSchema>;
@@ -802,6 +807,7 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.PERIOD_CLOSE]:PeriodClose;[IPC_CHANNELS.PERIOD_REOPEN]:PeriodClose;
   [IPC_CHANNELS.REPORT_MONTHLY]:FinancialReport;
   [IPC_CHANNELS.TODAY_OVERVIEW]:TodayOverview;
+  [IPC_CHANNELS.BACKUP_CREATE]:{cancelled:boolean;path:string|null};[IPC_CHANNELS.BACKUP_RESTORE]:{cancelled:boolean;path:string|null};[IPC_CHANNELS.EXPORT_EXCEL]:{cancelled:boolean;path:string|null};
 }
 
 export type IpcData<C extends IpcChannel> = IpcDataByChannel[C];
