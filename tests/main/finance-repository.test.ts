@@ -64,4 +64,15 @@ describe("financial position and month close", () => {
       expect.objectContaining({ action: "reopen", reason: "Bank correction received" }),
     ]);
   });
+
+  it("projects operational records into a monthly report", () => {
+    const { database, business, finance } = fixture();
+    const customer = database.prepare<[string], { id:string }>("INSERT INTO customers (business_id,name) VALUES (?,'Sarah N.') RETURNING id").get(business.businessId)!;
+    const booking = database.prepare<any, { id:string }>(`INSERT INTO bookings (business_id,unit_id,customer_id,check_in,check_out,nightly_rate,total_amount,status) VALUES (@businessId,@unitId,@customerId,'2026-07-10','2026-07-12',1000000,2000000,'completed') RETURNING id`).get({businessId:business.businessId,unitId:business.unitIds[0],customerId:customer.id})!;
+    database.prepare("INSERT INTO booking_months (booking_id,month,occupied_nights,earned_revenue,payable_base) VALUES (?,'2026-07',2,2000000,1500000)").run(booking.id);
+    database.prepare(`INSERT INTO expenses (business_id,category_id,scope,amount,expense_date,purchase_type,payment_status) VALUES (?,'cashPurchases','shared',400000,'2026-07-12','cash','paid'),(?,'maintenance','shared',100000,'2026-07-13','cash','paid')`).run(business.businessId,business.businessId);
+    const report=finance.getMonthlyReport("2026-07");
+    expect(report.incomeStatement).toMatchObject({revenue:2_000_000,purchases:400_000,operatingExpenses:100_000,taxExpense:1_200_000,netIncome:300_000});
+    expect(report.ratios.currentRatio).toEqual({state:"unavailable",reason:"Current liabilities are zero"});
+  });
 });

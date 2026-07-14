@@ -104,6 +104,7 @@ describe("IPC contract", () => {
       IPC_CHANNELS.LOAN_CREATE,
       IPC_CHANNELS.PERIOD_CLOSE,
       IPC_CHANNELS.PERIOD_REOPEN,
+      IPC_CHANNELS.REPORT_MONTHLY,
     ]);
     expect(handlers.has("database:query")).toBe(false);
   });

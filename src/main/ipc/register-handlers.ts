@@ -108,6 +108,7 @@ const defaultHandlers: IpcHandlers = {
   [IPC_CHANNELS.RECURRING_EXPENSES_LIST]:()=>[], [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]:()=>{throw new Error("Business session is unavailable");},
   [IPC_CHANNELS.FINANCE_OVERVIEW]:()=>{throw new Error("Business session is unavailable");},[IPC_CHANNELS.BALANCE_SAVE]:()=>{throw new Error("Business session is unavailable");},[IPC_CHANNELS.INVENTORY_SAVE]:()=>{throw new Error("Business session is unavailable");},
   [IPC_CHANNELS.ASSET_CREATE]:()=>{throw new Error("Business session is unavailable");},[IPC_CHANNELS.LOAN_CREATE]:()=>{throw new Error("Business session is unavailable");},[IPC_CHANNELS.PERIOD_CLOSE]:()=>{throw new Error("Business session is unavailable");},[IPC_CHANNELS.PERIOD_REOPEN]:()=>{throw new Error("Business session is unavailable");},
+  [IPC_CHANNELS.REPORT_MONTHLY]:()=>{throw new Error("Business session is unavailable");},
 };
 
 const registeredChannels = [
@@ -140,6 +141,7 @@ const registeredChannels = [
   IPC_CHANNELS.COMPENSATION_MONTHLY,
   IPC_CHANNELS.EXPENSES_LIST,IPC_CHANNELS.EXPENSE_CREATE,IPC_CHANNELS.SUPPLIERS_LIST,IPC_CHANNELS.SUPPLIER_CREATE,IPC_CHANNELS.SUPPLIER_PAYMENT,IPC_CHANNELS.RECURRING_EXPENSES_LIST,IPC_CHANNELS.RECURRING_EXPENSE_CREATE,
   IPC_CHANNELS.FINANCE_OVERVIEW,IPC_CHANNELS.BALANCE_SAVE,IPC_CHANNELS.INVENTORY_SAVE,IPC_CHANNELS.ASSET_CREATE,IPC_CHANNELS.LOAN_CREATE,IPC_CHANNELS.PERIOD_CLOSE,IPC_CHANNELS.PERIOD_REOPEN,
+  IPC_CHANNELS.REPORT_MONTHLY,
 ] as const;
 
 export function createBusinessIpcHandlers(
@@ -193,6 +195,7 @@ export function createBusinessIpcHandlers(
     [IPC_CHANNELS.RECURRING_EXPENSES_LIST]:({month})=>session.listRecurringExpenses(month), [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]:(payload)=>session.createRecurringExpense(payload),
     [IPC_CHANNELS.FINANCE_OVERVIEW]:({month})=>session.getFinanceOverview(month),[IPC_CHANNELS.BALANCE_SAVE]:(payload)=>session.recordBalance(payload),[IPC_CHANNELS.INVENTORY_SAVE]:(payload)=>session.recordInventory(payload),
     [IPC_CHANNELS.ASSET_CREATE]:(payload)=>session.createAsset(payload),[IPC_CHANNELS.LOAN_CREATE]:(payload)=>session.createLoan(payload),[IPC_CHANNELS.PERIOD_CLOSE]:({month})=>session.closeMonth(month),[IPC_CHANNELS.PERIOD_REOPEN]:({month,reason})=>session.reopenMonth(month,reason),
+    [IPC_CHANNELS.REPORT_MONTHLY]:({month})=>session.getMonthlyFinancialReport(month),
   };
 }
 

@@ -110,6 +110,7 @@ export interface BusinessSession {
   createLoan(input:Parameters<FinanceRepository["createLoan"]>[0]):LoanRecord;
   closeMonth(month:string):PeriodClose;
   reopenMonth(month:string,reason:string):PeriodClose;
+  getMonthlyFinancialReport(month:string):ReturnType<FinanceRepository["getMonthlyReport"]>;
 }
 
 export function createBusinessSession(options: BusinessSessionOptions): BusinessSession {
@@ -334,5 +335,6 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     createLoan:(input:Parameters<FinanceRepository["createLoan"]>[0])=>finance().createLoan(input),
     closeMonth:(month:string)=>finance().closeMonth(month),
     reopenMonth:(month:string,reason:string)=>finance().reopenMonth(month,reason),
+    getMonthlyFinancialReport:(month:string)=>finance().getMonthlyReport(month),
   });
 }
