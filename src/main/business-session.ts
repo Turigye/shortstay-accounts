@@ -36,6 +36,9 @@ import {
   type CompensationRepository,
   type MonthlyCompensationReport,
 } from "./db/repositories/compensation-repository";
+import { createExpenseRepository, type ExpenseRecord, type Supplier, type RecurringExpenseTemplate } from "./db/repositories/expense-repository";
+
+type ExpenseRepository = ReturnType<typeof createExpenseRepository>;
 
 export type BusinessSessionStatus =
   | { state: "setup" }
@@ -59,6 +62,7 @@ interface BusinessSessionOptions {
   createBookingRepository?: (database: Database.Database, businessId: string) => BookingRepository;
   createPaymentRepository?: (database: Database.Database, businessId: string) => PaymentRepository;
   createCompensationRepository?: (database: Database.Database, businessId: string) => CompensationRepository;
+  createExpenseRepository?: (database: Database.Database, businessId: string) => ExpenseRepository;
 }
 
 export interface BusinessSession {
@@ -89,6 +93,13 @@ export interface BusinessSession {
   recordCorrection(input: CorrectionInput): PaymentMovement;
   reversePayment(input: ReversalInput): PaymentMovement;
   getMonthlyCompensation(month: string): MonthlyCompensationReport;
+  listExpenses(): ExpenseRecord[];
+  createExpense(input: Parameters<ExpenseRepository["createExpense"]>[0]): ExpenseRecord;
+  listSuppliers(): Supplier[];
+  createSupplier(input: Parameters<ExpenseRepository["createSupplier"]>[0]): Supplier;
+  recordSupplierPayment(input: Parameters<ExpenseRepository["recordSupplierPayment"]>[0]): ExpenseRecord;
+  listRecurringExpenses(month: string): RecurringExpenseTemplate[];
+  createRecurringExpense(input: Parameters<ExpenseRepository["createRecurringTemplate"]>[0]): RecurringExpenseTemplate;
 }
 
 export function createBusinessSession(options: BusinessSessionOptions): BusinessSession {
@@ -97,6 +108,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
   const createBookings = options.createBookingRepository ?? createBookingRepository;
   const createPayments = options.createPaymentRepository ?? createPaymentRepository;
   const createCompensation = options.createCompensationRepository ?? createCompensationRepository;
+  const createExpenses = options.createExpenseRepository ?? createExpenseRepository;
   let database: Database.Database | undefined;
 
   function repository() {
@@ -131,6 +143,12 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     const business = repository().getSettings();
     if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
     return createCompensation(database, business.businessId);
+  }
+  function expenses(): ExpenseRepository {
+    if (!database) throw new BusinessSessionError("LOCKED", "The business file is locked.");
+    const business = repository().getSettings();
+    if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
+    return createExpenses(database, business.businessId);
   }
 
   function removeIncompleteFile(): void {
@@ -285,5 +303,12 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     getMonthlyCompensation(month: string): MonthlyCompensationReport {
       return compensation().getMonthlyReport(month as `${number}-${string}`);
     },
+    listExpenses: () => expenses().listExpenses(),
+    createExpense: (input: Parameters<ExpenseRepository["createExpense"]>[0]) => expenses().createExpense(input),
+    listSuppliers: () => expenses().listSuppliers(),
+    createSupplier: (input: Parameters<ExpenseRepository["createSupplier"]>[0]) => expenses().createSupplier(input),
+    recordSupplierPayment: (input: Parameters<ExpenseRepository["recordSupplierPayment"]>[0]) => expenses().recordSupplierPayment(input),
+    listRecurringExpenses: (month: string) => expenses().listRecurringForReview(month),
+    createRecurringExpense: (input: Parameters<ExpenseRepository["createRecurringTemplate"]>[0]) => expenses().createRecurringTemplate(input),
   });
 }

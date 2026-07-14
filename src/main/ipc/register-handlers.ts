@@ -103,6 +103,9 @@ const defaultHandlers: IpcHandlers = {
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: () => {
     throw new Error("Business session is unavailable");
   },
+  [IPC_CHANNELS.EXPENSES_LIST]:()=>[], [IPC_CHANNELS.EXPENSE_CREATE]:()=>{throw new Error("Business session is unavailable");},
+  [IPC_CHANNELS.SUPPLIERS_LIST]:()=>[], [IPC_CHANNELS.SUPPLIER_CREATE]:()=>{throw new Error("Business session is unavailable");}, [IPC_CHANNELS.SUPPLIER_PAYMENT]:()=>{throw new Error("Business session is unavailable");},
+  [IPC_CHANNELS.RECURRING_EXPENSES_LIST]:()=>[], [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]:()=>{throw new Error("Business session is unavailable");},
 };
 
 const registeredChannels = [
@@ -133,6 +136,7 @@ const registeredChannels = [
   IPC_CHANNELS.PAYMENT_CORRECTION,
   IPC_CHANNELS.PAYMENT_REVERSE,
   IPC_CHANNELS.COMPENSATION_MONTHLY,
+  IPC_CHANNELS.EXPENSES_LIST,IPC_CHANNELS.EXPENSE_CREATE,IPC_CHANNELS.SUPPLIERS_LIST,IPC_CHANNELS.SUPPLIER_CREATE,IPC_CHANNELS.SUPPLIER_PAYMENT,IPC_CHANNELS.RECURRING_EXPENSES_LIST,IPC_CHANNELS.RECURRING_EXPENSE_CREATE,
 ] as const;
 
 export function createBusinessIpcHandlers(
@@ -181,6 +185,9 @@ export function createBusinessIpcHandlers(
     [IPC_CHANNELS.PAYMENT_REVERSE]: (payload) => session.reversePayment(payload),
     [IPC_CHANNELS.COMPENSATION_MONTHLY]: ({ month }) =>
       session.getMonthlyCompensation(month),
+    [IPC_CHANNELS.EXPENSES_LIST]:()=>session.listExpenses(), [IPC_CHANNELS.EXPENSE_CREATE]:(payload)=>session.createExpense(payload),
+    [IPC_CHANNELS.SUPPLIERS_LIST]:()=>session.listSuppliers(), [IPC_CHANNELS.SUPPLIER_CREATE]:(payload)=>session.createSupplier(payload), [IPC_CHANNELS.SUPPLIER_PAYMENT]:(payload)=>session.recordSupplierPayment(payload),
+    [IPC_CHANNELS.RECURRING_EXPENSES_LIST]:({month})=>session.listRecurringExpenses(month), [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]:(payload)=>session.createRecurringExpense(payload),
   };
 }
 

@@ -7,6 +7,7 @@ import { BookingsScreen } from "./screens/BookingsScreen";
 import { PaymentsScreen } from "./screens/PaymentsScreen";
 import { SetupScreen } from "./screens/SetupScreen";
 import { StaffScreen } from "./screens/StaffScreen";
+import { ExpensesScreen } from "./screens/ExpensesScreen";
 import { UnlockScreen } from "./screens/UnlockScreen";
 import { useAppStore } from "./store/app-store";
 
@@ -51,6 +52,8 @@ export function App() {
         <PaymentsScreen />
       ) : activeScreen === "staff" ? (
         <StaffScreen />
+      ) : activeScreen === "expenses" ? (
+        <ExpensesScreen units={business.units} />
       ) : activeScreen === "settings" ? (
         <SettingsScreen
           business={business}

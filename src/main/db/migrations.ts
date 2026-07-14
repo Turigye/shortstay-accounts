@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3-multiple-ciphers";
 
-export const LATEST_SCHEMA_VERSION = 5;
+export const LATEST_SCHEMA_VERSION = 6;
 
 interface Migration {
   readonly version: number;
@@ -597,6 +597,45 @@ const CREATE_VERSION_FIVE_SCHEMA = `
   END;
 `;
 
+const CREATE_VERSION_SIX_SCHEMA = `
+  CREATE TABLE supplier_payments (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+    expense_id TEXT NOT NULL REFERENCES expenses(id),
+    account_id TEXT NOT NULL REFERENCES accounts(id),
+    amount INTEGER NOT NULL CHECK (amount > 0 AND amount <= 9007199254740991),
+    paid_at TEXT NOT NULL,
+    method TEXT NOT NULL CHECK (method IN ('cash', 'mobile_money', 'bank_transfer', 'card')),
+    reference TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+  CREATE INDEX supplier_payments_account_id_idx ON supplier_payments(account_id);
+  CREATE INDEX supplier_payments_business_id_idx ON supplier_payments(business_id);
+  CREATE INDEX supplier_payments_expense_id_idx ON supplier_payments(expense_id);
+  CREATE INDEX supplier_payments_supplier_id_idx ON supplier_payments(supplier_id);
+  CREATE TRIGGER supplier_payments_validate_insert BEFORE INSERT ON supplier_payments
+  WHEN
+    NEW.paid_at NOT GLOB '????-??-??'
+    OR date(NEW.paid_at, '+0 days') IS NULL
+    OR date(NEW.paid_at, '+0 days') <> NEW.paid_at
+    OR NOT EXISTS (SELECT 1 FROM suppliers WHERE id = NEW.supplier_id AND business_id = NEW.business_id AND archived_at IS NULL)
+    OR NOT EXISTS (SELECT 1 FROM accounts WHERE id = NEW.account_id AND business_id = NEW.business_id AND archived_at IS NULL)
+    OR NOT EXISTS (
+      SELECT 1 FROM expenses
+      WHERE id = NEW.expense_id AND business_id = NEW.business_id
+        AND supplier_id = NEW.supplier_id AND purchase_type = 'credit' AND archived_at IS NULL
+    )
+  BEGIN
+    SELECT RAISE(ABORT, 'invalid supplier payment');
+  END;
+  CREATE TRIGGER supplier_payments_prevent_update BEFORE UPDATE ON supplier_payments
+  BEGIN SELECT RAISE(ABORT, 'supplier payments are append-only'); END;
+  CREATE TRIGGER supplier_payments_prevent_delete BEFORE DELETE ON supplier_payments
+  BEGIN SELECT RAISE(ABORT, 'supplier payments are append-only'); END;
+`;
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -640,6 +679,14 @@ const migrations: readonly Migration[] = [
       database.exec(CREATE_VERSION_FIVE_SCHEMA);
       database
         .prepare("update app_meta set value = ? where key = 'schema_version'")
+        .run(String(LATEST_SCHEMA_VERSION));
+    },
+  },
+  {
+    version: 6,
+    up(database) {
+      database.exec(CREATE_VERSION_SIX_SCHEMA);
+      database.prepare("update app_meta set value = ? where key = 'schema_version'")
         .run(String(LATEST_SCHEMA_VERSION));
     },
   },

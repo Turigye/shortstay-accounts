@@ -7,6 +7,7 @@ import type {
   PaymentMovement,
 } from "../main/db/repositories/payment-repository";
 import type { MonthlyCompensationReport } from "../main/db/repositories/compensation-repository";
+import type { ExpenseRecord, RecurringExpenseTemplate, Supplier } from "../main/db/repositories/expense-repository";
 
 export const IPC_CHANNELS = {
   APP_READY: "app:ready",
@@ -36,6 +37,9 @@ export const IPC_CHANNELS = {
   PAYMENT_CORRECTION: "payments:correction",
   PAYMENT_REVERSE: "payments:reverse",
   COMPENSATION_MONTHLY: "compensation:monthly",
+  EXPENSES_LIST: "expenses:list", EXPENSE_CREATE: "expenses:create",
+  SUPPLIERS_LIST: "suppliers:list", SUPPLIER_CREATE: "suppliers:create", SUPPLIER_PAYMENT: "suppliers:payment",
+  RECURRING_EXPENSES_LIST: "recurring-expenses:list", RECURRING_EXPENSE_CREATE: "recurring-expenses:create",
 } as const;
 
 const roleSchema = z.enum([
@@ -448,6 +452,19 @@ const compensationMonthlyRequestSchema = z
     payload: z.object({ month: z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/) }).strict(),
   })
   .strict();
+const expenseScopeSchema=z.enum(["unit","shared"]); const purchaseTypeSchema=z.enum(["cash","credit"]);
+const expenseInputSchema=z.object({date:dateSchema,amount:positiveWholeUgxSchema,categoryId:z.string().min(1),scope:expenseScopeSchema,unitId:idSchema.nullable().optional(),supplierId:idSchema.nullable().optional(),accountId:idSchema.nullable().optional(),purchaseType:purchaseTypeSchema,dueDate:dateSchema.nullable().optional(),reference:z.string().max(500).nullable().optional(),notes:z.string().max(2000).nullable().optional()}).strict();
+const supplierInputSchema=z.object({name:z.string().trim().min(1).max(160),phone:z.string().max(80).nullable().optional(),email:z.string().email().max(254).nullable().optional(),notes:z.string().max(2000).nullable().optional()}).strict();
+const recurringInputSchema=z.object({categoryId:z.string().min(1),scope:expenseScopeSchema,unitId:idSchema.nullable().optional(),supplierId:idSchema.nullable().optional(),expectedAmount:wholeUgxSchema.nonnegative().nullable().optional(),cadence:z.enum(["monthly","quarterly","annually"]),nextReviewMonth:z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/),notes:z.string().max(2000).nullable().optional()}).strict();
+const expenseRequests=[
+ z.object({channel:z.literal(IPC_CHANNELS.EXPENSES_LIST),payload:z.object({}).strict()}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.EXPENSE_CREATE),payload:expenseInputSchema}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.SUPPLIERS_LIST),payload:z.object({}).strict()}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.SUPPLIER_CREATE),payload:supplierInputSchema}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.SUPPLIER_PAYMENT),payload:z.object({expenseId:idSchema,amount:positiveWholeUgxSchema,paidAt:dateSchema,accountId:idSchema,method:paymentMethodSchema,reference:z.string().max(500).nullable().optional(),notes:z.string().max(2000).nullable().optional()}).strict()}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.RECURRING_EXPENSES_LIST),payload:z.object({month:z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/)}).strict()}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.RECURRING_EXPENSE_CREATE),payload:recurringInputSchema}).strict(),
+] as const;
 
 export const ipcRequestSchema = z.discriminatedUnion("channel", [
   appReadyRequestSchema,
@@ -477,6 +494,7 @@ export const ipcRequestSchema = z.discriminatedUnion("channel", [
   paymentCorrectionRequestSchema,
   paymentReverseRequestSchema,
   compensationMonthlyRequestSchema,
+  ...expenseRequests,
 ]);
 
 export const IPC_FAILURE_CODES = [
@@ -654,6 +672,9 @@ const monthlyCompensationReportSchema = z.object({
   referrals: z.array(referralStatementLineSchema),
   traces: z.array(compensationTraceSchema),
 }).strict();
+const expenseSchema=z.object({id:z.string(),date:dateSchema,amount:wholeUgxSchema.nonnegative(),categoryId:z.string(),scope:expenseScopeSchema,unitId:z.string().nullable(),supplierId:z.string().nullable(),supplierName:z.string().nullable(),accountId:z.string().nullable(),purchaseType:purchaseTypeSchema,paymentStatus:z.enum(["paid","partial","unpaid"]),dueDate:z.string().nullable(),reference:z.string().nullable(),notes:z.string().nullable(),paidAmount:wholeUgxSchema.nonnegative(),due:wholeUgxSchema.nonnegative()}).strict();
+const supplierSchema=z.object({id:z.string(),name:z.string(),phone:z.string().nullable(),email:z.string().nullable(),balance:wholeUgxSchema.nonnegative()}).strict();
+const recurringExpenseSchema=z.object({id:z.string(),categoryId:z.string(),scope:expenseScopeSchema,unitId:z.string().nullable(),supplierId:z.string().nullable(),expectedAmount:wholeUgxSchema.nonnegative().nullable(),cadence:z.enum(["monthly","quarterly","annually"]),nextReviewMonth:z.string(),notes:z.string().nullable()}).strict();
 
 function responseSchema<T extends z.ZodType>(data: T) {
   return z.discriminatedUnion("ok", [
@@ -690,6 +711,9 @@ const responseSchemas = {
   [IPC_CHANNELS.PAYMENT_CORRECTION]: responseSchema(paymentMovementSchema),
   [IPC_CHANNELS.PAYMENT_REVERSE]: responseSchema(paymentMovementSchema),
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: responseSchema(monthlyCompensationReportSchema),
+  [IPC_CHANNELS.EXPENSES_LIST]: responseSchema(z.array(expenseSchema)), [IPC_CHANNELS.EXPENSE_CREATE]: responseSchema(expenseSchema),
+  [IPC_CHANNELS.SUPPLIERS_LIST]: responseSchema(z.array(supplierSchema)), [IPC_CHANNELS.SUPPLIER_CREATE]: responseSchema(supplierSchema), [IPC_CHANNELS.SUPPLIER_PAYMENT]: responseSchema(expenseSchema),
+  [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: responseSchema(z.array(recurringExpenseSchema)), [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: responseSchema(recurringExpenseSchema),
 } as const;
 
 export type IpcRequest = z.infer<typeof ipcRequestSchema>;
@@ -734,6 +758,9 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.PAYMENT_CORRECTION]: PaymentMovement;
   [IPC_CHANNELS.PAYMENT_REVERSE]: PaymentMovement;
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: MonthlyCompensationReport;
+  [IPC_CHANNELS.EXPENSES_LIST]: ExpenseRecord[]; [IPC_CHANNELS.EXPENSE_CREATE]: ExpenseRecord;
+  [IPC_CHANNELS.SUPPLIERS_LIST]: Supplier[]; [IPC_CHANNELS.SUPPLIER_CREATE]: Supplier; [IPC_CHANNELS.SUPPLIER_PAYMENT]: ExpenseRecord;
+  [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: RecurringExpenseTemplate[]; [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: RecurringExpenseTemplate;
 }
 
 export type IpcData<C extends IpcChannel> = IpcDataByChannel[C];
