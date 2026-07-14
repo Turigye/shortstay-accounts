@@ -31,6 +31,11 @@ import {
   type RefundInput,
   type ReversalInput,
 } from "./db/repositories/payment-repository";
+import {
+  createCompensationRepository,
+  type CompensationRepository,
+  type MonthlyCompensationReport,
+} from "./db/repositories/compensation-repository";
 
 export type BusinessSessionStatus =
   | { state: "setup" }
@@ -53,6 +58,7 @@ interface BusinessSessionOptions {
   createRepository?: (database: Database.Database) => BusinessRepository;
   createBookingRepository?: (database: Database.Database, businessId: string) => BookingRepository;
   createPaymentRepository?: (database: Database.Database, businessId: string) => PaymentRepository;
+  createCompensationRepository?: (database: Database.Database, businessId: string) => CompensationRepository;
 }
 
 export interface BusinessSession {
@@ -82,6 +88,7 @@ export interface BusinessSession {
   recordRefund(input: RefundInput): PaymentMovement;
   recordCorrection(input: CorrectionInput): PaymentMovement;
   reversePayment(input: ReversalInput): PaymentMovement;
+  getMonthlyCompensation(month: string): MonthlyCompensationReport;
 }
 
 export function createBusinessSession(options: BusinessSessionOptions): BusinessSession {
@@ -89,6 +96,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
   const createRepository = options.createRepository ?? createBusinessRepository;
   const createBookings = options.createBookingRepository ?? createBookingRepository;
   const createPayments = options.createPaymentRepository ?? createPaymentRepository;
+  const createCompensation = options.createCompensationRepository ?? createCompensationRepository;
   let database: Database.Database | undefined;
 
   function repository() {
@@ -114,6 +122,15 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     const business = repository().getSettings();
     if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
     return createPayments(database, business.businessId);
+  }
+
+  function compensation(): CompensationRepository {
+    if (!database) {
+      throw new BusinessSessionError("LOCKED", "The business file is locked.");
+    }
+    const business = repository().getSettings();
+    if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
+    return createCompensation(database, business.businessId);
   }
 
   function removeIncompleteFile(): void {
@@ -263,6 +280,10 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
 
     reversePayment(input: ReversalInput): PaymentMovement {
       return payments().reverseMovement(input);
+    },
+
+    getMonthlyCompensation(month: string): MonthlyCompensationReport {
+      return compensation().getMonthlyReport(month as `${number}-${string}`);
     },
   });
 }

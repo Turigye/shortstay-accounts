@@ -90,7 +90,7 @@ export interface StayMonthAllocation {
 }
 
 export interface StaffEarning {
-  month: MonthKey;
+  month?: MonthKey;
   role: RoleKey;
   base: Ugx;
   rate: number;

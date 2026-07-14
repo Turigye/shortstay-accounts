@@ -89,8 +89,20 @@ describe("IPC contract", () => {
       IPC_CHANNELS.PAYMENT_REFUND,
       IPC_CHANNELS.PAYMENT_CORRECTION,
       IPC_CHANNELS.PAYMENT_REVERSE,
+      IPC_CHANNELS.COMPENSATION_MONTHLY,
     ]);
     expect(handlers.has("database:query")).toBe(false);
+  });
+
+  it("accepts only canonical monthly compensation requests", () => {
+    expect(ipcRequestSchema.safeParse({
+      channel: IPC_CHANNELS.COMPENSATION_MONTHLY,
+      payload: { month: "2026-07" },
+    }).success).toBe(true);
+    expect(ipcRequestSchema.safeParse({
+      channel: IPC_CHANNELS.COMPENSATION_MONTHLY,
+      payload: { month: "2026-7" },
+    }).success).toBe(false);
   });
 
   it("returns structured field errors for invalid payloads", async () => {

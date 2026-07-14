@@ -12,6 +12,7 @@ import {
 import { summarizeBookingBalance } from "../../../domain/payments";
 import type { BookingStatus, Ugx } from "../../../domain/types";
 import { createAuditRepository } from "./audit-repository";
+import { refreshBookingCompensation } from "./compensation-repository";
 import {
   createPaymentRepository,
   type InitialPaymentInput,
@@ -572,6 +573,7 @@ export function createBookingRepository(
         if (input.initialPayment) {
           payments.recordReceipt({ ...input.initialPayment, bookingId: inserted.id });
         }
+        refreshBookingCompensation(database, scopedBusinessId, inserted.id);
         const result = bookingFromRow(getBookingRow(inserted.id));
         audit.append({ entityType: "booking", entityId: result.id, action: "create", after: result });
         return result;
@@ -614,6 +616,7 @@ export function createBookingRepository(
             total_amount = @total, notes = @notes
           WHERE id = @id AND business_id = @businessId AND archived_at IS NULL
         `).run({ id, businessId: scopedBusinessId, ...normalized, referrerId });
+        refreshBookingCompensation(database, scopedBusinessId, id);
         const after = bookingFromRow(getBookingRow(id));
         audit.append({ entityType: "booking", entityId: id, action: "update", before, after });
         return after;
@@ -639,6 +642,7 @@ export function createBookingRepository(
         database
           .prepare("UPDATE bookings SET status = ? WHERE id = ? AND business_id = ? AND archived_at IS NULL")
           .run(STATUS_TO_DATABASE[to], id, scopedBusinessId);
+        refreshBookingCompensation(database, scopedBusinessId, id);
         const after = bookingFromRow(getBookingRow(id));
         audit.append({ entityType: "booking", entityId: id, action: "update", before, after });
         return after;

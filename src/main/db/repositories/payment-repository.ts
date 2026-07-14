@@ -11,6 +11,7 @@ import {
 } from "../../../domain/payments";
 import type { BookingBalanceSummary, Ugx } from "../../../domain/types";
 import { createAuditRepository } from "./audit-repository";
+import { refreshBookingCompensation } from "./compensation-repository";
 
 export const PAYMENT_ACCOUNT_TYPES = ["cash", "bank", "mobileMoney", "card"] as const;
 export type PaymentAccountType = (typeof PAYMENT_ACCOUNT_TYPES)[number];
@@ -462,6 +463,7 @@ export function createPaymentRepository(
         reason,
       });
     if (!inserted) throw new Error("Payment movement could not be created");
+    refreshBookingCompensation(database, scopedBusinessId, booking.id);
     const movement = movementFromRow(getMovementRow(inserted.id));
     audit.append({
       entityType: "payment",

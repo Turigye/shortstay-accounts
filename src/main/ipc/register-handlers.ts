@@ -100,6 +100,9 @@ const defaultHandlers: IpcHandlers = {
   [IPC_CHANNELS.PAYMENT_REVERSE]: () => {
     throw new Error("Business session is unavailable");
   },
+  [IPC_CHANNELS.COMPENSATION_MONTHLY]: () => {
+    throw new Error("Business session is unavailable");
+  },
 };
 
 const registeredChannels = [
@@ -129,6 +132,7 @@ const registeredChannels = [
   IPC_CHANNELS.PAYMENT_REFUND,
   IPC_CHANNELS.PAYMENT_CORRECTION,
   IPC_CHANNELS.PAYMENT_REVERSE,
+  IPC_CHANNELS.COMPENSATION_MONTHLY,
 ] as const;
 
 export function createBusinessIpcHandlers(
@@ -175,6 +179,8 @@ export function createBusinessIpcHandlers(
     [IPC_CHANNELS.PAYMENT_REFUND]: (payload) => session.recordRefund(payload),
     [IPC_CHANNELS.PAYMENT_CORRECTION]: (payload) => session.recordCorrection(payload),
     [IPC_CHANNELS.PAYMENT_REVERSE]: (payload) => session.reversePayment(payload),
+    [IPC_CHANNELS.COMPENSATION_MONTHLY]: ({ month }) =>
+      session.getMonthlyCompensation(month),
   };
 }
 

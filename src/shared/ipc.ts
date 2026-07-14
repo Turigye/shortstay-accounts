@@ -6,6 +6,7 @@ import type {
   PaymentAccount,
   PaymentMovement,
 } from "../main/db/repositories/payment-repository";
+import type { MonthlyCompensationReport } from "../main/db/repositories/compensation-repository";
 
 export const IPC_CHANNELS = {
   APP_READY: "app:ready",
@@ -34,6 +35,7 @@ export const IPC_CHANNELS = {
   PAYMENT_REFUND: "payments:refund",
   PAYMENT_CORRECTION: "payments:correction",
   PAYMENT_REVERSE: "payments:reverse",
+  COMPENSATION_MONTHLY: "compensation:monthly",
 } as const;
 
 const roleSchema = z.enum([
@@ -440,6 +442,12 @@ const paymentReverseRequestSchema = z
       .strict(),
   })
   .strict();
+const compensationMonthlyRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.COMPENSATION_MONTHLY),
+    payload: z.object({ month: z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/) }).strict(),
+  })
+  .strict();
 
 export const ipcRequestSchema = z.discriminatedUnion("channel", [
   appReadyRequestSchema,
@@ -468,6 +476,7 @@ export const ipcRequestSchema = z.discriminatedUnion("channel", [
   paymentRefundRequestSchema,
   paymentCorrectionRequestSchema,
   paymentReverseRequestSchema,
+  compensationMonthlyRequestSchema,
 ]);
 
 export const IPC_FAILURE_CODES = [
@@ -609,6 +618,42 @@ const paymentMovementSchema = z
     createdAt: z.string(),
   })
   .strict();
+const staffStatementLineSchema = z.object({
+  role: roleSchema,
+  base: wholeUgxSchema.nonnegative(),
+  rate: z.number().min(0).max(100),
+  earned: wholeUgxSchema.nonnegative(),
+  adjustment: wholeUgxSchema,
+  paid: wholeUgxSchema.nonnegative(),
+  due: wholeUgxSchema.nonnegative(),
+}).strict();
+const referralStatementLineSchema = z.object({
+  bookingId: z.string(),
+  customerName: z.string(),
+  referrerName: z.string(),
+  base: wholeUgxSchema.nonnegative(),
+  rate: z.number().min(0).max(100),
+  earned: wholeUgxSchema.nonnegative(),
+  adjustment: wholeUgxSchema,
+  paid: wholeUgxSchema.nonnegative(),
+  due: wholeUgxSchema.nonnegative(),
+}).strict();
+const compensationTraceSchema = z.object({
+  bookingId: z.string(),
+  customerName: z.string(),
+  unitName: z.string(),
+  checkIn: dateSchema,
+  checkOut: dateSchema,
+  earnedRevenue: wholeUgxSchema.nonnegative(),
+  eligibleBase: wholeUgxSchema.nonnegative(),
+}).strict();
+const monthlyCompensationReportSchema = z.object({
+  month: z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/),
+  ncbr: wholeUgxSchema.nonnegative(),
+  staff: z.array(staffStatementLineSchema),
+  referrals: z.array(referralStatementLineSchema),
+  traces: z.array(compensationTraceSchema),
+}).strict();
 
 function responseSchema<T extends z.ZodType>(data: T) {
   return z.discriminatedUnion("ok", [
@@ -644,6 +689,7 @@ const responseSchemas = {
   [IPC_CHANNELS.PAYMENT_REFUND]: responseSchema(paymentMovementSchema),
   [IPC_CHANNELS.PAYMENT_CORRECTION]: responseSchema(paymentMovementSchema),
   [IPC_CHANNELS.PAYMENT_REVERSE]: responseSchema(paymentMovementSchema),
+  [IPC_CHANNELS.COMPENSATION_MONTHLY]: responseSchema(monthlyCompensationReportSchema),
 } as const;
 
 export type IpcRequest = z.infer<typeof ipcRequestSchema>;
@@ -687,6 +733,7 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.PAYMENT_REFUND]: PaymentMovement;
   [IPC_CHANNELS.PAYMENT_CORRECTION]: PaymentMovement;
   [IPC_CHANNELS.PAYMENT_REVERSE]: PaymentMovement;
+  [IPC_CHANNELS.COMPENSATION_MONTHLY]: MonthlyCompensationReport;
 }
 
 export type IpcData<C extends IpcChannel> = IpcDataByChannel[C];
