@@ -24,9 +24,10 @@ function fixture() {
 }
 
 describe("financial position and month close", () => {
-  it("uses the approved manual provision", () => {
-    expect(calculateTaxProvision(2, ugx(600_000))).toBe(1_200_000);
-    expect(calculateAnnualProvision(2, ugx(600_000))).toBe(14_400_000);
+  it("applies the individual rental-tax threshold and 12% rate", () => {
+    expect(calculateTaxProvision(2, ugx(600_000))).toBe(115_800);
+    expect(calculateAnnualProvision(2, ugx(600_000))).toBe(1_389_600);
+    expect(calculateAnnualProvision(1, ugx(200_000))).toBe(0);
   });
 
   it("records balances, assets, loans, and inventory", () => {
@@ -72,7 +73,7 @@ describe("financial position and month close", () => {
     database.prepare("INSERT INTO booking_months (booking_id,month,occupied_nights,earned_revenue,payable_base) VALUES (?,'2026-07',2,2000000,1500000)").run(booking.id);
     database.prepare(`INSERT INTO expenses (business_id,category_id,scope,amount,expense_date,purchase_type,payment_status) VALUES (?,'cashPurchases','shared',400000,'2026-07-12','cash','paid'),(?,'maintenance','shared',100000,'2026-07-13','cash','paid')`).run(business.businessId,business.businessId);
     const report=finance.getMonthlyReport("2026-07");
-    expect(report.incomeStatement).toMatchObject({revenue:2_000_000,purchases:400_000,operatingExpenses:100_000,taxExpense:1_200_000,netIncome:300_000});
+    expect(report.incomeStatement).toMatchObject({revenue:2_000_000,purchases:400_000,operatingExpenses:100_000,taxExpense:115_800,netIncome:1_384_200});
     expect(report.ratios.currentRatio).toEqual({state:"unavailable",reason:"Current liabilities are zero"});
   });
 });

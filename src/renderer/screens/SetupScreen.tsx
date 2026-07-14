@@ -142,7 +142,7 @@ export function SetupScreen({ onCreate, busy = false, error }: SetupScreenProps)
             <div className="defaults-list">
               <span><Check aria-hidden="true" size={16} />37% total staff allocation</span>
               <span><Check aria-hidden="true" size={16} />10% referral commission</span>
-              <span><Check aria-hidden="true" size={16} />UGX 600,000 per unit</span>
+              <span><Check aria-hidden="true" size={16} />UGX 600,000 monthly rental basis per unit</span>
             </div>
             <label className="check-control">
               <input name="approvedDefaults" type="checkbox" />
@@ -154,7 +154,7 @@ export function SetupScreen({ onCreate, busy = false, error }: SetupScreenProps)
           <footer className="setup-footer">
             <div>
               <span>Monthly tax provision</span>
-              <strong>UGX 1,200,000</strong>
+              <strong>UGX 115,800</strong>
             </div>
             <button className="primary-button" disabled={isBusy} type="submit">
               {isBusy ? "Creating…" : "Create business"}

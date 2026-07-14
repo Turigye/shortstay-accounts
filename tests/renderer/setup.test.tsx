@@ -40,10 +40,10 @@ describe("business setup", () => {
     expect(screen.getByRole("heading", { name: "Set up your business" })).toBeTruthy();
     expect(screen.getAllByLabelText(/unit \d name/i)).toHaveLength(2);
     expect(screen.queryByLabelText(/unit 3/i)).toBeNull();
-    expect(screen.getByText("UGX 1,200,000")).toBeTruthy();
+    expect(screen.getByText("UGX 115,800")).toBeTruthy();
     expect(screen.getByText("37% total staff allocation")).toBeTruthy();
     expect(screen.getByText("10% referral commission")).toBeTruthy();
-    expect(screen.getByText("UGX 600,000 per unit")).toBeTruthy();
+    expect(screen.getByText("UGX 600,000 monthly rental basis per unit")).toBeTruthy();
   });
 
   it("submits from the keyboard and clears password fields before awaiting creation", async () => {
@@ -109,7 +109,7 @@ describe("settings", () => {
       "Units",
       "Compensation",
       "Referral",
-      "Tax provision",
+      "Rental tax",
       "Categories",
       "Accounts",
       "Backup",

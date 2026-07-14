@@ -582,7 +582,7 @@ export function createBusinessRepository(
           };
         } else {
           if (!Number.isSafeInteger(input.value) || input.value < 0) {
-            throw new TypeError("Tax provision must be a whole non-negative UGX amount");
+            throw new TypeError("Monthly rental income must be a whole non-negative UGX amount");
           }
           const existing = database
             .prepare<[string, string], TaxRateRow>(`
@@ -610,7 +610,7 @@ export function createBusinessRepository(
                 "INSERT INTO tax_provision_rates (business_id, amount_per_unit, effective_from, reason) VALUES (?, ?, ?, ?) RETURNING id",
               )
               .get(business.businessId, input.value, effectiveFrom, reason);
-            if (!inserted) throw new Error("Tax provision could not be saved");
+            if (!inserted) throw new Error("Monthly rental income could not be saved");
             entityId = inserted.id;
           }
           after = {

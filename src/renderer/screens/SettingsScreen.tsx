@@ -16,6 +16,14 @@ import {
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { EXPENSE_CATEGORIES } from "../../domain/categories";
+import { ugx } from "../../domain/money";
+import {
+  calculateAnnualRentalIncome,
+  calculateAnnualRentalTax,
+  calculateMonthlyRentalTaxProvision,
+  RENTAL_TAX_ANNUAL_THRESHOLD,
+  RENTAL_TAX_RATE_PERCENT,
+} from "../../domain/rental-tax";
 import type { BusinessSettings, RoleKey } from "../../domain/types";
 import type { SetRatePayload } from "../../shared/ipc";
 import { IPC_CHANNELS } from "../../shared/ipc";
@@ -55,7 +63,7 @@ const TABS = [
   { id: "units", label: "Units", icon: Landmark },
   { id: "compensation", label: "Compensation", icon: Calculator },
   { id: "referral", label: "Referral", icon: Percent },
-  { id: "tax", label: "Tax provision", icon: Banknote },
+  { id: "tax", label: "Rental tax", icon: Banknote },
   { id: "categories", label: "Categories", icon: ListTree },
   { id: "accounts", label: "Accounts", icon: Archive },
   { id: "backup", label: "Backup", icon: ShieldCheck },
@@ -130,7 +138,7 @@ function RateEditor({
     <form className="rate-editor" onSubmit={handleSubmit}>
       <div className="field-group">
         <label htmlFor={`${kind}-value`}>
-          {kind === "taxProvision" ? "Amount per unit" : "Rate"}
+          {kind === "taxProvision" ? "Monthly rental income per unit" : "Rate"}
         </label>
         <div className={kind === "taxProvision" ? "input-with-prefix" : "input-with-suffix"}>
           {kind === "taxProvision" ? <span>UGX</span> : null}
@@ -213,6 +221,11 @@ export function SettingsScreen({
     () => Object.values(business.staffRates).reduce((sum, value) => sum + value, 0),
     [business.staffRates],
   );
+  const activeUnitCount = business.units.filter(({ status }) => status === "active").length;
+  const monthlyRentalBasis = ugx(business.taxProvisionPerUnit);
+  const annualRentalIncome = calculateAnnualRentalIncome(activeUnitCount, monthlyRentalBasis);
+  const annualRentalTax = calculateAnnualRentalTax(activeUnitCount, monthlyRentalBasis);
+  const monthlyRentalTax = calculateMonthlyRentalTaxProvision(activeUnitCount, monthlyRentalBasis);
 
   async function handleManageUnits(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -371,9 +384,15 @@ export function SettingsScreen({
           {activeTab === "tax" ? (
             <>
               <div className="panel-heading panel-heading-split">
-                <div><h2>Tax provision</h2><p>Manual monthly planning amount per unit</p></div>
-                <strong>UGX {formatNumber(business.taxProvisionPerUnit * business.units.length)}</strong>
+                <div><h2>Rental tax</h2><p>Annual estimate for an individual landlord</p></div>
+                <strong>UGX {formatNumber(annualRentalTax)} / year</strong>
               </div>
+              <dl className="settings-definition-list">
+                <div><dt>Annual gross rental basis</dt><dd>UGX {formatNumber(annualRentalIncome)}</dd></div>
+                <div><dt>Tax-free annual threshold</dt><dd>UGX {formatNumber(RENTAL_TAX_ANNUAL_THRESHOLD)}</dd></div>
+                <div><dt>Rental tax rate</dt><dd>{RENTAL_TAX_RATE_PERCENT}%</dd></div>
+                <div><dt>Monthly provision</dt><dd>UGX {formatNumber(monthlyRentalTax)}</dd></div>
+              </dl>
               <RateEditor
                 busy={busy}
                 closedMonths={business.closedMonths}
@@ -382,7 +401,7 @@ export function SettingsScreen({
                 onSave={onSetRate}
                 today={today}
               />
-              <p className="provision-note">Manual provision, separate from statutory assessment.</p>
+              <p className="provision-note">Estimate: 12% of annual gross rental income above UGX 2,820,000. Confirm filings with URA or the business accountant.</p>
             </>
           ) : null}
 

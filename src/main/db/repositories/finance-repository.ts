@@ -3,6 +3,10 @@ import type Database from "better-sqlite3-multiple-ciphers";
 import { ugx } from "../../../domain/money";
 import type { Ugx } from "../../../domain/types";
 import { buildFinancialReport, type FinancialReport } from "../../../domain/accounting";
+import {
+  calculateAnnualRentalTax,
+  calculateMonthlyRentalTaxProvision,
+} from "../../../domain/rental-tax";
 import { createAuditRepository } from "./audit-repository";
 
 export type BalanceCategory =
@@ -64,11 +68,10 @@ function requireMonth(month: string): void {
 }
 
 export function calculateTaxProvision(activeUnitCount: number, perUnitAmount: Ugx): Ugx {
-  if (!Number.isSafeInteger(activeUnitCount) || activeUnitCount < 0) throw new Error("Active unit count must be a whole non-negative number.");
-  return wholeUgx(activeUnitCount * perUnitAmount);
+  return calculateMonthlyRentalTaxProvision(activeUnitCount, perUnitAmount);
 }
 export function calculateAnnualProvision(activeUnitCount: number, perUnitAmount: Ugx): Ugx {
-  return wholeUgx(calculateTaxProvision(activeUnitCount, perUnitAmount) * 12);
+  return calculateAnnualRentalTax(activeUnitCount, perUnitAmount);
 }
 
 export function createFinanceRepository(database: Database.Database, businessId: string) {
@@ -143,7 +146,7 @@ export function createFinanceRepository(database: Database.Database, businessId:
     const cashExpense=expenseRows.filter(({purchase_type})=>purchase_type==="cash").reduce((total,row)=>total+row.total,0);const supplierPaid=database.prepare<[string,string],{total:number}>("SELECT COALESCE(SUM(amount),0) total FROM supplier_payments WHERE business_id=? AND substr(paid_at,1,7)=?").get(businessId,month)?.total??0;
     const cashSales=Math.min(allocation.earned,allocation.collected),creditSales=Math.max(0,allocation.earned-cashSales),cashPurchases=purchaseRows.filter(({purchase_type})=>purchase_type==="cash").reduce((t,r)=>t+r.total,0),creditPurchases=purchaseRows.filter(({purchase_type})=>purchase_type==="credit").reduce((t,r)=>t+r.total,0);
     const cash=balance("cash_on_hand","current_bank","mobile_money"),cashPayments=cashMovements.refunds+cashExpense+supplierPaid;
-    return buildFinancialReport({cashSales,creditSales,cashPurchases,creditPurchases,operatingExpenses,financialExpenses,taxExpense:activeUnits*taxRate,cash,longTermDeposits:balance("long_term_deposit"),receivables:balance("customer_receivable","other_receivable"),inventory,fixedAssets,currentLiabilities:balance("supplier_payable","staff_payable","referral_payable","tax_payable","pension_payable")+currentLoans,nonCurrentLiabilities:nonCurrentLoans,ownerEquity:balance("owner_capital"),drawings:balance("owner_drawings"),openingCash:cash-(cashMovements.receipts-cashPayments),cashReceipts:cashMovements.receipts,cashPayments,fixedCosts:Object.values(operatingExpenses).reduce((t,v)=>t+v,0)+financialExpenses,variableCosts:cashPurchases+creditPurchases});
+    return buildFinancialReport({cashSales,creditSales,cashPurchases,creditPurchases,operatingExpenses,financialExpenses,taxExpense:calculateMonthlyRentalTaxProvision(activeUnits,ugx(taxRate)),cash,longTermDeposits:balance("long_term_deposit"),receivables:balance("customer_receivable","other_receivable"),inventory,fixedAssets,currentLiabilities:balance("supplier_payable","staff_payable","referral_payable","tax_payable","pension_payable")+currentLoans,nonCurrentLiabilities:nonCurrentLoans,ownerEquity:balance("owner_capital"),drawings:balance("owner_drawings"),openingCash:cash-(cashMovements.receipts-cashPayments),cashReceipts:cashMovements.receipts,cashPayments,fixedCosts:Object.values(operatingExpenses).reduce((t,v)=>t+v,0)+financialExpenses,variableCosts:cashPurchases+creditPurchases});
   }
 
   return Object.freeze({

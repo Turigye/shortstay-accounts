@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Private desktop accounting for short-stay accommodation",
+  "author": "Turigye",
   "main": ".vite/build/main.js",
   "scripts": {
     "postinstall": "electron-forge install-app-deps",

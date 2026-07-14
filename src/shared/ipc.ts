@@ -170,7 +170,7 @@ const taxProvisionRateRequestSchema = z
       .number()
       .nonnegative()
       .refine(Number.isSafeInteger, {
-        message: "Tax provision must be a whole safe-integer UGX amount.",
+        message: "Monthly rental income must be a whole safe-integer UGX amount.",
       }),
     effectiveFrom: dateSchema,
     reason: z.string().trim().max(500).optional(),
