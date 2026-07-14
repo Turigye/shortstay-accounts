@@ -220,6 +220,7 @@ export function registerIpcHandlers(
         if (error instanceof PaymentRepositoryError) {
           return publicFailure(error.code, error.message, error.fieldErrors);
         }
+        console.error(`[IPC] ${channel} failed`, error);
         return internalFailure();
       }
     });
