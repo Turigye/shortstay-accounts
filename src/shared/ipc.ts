@@ -214,7 +214,39 @@ const bookingInputSchema = z
     referrerName: z.string().trim().max(160).nullable().optional(),
     notes: z.string().trim().max(2_000).nullable().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    const hasReferrerId = Boolean(input.referrerId);
+    const hasReferrerName = Boolean(input.referrerName?.trim());
+
+    if (input.referred !== true) {
+      if (hasReferrerId) {
+        context.addIssue({
+          code: "custom",
+          message: "Remove the referrer ID or mark this as a referral booking.",
+          path: ["referrerId"],
+        });
+      }
+      if (hasReferrerName) {
+        context.addIssue({
+          code: "custom",
+          message: "Remove the referrer name or mark this as a referral booking.",
+          path: ["referrerName"],
+        });
+      }
+      return;
+    }
+
+    if (hasReferrerId === hasReferrerName) {
+      context.addIssue({
+        code: "custom",
+        message: hasReferrerId
+          ? "Choose an existing referrer or enter a new name, not both."
+          : "Choose an existing referrer or enter a new name.",
+        path: ["referrerName"],
+      });
+    }
+  });
 const bookingsListRequestSchema = z
   .object({
     channel: z.literal(IPC_CHANNELS.BOOKINGS_LIST),

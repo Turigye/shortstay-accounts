@@ -145,10 +145,12 @@ export function BookingEditor({
     initialState(booking, initialUnitId, initialCheckIn),
   );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
 
   useEffect(() => {
     setForm(initialState(booking, initialUnitId, initialCheckIn));
     setFieldErrors({});
+    setSubmissionError(null);
   }, [booking, initialCheckIn, initialUnitId]);
 
   const calculation = useMemo(() => {
@@ -189,6 +191,7 @@ export function BookingEditor({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setSubmissionError(null);
     const errors: Record<string, string> = {};
     if (!form.unitId) errors.unitId = "Choose a unit.";
     if (!form.customerId) errors.customerId = "Choose a customer or add a new one.";
@@ -208,6 +211,9 @@ export function BookingEditor({
     if (calculation.error) errors.checkOut = calculation.error;
     if (form.referred && !form.referrerName.trim()) {
       errors.referrerName = "Enter who referred this booking.";
+    } else if (!form.referred && form.referrerName.trim()) {
+      errors.referrerName =
+        "Remove the referrer name or mark this as a referral booking.";
     }
     const initialPayment = parseWholeUgx(form.initialPayment);
     if (initialPayment === null || initialPayment < 0) {
@@ -229,21 +235,26 @@ export function BookingEditor({
         email: form.email.trim() || null,
       });
       customerId = customer.id;
+      setForm((current) => ({ ...current, customerId: customer.id }));
     }
-    await onSave({
-      unitId: form.unitId,
-      customerId,
-      checkIn: form.checkIn,
-      checkOut: form.checkOut,
-      checkInTime: form.checkInTime,
-      checkOutTime: form.checkOutTime,
-      nightlyRate: nightlyRate!,
-      adjustment: adjustment!,
-      status: booking?.status ?? form.status,
-      referred: form.referred,
-      referrerName: form.referred ? form.referrerName.trim() : null,
-      notes: form.notes.trim() || null,
-    });
+    try {
+      await onSave({
+        unitId: form.unitId,
+        customerId,
+        checkIn: form.checkIn,
+        checkOut: form.checkOut,
+        checkInTime: form.checkInTime,
+        checkOutTime: form.checkOutTime,
+        nightlyRate: nightlyRate!,
+        adjustment: adjustment!,
+        status: booking?.status ?? form.status,
+        referred: form.referred,
+        referrerName: form.referrerName.trim() || null,
+        notes: form.notes.trim() || null,
+      });
+    } catch {
+      setSubmissionError("The booking could not be saved. Review the details and try again.");
+    }
   }
 
   return (
@@ -259,7 +270,9 @@ export function BookingEditor({
       </header>
 
       <form className="booking-form" onSubmit={(event) => void handleSubmit(event)}>
-        {error ? <p className="form-alert">{error}</p> : null}
+        {error || submissionError ? (
+          <p className="form-alert">{error ?? submissionError}</p>
+        ) : null}
         <div className="booking-form-grid">
           <div className="field-group" data-invalid={Boolean(errorFor("unitId"))}>
             <label htmlFor="booking-unit">Unit</label>
@@ -372,7 +385,7 @@ export function BookingEditor({
               <input checked={form.referred} onChange={(event) => update("referred", event.target.checked)} type="checkbox" />
               Referral booking
             </label>
-            {form.referred ? (
+            {form.referred || Boolean(form.referrerName.trim()) ? (
               <div className="field-group" data-invalid={Boolean(errorFor("referrerName"))}>
                 <label htmlFor="booking-referrer">Referrer</label>
                 <input id="booking-referrer" onChange={(event) => update("referrerName", event.target.value)} value={form.referrerName} />

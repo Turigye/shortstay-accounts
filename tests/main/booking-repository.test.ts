@@ -159,6 +159,27 @@ describe("booking repository", () => {
     expect(fixture.repository.getBooking(staleDraft.id).status).toBe("draft");
   });
 
+  it("reuses one persisted customer when a failed booking is retried", () => {
+    const fixture = createFixture();
+    fixture.repository.createBooking(bookingInput(fixture));
+    const customer = fixture.repository.createCustomer({
+      name: "Brian K.",
+      phone: "+256 755 000111",
+    });
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      expect(() =>
+        fixture.repository.createBooking(
+          bookingInput(fixture, { customerId: customer.id }),
+        ),
+      ).toThrowError(expect.objectContaining({ code: "CONFLICT" }));
+    }
+
+    expect(
+      fixture.repository.listCustomers().filter(({ name }) => name === "Brian K."),
+    ).toHaveLength(1);
+  });
+
   it("rechecks overlap when an existing confirmed booking is updated", () => {
     const fixture = createFixture();
     const first = fixture.repository.createBooking(bookingInput(fixture));
@@ -218,6 +239,79 @@ describe("booking repository", () => {
     ).toThrowError(
       expect.objectContaining({ fieldErrors: { referrerName: [expect.any(String)] } }),
     );
+  });
+
+  it.each([
+    { referred: false, referrerName: "Kato Travel" },
+    { referred: false, referrerId: "referrer-1" },
+    { referred: true },
+    { referred: true, referrerName: "  " },
+    { referrerName: "Kato Travel" },
+    { referred: true, referrerId: "referrer-1", referrerName: "Kato Travel" },
+  ])("rejects contradictory referral intent: %#", (referral) => {
+    const fixture = createFixture();
+    if (referral.referrerId) {
+      fixture.database
+        .prepare(
+          "INSERT INTO referrers (id, business_id, name) VALUES (?, ?, 'Existing Referrer')",
+        )
+        .run(referral.referrerId, fixture.businessId);
+    }
+
+    expect(() =>
+      fixture.repository.createBooking(bookingInput(fixture, referral)),
+    ).toThrowError(
+      expect.objectContaining<Partial<BookingRepositoryError>>({
+        code: "VALIDATION_ERROR",
+      }),
+    );
+  });
+
+  it("accepts one active business-scoped referrer ID", () => {
+    const fixture = createFixture();
+    const referrer = fixture.database
+      .prepare<[string], { id: string }>(
+        "INSERT INTO referrers (business_id, name) VALUES (?, 'Existing Referrer') RETURNING id",
+      )
+      .get(fixture.businessId);
+    if (!referrer) throw new Error("test referrer was not created");
+
+    expect(
+      fixture.repository.createBooking(
+        bookingInput(fixture, { referred: true, referrerId: referrer.id }),
+      ).referrerId,
+    ).toBe(referrer.id);
+  });
+
+  it("rejects archived and cross-business referrer IDs", () => {
+    const fixture = createFixture();
+    const archived = fixture.database
+      .prepare<[string], { id: string }>(
+        "INSERT INTO referrers (business_id, name, archived_at) VALUES (?, 'Archived', CURRENT_TIMESTAMP) RETURNING id",
+      )
+      .get(fixture.businessId);
+    const otherBusiness = fixture.database
+      .prepare<[], { id: string }>(
+        "INSERT INTO businesses (name) VALUES ('Referral Business') RETURNING id",
+      )
+      .get();
+    if (!archived || !otherBusiness) throw new Error("test referral scope was not created");
+    const crossBusiness = fixture.database
+      .prepare<[string], { id: string }>(
+        "INSERT INTO referrers (business_id, name) VALUES (?, 'Cross Business') RETURNING id",
+      )
+      .get(otherBusiness.id);
+    if (!crossBusiness) throw new Error("cross-business referrer was not created");
+
+    for (const referrerId of [archived.id, crossBusiness.id]) {
+      expect(() =>
+        fixture.repository.createBooking(
+          bookingInput(fixture, { referred: true, referrerId }),
+        ),
+      ).toThrowError(
+        expect.objectContaining<Partial<BookingRepositoryError>>({ code: "NOT_FOUND" }),
+      );
+    }
   });
 
   it("rejects archived and cross-business unit or customer IDs", () => {

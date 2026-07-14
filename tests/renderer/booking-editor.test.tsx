@@ -149,6 +149,33 @@ describe("BookingEditor", () => {
     );
   });
 
+  it("does not silently discard a referrer name when referral is unchecked", async () => {
+    const onSave = vi.fn();
+    render(
+      <BookingEditor customers={customers} onCancel={vi.fn()} onSave={onSave} units={units} />,
+    );
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("Unit"), "unit-1");
+    await user.selectOptions(screen.getByLabelText("Customer"), "customer-1");
+    fireEvent.change(screen.getByLabelText("Check-in date"), {
+      target: { value: "2026-07-20" },
+    });
+    fireEvent.change(screen.getByLabelText("Check-out date"), {
+      target: { value: "2026-07-22" },
+    });
+    await user.type(screen.getByLabelText("Nightly rate"), "180000");
+    await user.click(screen.getByText("Advanced booking details"));
+    await user.click(screen.getByRole("checkbox", { name: "Referral booking" }));
+    await user.type(screen.getByLabelText("Referrer"), "Kato Travel");
+    await user.click(screen.getByRole("checkbox", { name: "Referral booking" }));
+    await user.click(screen.getByRole("button", { name: "Save booking" }));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByLabelText<HTMLInputElement>("Referrer").value).toBe("Kato Travel");
+    expect(screen.getByText(/remove the referrer name or mark this as a referral booking/i)).toBeTruthy();
+  });
+
   it("creates a customer before saving a manual booking", async () => {
     const newCustomer = { ...customers[0], id: "customer-2", name: "Brian K." };
     const onCreateCustomer = vi.fn().mockResolvedValue(newCustomer);
@@ -184,6 +211,50 @@ describe("BookingEditor", () => {
     });
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ customerId: "customer-2" }));
   });
+
+  it.each(["conflict response", "unexpected rejection"])(
+    "reuses the persisted customer when booking creation fails with %s",
+    async (failureMode) => {
+      const newCustomer = { ...customers[0], id: "customer-2", name: "Brian K." };
+      const onCreateCustomer = vi.fn().mockResolvedValue(newCustomer);
+      const onSave =
+        failureMode === "unexpected rejection"
+          ? vi.fn().mockRejectedValueOnce(new Error("booking write failed")).mockResolvedValueOnce(undefined)
+          : vi.fn().mockResolvedValue(undefined);
+      render(
+        <BookingEditor
+          customers={customers}
+          onCancel={vi.fn()}
+          onCreateCustomer={onCreateCustomer}
+          onSave={onSave}
+          units={units}
+        />,
+      );
+      const user = userEvent.setup();
+
+      await user.selectOptions(screen.getByLabelText("Unit"), "unit-1");
+      await user.selectOptions(screen.getByLabelText("Customer"), "new");
+      await user.type(screen.getByLabelText("Customer name"), "Brian K.");
+      await user.type(screen.getByLabelText("Phone"), "+256 755 000111");
+      fireEvent.change(screen.getByLabelText("Check-in date"), {
+        target: { value: "2026-07-20" },
+      });
+      fireEvent.change(screen.getByLabelText("Check-out date"), {
+        target: { value: "2026-07-22" },
+      });
+      await user.type(screen.getByLabelText("Nightly rate"), "180000");
+      await user.click(screen.getByRole("button", { name: "Save booking" }));
+      await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+      await user.click(screen.getByRole("button", { name: "Save booking" }));
+      await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+
+      expect(onCreateCustomer).toHaveBeenCalledOnce();
+      expect(onSave).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ customerId: "customer-2" }),
+      );
+    },
+  );
 });
 
 describe("UnitSchedule", () => {

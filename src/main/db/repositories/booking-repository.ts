@@ -342,8 +342,48 @@ export function createBookingRepository(
   }
 
   function resolveReferrer(input: BookingInput): string | null {
-    const referred = input.referred ?? Boolean(input.referrerId || input.referrerName?.trim());
-    if (!referred) return null;
+    const hasReferrerId = Boolean(input.referrerId);
+    const referrerName = input.referrerName?.trim() || null;
+    const hasReferrerName = referrerName !== null;
+
+    if (input.referred !== true) {
+      const fieldErrors: Record<string, string[]> = {};
+      if (hasReferrerId) {
+        fieldErrors.referrerId = [
+          "Remove the referrer ID or mark this as a referral booking.",
+        ];
+      }
+      if (hasReferrerName) {
+        fieldErrors.referrerName = [
+          "Remove the referrer name or mark this as a referral booking.",
+        ];
+      }
+      if (Object.keys(fieldErrors).length > 0) {
+        throw new BookingRepositoryError(
+          "VALIDATION_ERROR",
+          "Referral details contradict the booking referral choice.",
+          fieldErrors,
+        );
+      }
+      return null;
+    }
+
+    if (hasReferrerId === hasReferrerName) {
+      throw new BookingRepositoryError(
+        "VALIDATION_ERROR",
+        hasReferrerId
+          ? "Choose an existing referrer or enter a new name, not both."
+          : "A referrer is required.",
+        {
+          referrerName: [
+            hasReferrerId
+              ? "Remove the new name when choosing an existing referrer."
+              : "Enter who referred this booking.",
+          ],
+        },
+      );
+    }
+
     if (input.referrerId) {
       const row = database
         .prepare<[string, string], { id: string }>(`
@@ -358,25 +398,19 @@ export function createBookingRepository(
       }
       return row.id;
     }
-    const name = input.referrerName?.trim();
-    if (!name) {
-      throw new BookingRepositoryError("VALIDATION_ERROR", "A referrer is required.", {
-        referrerName: ["Enter who referred this booking."],
-      });
-    }
     const existing = database
       .prepare<[string, string], { id: string }>(`
         SELECT id FROM referrers
         WHERE business_id = ? AND lower(name) = lower(?) AND archived_at IS NULL
         ORDER BY created_at LIMIT 1
       `)
-      .get(scopedBusinessId, name);
+      .get(scopedBusinessId, referrerName!);
     if (existing) return existing.id;
     const inserted = database
       .prepare<[string, string], { id: string }>(
         "INSERT INTO referrers (business_id, name) VALUES (?, ?) RETURNING id",
       )
-      .get(scopedBusinessId, name);
+      .get(scopedBusinessId, referrerName!);
     if (!inserted) throw new Error("Referrer could not be created");
     return inserted.id;
   }

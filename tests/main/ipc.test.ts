@@ -295,6 +295,49 @@ describe("IPC contract", () => {
     ).toBe(false);
   });
 
+  it.each([
+    { referred: false, referrerName: "Kato Travel" },
+    { referred: false, referrerId: "referrer-1" },
+    { referred: true },
+    { referred: true, referrerName: " " },
+    { referrerName: "Kato Travel" },
+    { referred: true, referrerId: "referrer-1", referrerName: "Kato Travel" },
+  ])("rejects contradictory referral payloads: %#", (referral) => {
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.BOOKING_CREATE,
+        payload: {
+          unitId: "unit-1",
+          customerId: "customer-1",
+          checkIn: "2026-07-20",
+          checkOut: "2026-07-22",
+          nightlyRate: 180_000,
+          ...referral,
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    { referred: false, referrerName: " " },
+    { referred: true, referrerName: "Kato Travel" },
+    { referred: true, referrerId: "referrer-1" },
+  ])("accepts consistent referral payloads: %#", (referral) => {
+    expect(
+      ipcRequestSchema.safeParse({
+        channel: IPC_CHANNELS.BOOKING_CREATE,
+        payload: {
+          unitId: "unit-1",
+          customerId: "customer-1",
+          checkIn: "2026-07-20",
+          checkOut: "2026-07-22",
+          nightlyRate: 180_000,
+          ...referral,
+        },
+      }).success,
+    ).toBe(true);
+  });
+
   it("validates booking dates and whole-UGX amounts at the process boundary", async () => {
     const handler = captureHandlers().get(IPC_CHANNELS.BOOKING_CREATE);
     const base = {
