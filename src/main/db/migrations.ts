@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3-multiple-ciphers";
 
-export const LATEST_SCHEMA_VERSION = 4;
+export const LATEST_SCHEMA_VERSION = 5;
 
 interface Migration {
   readonly version: number;
@@ -581,6 +581,22 @@ const CREATE_VERSION_FOUR_SCHEMA = `
   END;
 `;
 
+const CREATE_VERSION_FIVE_SCHEMA = `
+  CREATE TRIGGER payments_validate_amount_date_insert
+  BEFORE INSERT ON payments
+  WHEN
+    typeof(NEW.amount) <> 'integer'
+    OR NEW.amount <= 0
+    OR NEW.amount > 9007199254740991
+    OR length(NEW.paid_at) <> 24
+    OR NEW.paid_at NOT GLOB '????-??-??T??:??:??.???Z'
+    OR strftime('%Y-%m-%dT%H:%M:%fZ', NEW.paid_at) IS NULL
+    OR strftime('%Y-%m-%dT%H:%M:%fZ', NEW.paid_at) <> NEW.paid_at
+  BEGIN
+    SELECT RAISE(ABORT, 'invalid payment amount or date');
+  END;
+`;
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -613,6 +629,15 @@ const migrations: readonly Migration[] = [
     version: 4,
     up(database) {
       database.exec(CREATE_VERSION_FOUR_SCHEMA);
+      database
+        .prepare("update app_meta set value = ? where key = 'schema_version'")
+        .run(String(LATEST_SCHEMA_VERSION));
+    },
+  },
+  {
+    version: 5,
+    up(database) {
+      database.exec(CREATE_VERSION_FIVE_SCHEMA);
       database
         .prepare("update app_meta set value = ? where key = 'schema_version'")
         .run(String(LATEST_SCHEMA_VERSION));

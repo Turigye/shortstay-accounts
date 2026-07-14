@@ -356,6 +356,63 @@ describe("booking movements", () => {
       insert.run(fixture.businessId, fixture.bookingId, otherAccount.id, "cash"),
     ).toThrow("invalid payment movement");
   });
+
+  it("rejects unsafe amounts and non-canonical payment timestamps at the database boundary", () => {
+    const fixture = createFixture();
+    const insert = fixture.database.prepare(`
+      INSERT INTO payments (
+        business_id, booking_id, account_id, direction, amount, paid_at, method, record_type
+      ) VALUES (?, ?, ?, 'receipt', ?, ?, 'cash', 'receipt')
+    `);
+
+    for (const amount of ["9007199254740992", "1.5"]) {
+      expect(() =>
+        fixture.database.exec(`
+          INSERT INTO payments (
+            business_id, booking_id, account_id, direction, amount, paid_at, method, record_type
+          ) VALUES (
+            '${fixture.businessId}', '${fixture.bookingId}', '${fixture.accountId}',
+            'receipt', ${amount}, '2026-07-14T09:30:00.000Z', 'cash', 'receipt'
+          )
+        `),
+      ).toThrow("invalid payment amount or date");
+    }
+
+    for (const paidAt of [
+      "2026-02-30T09:30:00.000Z",
+      "2026-07-14 09:30:00",
+      "2026-07-14T09:30:00Z",
+    ]) {
+      expect(() =>
+        insert.run(
+          fixture.businessId,
+          fixture.bookingId,
+          fixture.accountId,
+          1_000,
+          paidAt,
+        ),
+      ).toThrow("invalid payment amount or date");
+    }
+
+    expect(() =>
+      insert.run(
+        fixture.businessId,
+        fixture.bookingId,
+        fixture.accountId,
+        Number.MAX_SAFE_INTEGER,
+        "2026-02-29T09:30:00.000Z",
+      ),
+    ).toThrow("invalid payment amount or date");
+    expect(() =>
+      insert.run(
+        fixture.businessId,
+        fixture.bookingId,
+        fixture.accountId,
+        Number.MAX_SAFE_INTEGER,
+        "2028-02-29T09:30:00.000Z",
+      ),
+    ).not.toThrow();
+  });
 });
 
 describe("initial booking receipt", () => {

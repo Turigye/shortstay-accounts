@@ -261,17 +261,17 @@ export function BookingEditor({
       return;
     }
 
-    let customerId = form.customerId;
-    if (customerId === "new" && onCreateCustomer) {
-      const customer = await onCreateCustomer({
-        name: form.customerName.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim() || null,
-      });
-      customerId = customer.id;
-      setForm((current) => ({ ...current, customerId: customer.id }));
-    }
     try {
+      let customerId = form.customerId;
+      if (customerId === "new" && onCreateCustomer) {
+        const customer = await onCreateCustomer({
+          name: form.customerName.trim(),
+          phone: form.phone.trim(),
+          email: form.email.trim() || null,
+        });
+        customerId = customer.id;
+        setForm((current) => ({ ...current, customerId: customer.id }));
+      }
       await onSave({
         unitId: form.unitId,
         customerId,

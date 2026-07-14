@@ -366,6 +366,48 @@ describe("BookingEditor", () => {
       );
     },
   );
+
+  it("recovers when inline customer creation is rejected", async () => {
+    const newCustomer = { ...customers[0], id: "customer-2", name: "Brian K." };
+    const onCreateCustomer = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("customer write failed"))
+      .mockResolvedValueOnce(newCustomer);
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <BookingEditor
+        customers={customers}
+        onCancel={vi.fn()}
+        onCreateCustomer={onCreateCustomer}
+        onSave={onSave}
+        units={units}
+      />,
+    );
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("Unit"), "unit-1");
+    await user.selectOptions(screen.getByLabelText("Customer"), "new");
+    await user.type(screen.getByLabelText("Customer name"), "Brian K.");
+    await user.type(screen.getByLabelText("Phone"), "+256 755 000111");
+    fireEvent.change(screen.getByLabelText("Check-in date"), {
+      target: { value: "2026-07-20" },
+    });
+    fireEvent.change(screen.getByLabelText("Check-out date"), {
+      target: { value: "2026-07-22" },
+    });
+    await user.type(screen.getByLabelText("Nightly rate"), "180000");
+
+    await user.click(screen.getByRole("button", { name: "Save booking" }));
+    expect(await screen.findByText(/booking could not be saved/i)).toBeTruthy();
+    expect(onSave).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Save booking" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    expect(onCreateCustomer).toHaveBeenCalledTimes(2);
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: "customer-2" }),
+    );
+  });
 });
 
 describe("UnitSchedule", () => {
