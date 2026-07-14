@@ -11,7 +11,7 @@ export function contentSecurityPolicyFor(url: string): string {
     "form-action 'none'",
     "frame-ancestors 'none'",
     "object-src 'none'",
-    "script-src 'self'",
+    `script-src 'self'${isViteDevelopment ? " 'unsafe-inline'" : ""}`,
     `style-src 'self'${isViteDevelopment ? " 'unsafe-inline'" : ""}`,
     "img-src 'self' data:",
     "font-src 'self'",

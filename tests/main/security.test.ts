@@ -47,6 +47,7 @@ describe("contentSecurityPolicyFor", () => {
   it("allows only localhost websocket connections needed by Vite development", () => {
     const policy = contentSecurityPolicyFor("http://localhost:5173/");
 
+    expect(policy).toContain("script-src 'self' 'unsafe-inline'");
     expect(policy).toContain("connect-src 'self' ws://localhost:*");
     expect(policy).not.toContain("http://*");
     expect(policy).not.toContain("https://*");
