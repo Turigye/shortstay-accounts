@@ -49,7 +49,7 @@ export function BookingBalance({
   );
 
   return (
-    <section className="booking-balance" aria-label="Booking balance">
+    <section className="booking-balance" aria-label="Booking balance" data-tour="payment-balance">
       <dl className="balance-summary">
         {[
           ["Total", booking.total],

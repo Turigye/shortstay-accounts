@@ -270,6 +270,7 @@ export function PaymentsScreen() {
           </button>
           <button
             className="primary-button compact-button"
+            data-tour="payment-action"
             disabled={!selectedBooking || accounts.length === 0}
             onClick={() => openEditor({ mode: "receipt", movement: null })}
             type="button"
@@ -289,7 +290,7 @@ export function PaymentsScreen() {
           </select>
         </div>
         {selectedBooking ? (
-          <button className="secondary-button compact-button" onClick={() => openEditor({ mode: "refund", movement: null })} type="button">
+          <button className="secondary-button compact-button" data-tour="payment-history" onClick={() => openEditor({ mode: "refund", movement: null })} type="button">
             Record refund
           </button>
         ) : null}

@@ -70,6 +70,13 @@ const TABS = [
   { id: "security", label: "Security", icon: KeyRound },
 ] as const;
 
+const tabTourTargets: Partial<Record<SettingsTab, string>> = {
+  compensation: "effective-rates",
+  tax: "tax-guidance",
+  backup: "excel-export",
+  security: "security",
+};
+
 function todayDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -253,11 +260,12 @@ export function SettingsScreen({
       {error ? <div className="form-alert" role="alert">{error}</div> : null}
 
       <div className="settings-layout">
-        <div className="settings-tabs" role="tablist" aria-label="Settings sections">
+        <div className="settings-tabs" data-tour="backup" role="tablist" aria-label="Settings sections">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               aria-selected={activeTab === id}
               className="settings-tab"
+              data-tour={tabTourTargets[id]}
               key={id}
               onClick={() => setActiveTab(id)}
               role="tab"
@@ -269,14 +277,14 @@ export function SettingsScreen({
           ))}
         </div>
 
-        <section className="settings-panel" role="tabpanel">
+        <section className="settings-panel" data-tour="restore" role="tabpanel">
           {activeTab === "units" ? (
             <>
               <div className="panel-heading">
                 <h2>Units</h2>
                 <p>{units.length} active accommodation {units.length === 1 ? "unit" : "units"}</p>
               </div>
-              <form className="unit-settings-form" onSubmit={handleManageUnits}>
+              <form className="unit-settings-form" data-tour="unit-settings" onSubmit={handleManageUnits}>
                 {units.map((unit, index) => (
                   <div className="unit-setting-row" key={unit.id ?? `new-${index}`}>
                     <span className="unit-index">{index + 1}</span>
