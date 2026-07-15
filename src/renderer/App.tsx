@@ -1,7 +1,10 @@
 import { CalendarCheck2, LoaderCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AppShell, type AppScreen } from "./components/AppShell";
+import { FirstUnlockWelcome } from "./guidance/FirstUnlockWelcome";
+import { GuidedTour } from "./guidance/GuidedTour";
+import { TourProvider } from "./guidance/TourProvider";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { BookingsScreen } from "./screens/BookingsScreen";
 import { PaymentsScreen } from "./screens/PaymentsScreen";
@@ -9,6 +12,7 @@ import { SetupScreen } from "./screens/SetupScreen";
 import { StaffScreen } from "./screens/StaffScreen";
 import { ExpensesScreen } from "./screens/ExpensesScreen";
 import { FinancialPositionScreen } from "./screens/FinancialPositionScreen";
+import { HelpCenterScreen } from "./screens/HelpCenterScreen";
 import { ReportsScreen } from "./screens/ReportsScreen";
 import { TodayScreen } from "./screens/TodayScreen";
 import { UnlockScreen } from "./screens/UnlockScreen";
@@ -26,6 +30,9 @@ const screenContent: Record<Exclude<AppScreen, "settings">, { title: string; des
 
 export function App() {
   const [activeScreen, setActiveScreen] = useState<AppScreen>("today");
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [screenBeforeHelp, setScreenBeforeHelp] = useState<AppScreen>("today");
+  const helpFocusReturnTarget = useRef<HTMLElement | null>(null);
   const { phase, business, error, busy, hydrate, createBusiness, unlock, lock, manageUnits, setRate } = useAppStore();
 
   useEffect(() => { void hydrate(); }, [hydrate]);
@@ -42,46 +49,67 @@ export function App() {
   if (!business) return null;
 
   const content = activeScreen === "settings" ? null : screenContent[activeScreen];
+  const openHelp = (opener?: HTMLButtonElement) => {
+    helpFocusReturnTarget.current = opener ?? document.querySelector<HTMLElement>('[data-tour="help"]');
+    setScreenBeforeHelp(activeScreen);
+    setHelpOpen(true);
+  };
+  const closeHelp = () => {
+    setHelpOpen(false);
+    setActiveScreen(screenBeforeHelp);
+    const focusTarget = helpFocusReturnTarget.current;
+    if (focusTarget?.isConnected) requestAnimationFrame(() => focusTarget.focus());
+  };
+  const navigateFromHelp = (screen: AppScreen) => {
+    setScreenBeforeHelp(screen);
+    setActiveScreen(screen);
+  };
+
   return (
-    <AppShell
-      activeScreen={activeScreen}
-      businessName={business.name}
-      onLock={() => void lock()}
-      onScreenChange={setActiveScreen}
-    >
-      {activeScreen === "bookings" ? (
-        <BookingsScreen units={business.units} />
-      ) : activeScreen === "today" ? (
-        <TodayScreen onNavigate={setActiveScreen} />
-      ) : activeScreen === "payments" ? (
-        <PaymentsScreen />
-      ) : activeScreen === "staff" ? (
-        <StaffScreen />
-      ) : activeScreen === "expenses" ? (
-        <ExpensesScreen units={business.units} />
-      ) : activeScreen === "financial-position" ? (
-        <FinancialPositionScreen units={business.units} taxProvisionPerUnit={business.taxProvisionPerUnit} />
-      ) : activeScreen === "reports" ? (
-        <ReportsScreen />
-      ) : activeScreen === "settings" ? (
-        <SettingsScreen
-          business={business}
-          busy={busy}
-          error={error}
-          onLock={lock}
-          onManageUnits={manageUnits}
-          onSetRate={setRate}
-        />
-      ) : (
-        <>
-          <header className="page-header"><h1>{content?.title}</h1><p>{content?.description}</p></header>
-          <section className="empty-state" aria-labelledby="empty-state-title">
-            <CalendarCheck2 aria-hidden="true" size={28} strokeWidth={1.8} />
-            <h2 id="empty-state-title">No activity recorded</h2>
-            <p>Records for this area will appear here as daily work is added.</p>
-          </section>
-        </>
-      )}
-    </AppShell>
+    <TourProvider navigate={setActiveScreen}>
+      <AppShell
+        activeScreen={activeScreen}
+        businessName={business.name}
+        onHelp={openHelp}
+        onLock={() => void lock()}
+        onScreenChange={setActiveScreen}
+      >
+        {helpOpen ? <HelpCenterScreen onClose={closeHelp} onNavigate={navigateFromHelp} /> : activeScreen === "bookings" ? (
+          <BookingsScreen units={business.units} />
+        ) : activeScreen === "today" ? (
+          <TodayScreen onNavigate={setActiveScreen} />
+        ) : activeScreen === "payments" ? (
+          <PaymentsScreen />
+        ) : activeScreen === "staff" ? (
+          <StaffScreen />
+        ) : activeScreen === "expenses" ? (
+          <ExpensesScreen units={business.units} />
+        ) : activeScreen === "financial-position" ? (
+          <FinancialPositionScreen units={business.units} taxProvisionPerUnit={business.taxProvisionPerUnit} />
+        ) : activeScreen === "reports" ? (
+          <ReportsScreen />
+        ) : activeScreen === "settings" ? (
+          <SettingsScreen
+            business={business}
+            busy={busy}
+            error={error}
+            onLock={lock}
+            onManageUnits={manageUnits}
+            onSetRate={setRate}
+          />
+        ) : (
+          <>
+            <header className="page-header"><h1>{content?.title}</h1><p>{content?.description}</p></header>
+            <section className="empty-state" aria-labelledby="empty-state-title">
+              <CalendarCheck2 aria-hidden="true" size={28} strokeWidth={1.8} />
+              <h2 id="empty-state-title">No activity recorded</h2>
+              <p>Records for this area will appear here as daily work is added.</p>
+            </section>
+          </>
+        )}
+      </AppShell>
+      <FirstUnlockWelcome onOpenGuide={() => openHelp()} returnFocusTarget={helpFocusReturnTarget.current} />
+      <GuidedTour />
+    </TourProvider>
   );
 }
