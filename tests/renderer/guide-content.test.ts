@@ -59,7 +59,8 @@ const targetSourceFiles: Record<string, string> = {
 
 const dynamicTargetMarkers: Partial<Record<string, readonly string[]>> = {
   "reopen-period": ['data-tour={item==="month-end"?"reopen-period":undefined}'],
-  "effective-rates": ["data-tour={guidanceTarget}"],
+  "effective-rates": ["data-tour={tourTarget}"],
+  backup: ['data-tour={id === "backup" ? "backup" : undefined}'],
 };
 
 describe("beginner guide content", () => {
@@ -126,5 +127,13 @@ describe("beginner guide content", () => {
 
     expect(moneySteps.find((step) => step.id === "payment-balance")?.body).toMatch(/select a booking/i);
     expect(moneySteps.find((step) => step.id === "payment-history")?.body).toMatch(/select a booking/i);
+  });
+
+  it("tells users to choose the visible Backup navigation controls before taking file actions", () => {
+    const steps = tourDefinitions.flatMap((tour) => tour.steps);
+
+    expect(steps.find((step) => step.id === "backup")?.body).toMatch(/choose backup/i);
+    expect(steps.find((step) => step.id === "restore")?.body).toMatch(/choose restore shortcut/i);
+    expect(steps.find((step) => step.id === "excel-export")?.body).toMatch(/choose export excel shortcut/i);
   });
 });

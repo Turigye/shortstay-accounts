@@ -36,6 +36,27 @@ Validation:
 
 Concerns: none.
 
+## G5 Final Settings Navigation Fix
+
+Status: complete
+
+Removed the App tour-to-Settings tab wiring and the Settings `guidanceTarget` input/effect. Tours no longer change a Settings panel automatically.
+
+Settings now keeps `backup` on the Backup tab and provides distinct, always-visible Restore and Export Excel shortcut buttons outside the Settings tablist. Both shortcuts only select the Backup panel; they do not restore, export, mutate records, or invoke IPC. The backup action rows no longer carry those tour markers.
+
+The navigation column remains 178px wide and now groups the valid tablist with a labeled Backup shortcuts section. Guide copy tells users to choose Backup, Restore shortcut, or Export Excel shortcut before using the corresponding actual control.
+
+Rendered tests cover visible target uniqueness, valid tablist separation, and inert shortcut behavior. App coverage confirms tour navigation leaves the default Units panel selected.
+
+Validation:
+
+- Focused App, Settings, and guide tests: 3 files, 22 tests passed.
+- All renderer tests: 14 files, 78 tests passed.
+- `npm run typecheck` passed.
+- `git diff --check` passed.
+
+Concerns: none.
+
 ## G5 Uniqueness Fix
 
 Status: complete

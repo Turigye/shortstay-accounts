@@ -83,7 +83,7 @@ describe("App Help navigation", () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Search guide" })));
   });
 
-  it("reveals the relevant Settings panel when a tour enters a Settings step", async () => {
+  it("keeps the default Settings panel when a tour enters a Settings step", async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -93,7 +93,7 @@ describe("App Help navigation", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
 
-    expect(await screen.findByRole("heading", { name: "Rental tax" })).toBeTruthy();
-    expect(document.querySelector('[data-tour="tax-guidance"]')?.textContent).toContain("Annual gross rental basis");
+    expect(await screen.findByRole("heading", { name: "Units" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Rental tax" })).toBeNull();
   });
 });
