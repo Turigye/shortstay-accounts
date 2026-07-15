@@ -1,10 +1,10 @@
 import { CalendarCheck2, LoaderCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
 
 import { AppShell, type AppScreen } from "./components/AppShell";
 import { FirstUnlockWelcome } from "./guidance/FirstUnlockWelcome";
 import { GuidedTour } from "./guidance/GuidedTour";
-import { TourProvider } from "./guidance/TourProvider";
+import { TourProvider, useTour } from "./guidance/TourProvider";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { BookingsScreen } from "./screens/BookingsScreen";
 import { PaymentsScreen } from "./screens/PaymentsScreen";
@@ -27,6 +27,13 @@ const screenContent: Record<Exclude<AppScreen, "settings">, { title: string; des
   "financial-position": { title: "Financial Position", description: "Cash, receivables, inventory, obligations, assets, and equity." },
   reports: { title: "Reports", description: "Statements, cash flow, break-even, trends, and ratios." },
 };
+
+function GuidedSettingsScreen(props: ComponentProps<typeof SettingsScreen>) {
+  const { activeTour, stepIndex } = useTour();
+  const step = activeTour?.steps[stepIndex];
+
+  return <SettingsScreen {...props} guidanceTarget={step?.screen === "settings" ? step.target : undefined} />;
+}
 
 export function App() {
   const [activeScreen, setActiveScreen] = useState<AppScreen>("today");
@@ -97,7 +104,7 @@ export function App() {
         ) : activeScreen === "reports" ? (
           <ReportsScreen />
         ) : activeScreen === "settings" ? (
-          <SettingsScreen
+          <GuidedSettingsScreen
             business={business}
             busy={busy}
             error={error}

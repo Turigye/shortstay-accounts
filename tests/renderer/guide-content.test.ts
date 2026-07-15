@@ -59,12 +59,7 @@ const targetSourceFiles: Record<string, string> = {
 
 const dynamicTargetMarkers: Partial<Record<string, readonly string[]>> = {
   "reopen-period": ['data-tour={item==="month-end"?"reopen-period":undefined}'],
-  "tax-guidance": ['tax: "tax-guidance"'],
-  backup: ['data-tour={id === "backup" ? "backup" : tabTourTargets[id]}'],
-  restore: ['data-tour={id === "backup" ? "restore" : undefined}'],
-  "excel-export": ['data-tour={id === "backup" ? "excel-export" : undefined}'],
-  "effective-rates": ['compensation: "effective-rates"'],
-  security: ['security: "security"'],
+  "effective-rates": ["data-tour={guidanceTarget}"],
 };
 
 describe("beginner guide content", () => {

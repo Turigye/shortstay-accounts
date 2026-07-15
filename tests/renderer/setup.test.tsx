@@ -95,32 +95,79 @@ describe("business setup", () => {
 });
 
 describe("settings", () => {
-  it("maps backup, restore, and export tour steps to distinct visible Backup-tab elements by default", () => {
-    render(
-      <SettingsScreen
-        business={business}
-        onLock={vi.fn()}
-        onManageUnits={vi.fn()}
-        onSetRate={vi.fn()}
-      />,
-    );
-
-    const backupTab = screen.getByRole("tab", { name: "Backup" });
-    for (const target of ["backup", "restore", "excel-export"]) {
+  it("reveals each backup guidance target on its real action row without side effects", () => {
+    const onLock = vi.fn();
+    const onManageUnits = vi.fn();
+    const onSetRate = vi.fn();
+    const invoke = vi.fn();
+    Object.defineProperty(window, "stayBooks", {
+      configurable: true,
+      value: { invoke },
+    });
+    const props = { business, onLock, onManageUnits, onSetRate };
+    const { rerender } = render(<SettingsScreen {...props} guidanceTarget="backup" />);
+    const backupTargets = ["backup", "restore", "excel-export"].map((target) => {
       const matches = document.querySelectorAll<HTMLElement>(`[data-tour="${target}"]`);
       expect(matches).toHaveLength(1);
-      const style = getComputedStyle(matches[0]);
-      expect(
-        !matches[0].hidden &&
-          matches[0].getAttribute("aria-hidden") !== "true" &&
-          style.display !== "none" &&
-          style.visibility !== "hidden",
-      ).toBe(true);
-      expect(backupTab.contains(matches[0])).toBe(true);
+      return matches[0];
+    });
+
+    for (const target of backupTargets) {
+      expect(target.hidden).toBe(false);
+      expect(target.getAttribute("aria-hidden")).not.toBe("true");
+      expect(getComputedStyle(target).display).not.toBe("none");
+      expect(getComputedStyle(target).visibility).not.toBe("hidden");
     }
-    expect(document.querySelector('[data-tour="backup"]')).toBe(backupTab);
-    expect(screen.getByRole("heading", { name: "Units" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Backup and export" })).toBeNull();
+    expect(backupTargets.every((target, index) =>
+      backupTargets.every((other, otherIndex) => index === otherIndex || (!target.contains(other) && !other.contains(target))),
+    )).toBe(true);
+
+    for (const [target, text] of [
+      ["backup", "Create backup"],
+      ["restore", "Restore"],
+      ["excel-export", "Export Excel"],
+    ] as const) {
+      rerender(<SettingsScreen {...props} guidanceTarget={target} />);
+
+      const matches = document.querySelectorAll<HTMLElement>(`[data-tour="${target}"]`);
+      expect(matches).toHaveLength(1);
+      expect(matches[0].textContent).toContain(text);
+      expect(screen.getByRole("heading", { name: "Backup and export" })).toBeTruthy();
+      expect(screen.getByRole("tab", { name: "Backup" }).getAttribute("aria-selected")).toBe("true");
+    }
+
+    expect(onLock).not.toHaveBeenCalled();
+    expect(onManageUnits).not.toHaveBeenCalled();
+    expect(onSetRate).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("switches Settings tabs from guidance targets without side effects", () => {
+    const onLock = vi.fn();
+    const onManageUnits = vi.fn();
+    const onSetRate = vi.fn();
+    const invoke = vi.fn();
+    Object.defineProperty(window, "stayBooks", {
+      configurable: true,
+      value: { invoke },
+    });
+    const props = { business, onLock, onManageUnits, onSetRate };
+    const { rerender } = render(<SettingsScreen {...props} guidanceTarget="tax-guidance" />);
+
+    for (const [target, heading] of [
+      ["unit-settings", "Units"],
+      ["effective-rates", "Compensation"],
+      ["tax-guidance", "Rental tax"],
+      ["security", "Security"],
+    ] as const) {
+      rerender(<SettingsScreen {...props} guidanceTarget={target} />);
+      expect(screen.getByRole("heading", { name: heading })).toBeTruthy();
+    }
+
+    expect(onLock).not.toHaveBeenCalled();
+    expect(onManageUnits).not.toHaveBeenCalled();
+    expect(onSetRate).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalled();
     expect(
       tourDefinitions
         .flatMap((tour) => tour.steps)

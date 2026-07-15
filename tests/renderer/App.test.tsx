@@ -12,14 +12,21 @@ vi.mock("../../src/renderer/screens/TodayScreen", () => ({
 }));
 
 vi.mock("../../src/renderer/screens/ReportsScreen", () => ({
-  ReportsScreen: () => <h1>Reports</h1>,
+  ReportsScreen: () => <><h1>Reports</h1><div data-tour="report-period" /><div data-tour="report-tabs" /></>,
 }));
 
 const business = {
   id: "business-1",
+  businessId: "business-1",
   name: "Demo apartments",
+  currency: "UGX",
+  unitIds: [],
   units: [],
+  staffRates: { operations: 5, salesMarketing: 5, finance: 10, itLegal: 2, security: 5, ceo: 10 },
+  referralRate: 10,
   taxProvisionPerUnit: 0,
+  closedMonths: [],
+  rateHistory: { staff: [], referral: [], taxProvision: [] },
 };
 
 beforeEach(() => {
@@ -74,5 +81,19 @@ describe("App Help navigation", () => {
 
     expect(await screen.findByRole("heading", { name: "Help Center" })).toBeTruthy();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Search guide" })));
+  });
+
+  it("reveals the relevant Settings panel when a tour enters a Settings step", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Help" }));
+    await user.click(screen.getByRole("button", { name: "Start tour: reports" }));
+    await screen.findByRole("heading", { name: "Reports" });
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(await screen.findByRole("heading", { name: "Rental tax" })).toBeTruthy();
+    expect(document.querySelector('[data-tour="tax-guidance"]')?.textContent).toContain("Annual gross rental basis");
   });
 });

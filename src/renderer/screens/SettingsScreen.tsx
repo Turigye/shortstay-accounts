@@ -48,6 +48,7 @@ interface SettingsScreenProps {
   busy?: boolean;
   error?: string | null;
   today?: string;
+  guidanceTarget?: string;
 }
 
 const ROLE_LABELS: Record<RoleKey, string> = {
@@ -70,9 +71,13 @@ const TABS = [
   { id: "security", label: "Security", icon: KeyRound },
 ] as const;
 
-const tabTourTargets: Partial<Record<SettingsTab, string>> = {
-  compensation: "effective-rates",
-  tax: "tax-guidance",
+const guidanceTargetTabs: Record<string, SettingsTab> = {
+  "unit-settings": "units",
+  "effective-rates": "compensation",
+  "tax-guidance": "tax",
+  backup: "backup",
+  restore: "backup",
+  "excel-export": "backup",
   security: "security",
 };
 
@@ -93,6 +98,7 @@ interface RateEditorProps {
   onSave: SettingsScreenProps["onSetRate"];
   busy: boolean;
   existingStaffTotal?: number;
+  guidanceTarget?: string;
 }
 
 function RateEditor({
@@ -104,6 +110,7 @@ function RateEditor({
   onSave,
   busy,
   existingStaffTotal = 0,
+  guidanceTarget,
 }: RateEditorProps) {
   const [value, setValue] = useState(String(currentValue));
   const [effectiveFrom, setEffectiveFrom] = useState(today);
@@ -141,7 +148,7 @@ function RateEditor({
   }
 
   return (
-    <form className="rate-editor" onSubmit={handleSubmit}>
+    <form className="rate-editor" data-tour={guidanceTarget} onSubmit={handleSubmit}>
       <div className="field-group">
         <label htmlFor={`${kind}-value`}>
           {kind === "taxProvision" ? "Monthly rental income per unit" : "Rate"}
@@ -207,6 +214,7 @@ export function SettingsScreen({
   busy = false,
   error,
   today = todayDate(),
+  guidanceTarget,
 }: SettingsScreenProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("units");
   const [units, setUnits] = useState<{ id?: string; name: string }[]>(
@@ -222,6 +230,11 @@ export function SettingsScreen({
   useEffect(() => {
     setUnits(business.units.map(({ id, name }) => ({ id, name })));
   }, [business.units]);
+
+  useEffect(() => {
+    const tab = guidanceTarget ? guidanceTargetTabs[guidanceTarget] : undefined;
+    if (tab) setActiveTab(tab);
+  }, [guidanceTarget]);
 
   const staffTotal = useMemo(
     () => Object.values(business.staffRates).reduce((sum, value) => sum + value, 0),
@@ -264,18 +277,14 @@ export function SettingsScreen({
             <button
               aria-selected={activeTab === id}
               className="settings-tab"
-              data-tour={id === "backup" ? "backup" : tabTourTargets[id]}
               key={id}
               onClick={() => setActiveTab(id)}
               role="tab"
               type="button"
             >
-              <span
-                className="settings-tab-content"
-                data-tour={id === "backup" ? "restore" : undefined}
-              >
+              <span className="settings-tab-content">
                 <Icon aria-hidden="true" size={16} />
-                <span data-tour={id === "backup" ? "excel-export" : undefined}>{label}</span>
+                <span>{label}</span>
               </span>
             </button>
           ))}
@@ -368,6 +377,7 @@ export function SettingsScreen({
                 closedMonths={business.closedMonths}
                 currentValue={business.staffRates[selectedRole]}
                 existingStaffTotal={staffTotal - business.staffRates[selectedRole]}
+                guidanceTarget="effective-rates"
                 kind="staff"
                 onSave={onSetRate}
                 role={selectedRole}
@@ -399,7 +409,7 @@ export function SettingsScreen({
                 <div><h2>Rental tax</h2><p>Annual estimate for an individual landlord</p></div>
                 <strong>UGX {formatNumber(annualRentalTax)} / year</strong>
               </div>
-              <dl className="settings-definition-list">
+              <dl className="settings-definition-list" data-tour="tax-guidance">
                 <div><dt>Annual gross rental basis</dt><dd>UGX {formatNumber(annualRentalIncome)}</dd></div>
                 <div><dt>Tax-free annual threshold</dt><dd>UGX {formatNumber(RENTAL_TAX_ANNUAL_THRESHOLD)}</dd></div>
                 <div><dt>Rental tax rate</dt><dd>{RENTAL_TAX_RATE_PERCENT}%</dd></div>
@@ -448,14 +458,14 @@ export function SettingsScreen({
                 <div><dt>Encryption</dt><dd>On</dd></div>
                 <div><dt>Automatic upload</dt><dd>Off</dd></div>
               </dl>
-              <div className="file-actions"><label className="field-group"><span>Local password</span><input type="password" value={filePassword} onChange={(event)=>setFilePassword(event.target.value)} autoComplete="current-password"/></label><div className="file-action-row"><div><strong>Encrypted backup</strong><span>Create a portable copy of the complete local business file.</span></div><button className="secondary-button" disabled={fileBusy||!filePassword} onClick={()=>void createBackup()} type="button"><Download size={16}/>Create backup</button></div><label className="restore-confirm"><input type="checkbox" checked={restoreConfirmed} onChange={(event)=>setRestoreConfirmed(event.target.checked)}/><span>I understand restore replaces the current local business file.</span></label><div className="file-action-row"><div><strong>Restore backup</strong><span>Validate an encrypted backup before replacing this file.</span></div><button className="secondary-button" disabled={fileBusy||!filePassword||!restoreConfirmed} onClick={()=>void restoreBackup()} type="button"><Upload size={16}/>Restore</button></div><div className="file-action-row"><label className="field-group"><span>Export month</span><input type="month" value={exportMonth} onChange={(event)=>setExportMonth(event.target.value)}/></label><button className="primary-button" disabled={fileBusy} onClick={()=>void exportExcel()} type="button"><FileSpreadsheet size={16}/>Export Excel</button></div>{fileMessage?<p className="inline-message" role="status">{fileMessage}</p>:null}</div>
+              <div className="file-actions"><label className="field-group"><span>Local password</span><input type="password" value={filePassword} onChange={(event)=>setFilePassword(event.target.value)} autoComplete="current-password"/></label><div className="file-action-row" data-tour="backup"><div><strong>Encrypted backup</strong><span>Create a portable copy of the complete local business file.</span></div><button className="secondary-button" disabled={fileBusy||!filePassword} onClick={()=>void createBackup()} type="button"><Download size={16}/>Create backup</button></div><label className="restore-confirm"><input type="checkbox" checked={restoreConfirmed} onChange={(event)=>setRestoreConfirmed(event.target.checked)}/><span>I understand restore replaces the current local business file.</span></label><div className="file-action-row" data-tour="restore"><div><strong>Restore backup</strong><span>Validate an encrypted backup before replacing this file.</span></div><button className="secondary-button" disabled={fileBusy||!filePassword||!restoreConfirmed} onClick={()=>void restoreBackup()} type="button"><Upload size={16}/>Restore</button></div><div className="file-action-row" data-tour="excel-export"><label className="field-group"><span>Export month</span><input type="month" value={exportMonth} onChange={(event)=>setExportMonth(event.target.value)}/></label><button className="primary-button" disabled={fileBusy} onClick={()=>void exportExcel()} type="button"><FileSpreadsheet size={16}/>Export Excel</button></div>{fileMessage?<p className="inline-message" role="status">{fileMessage}</p>:null}</div>
             </>
           ) : null}
 
           {activeTab === "security" ? (
             <>
               <div className="panel-heading"><h2>Security</h2><p>Encrypted local access</p></div>
-              <div className="security-setting-row">
+              <div className="security-setting-row" data-tour="security">
                 <div><strong>Business file</strong><span>Currently unlocked</span></div>
                 <button className="secondary-button" disabled={busy} onClick={() => void onLock()} type="button">
                   <KeyRound aria-hidden="true" size={16} /> Lock now

@@ -52,3 +52,20 @@ Validation:
 - `git diff --check` passed
 
 Concerns: none.
+
+## G5 Context-Aware Settings Targets
+
+Status: complete
+
+Settings now accepts an optional guidance target and changes only the visible Settings tab for guided targets. App renders a `GuidedSettingsScreen` inside `TourProvider`, which supplies the active Settings step target without coupling standalone Settings renders to tour context.
+
+Backup, restore, and Excel export targets now identify distinct action rows in the Backup panel. Tax guidance, effective rates, and security identify their actual panel content; unit settings remains on its form. The target manifest retains strict uniqueness and source-binding checks, and rendered tests verify target visibility, semantic content, disjoint regions, passive tab changes, and the App tour transition into Rental tax.
+
+Validation:
+
+- Focused App, Settings, and guide tests: 3 files, 20 tests passed.
+- All renderer tests: 14 files, 76 tests passed.
+- `npm run typecheck` passed.
+- `git diff --check` passed.
+
+Concerns: none.
