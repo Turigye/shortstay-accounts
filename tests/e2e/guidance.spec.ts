@@ -19,19 +19,24 @@ const CHAPTERS = [
   ["administration", "Administration and Safety"],
 ] as const;
 
-async function setWindowViewport(app: ElectronApplication, page: Page, width: number, height: number) {
-  const viewport = await app.evaluate(({ BrowserWindow }, size) => {
+interface Viewport {
+  height: number;
+  width: number;
+}
+
+async function setContentViewport(app: ElectronApplication, page: Page, width: number, height: number): Promise<Viewport> {
+  const contentSize = await app.evaluate(({ BrowserWindow }, size) => {
     const window = BrowserWindow.getAllWindows()[0];
-    window?.setSize(size.width, size.height);
-    return window ? { contentSize: window.getContentSize(), size: window.getSize() } : null;
+    window?.setContentSize(size.width, size.height);
+    return window?.getContentSize() ?? null;
   }, { width, height });
-  expect(viewport).not.toBeNull();
-  expect(viewport!.size[0]).toBe(width);
-  expect(viewport!.size[1]).toBeLessThanOrEqual(height);
-  expect(viewport!.size[1]).toBeGreaterThanOrEqual(640);
-  await page.evaluate(() => new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-  }));
+  expect(contentSize).not.toBeNull();
+
+  await expect.poll(async () => page.evaluate(() => ({ height: window.innerHeight, width: window.innerWidth }))).toEqual({
+    height: contentSize![1],
+    width: contentSize![0],
+  });
+  return page.evaluate(() => ({ height: window.innerHeight, width: window.innerWidth }));
 }
 
 async function createBusiness(page: Page) {
@@ -48,7 +53,17 @@ async function openHelp(page: Page) {
   await expect(page.getByRole("heading", { name: "Help Center", level: 1 })).toBeVisible();
 }
 
-async function expectTourGeometry(page: Page) {
+async function resetGuidance(page: Page) {
+  await page.evaluate(() => localStorage.removeItem("shortstay-guidance:v1"));
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
+}
+
+function expectDatabaseUnchanged(database: string, initialDatabaseMtime: number) {
+  expect(statSync(database).mtimeMs).toBe(initialDatabaseMtime);
+}
+
+async function expectTourGeometry(page: Page, viewport: Viewport) {
   await expect(page.getByRole("dialog", { name: "Orientation" })).toBeVisible();
   await expect.poll(() => page.locator(".tour-panel").boundingBox()).not.toBeNull();
 
@@ -77,6 +92,7 @@ async function expectTourGeometry(page: Page) {
 
   expect(geometry.horizontalOverflow).toBe(false);
   expect(geometry.overlaps).toBe(false);
+  expect(geometry.viewport).toEqual(viewport);
   for (const rectangle of [geometry.panel, geometry.spotlight]) {
     expect(rectangle).not.toBeNull();
     expect(rectangle!.left).toBeGreaterThanOrEqual(0);
@@ -96,7 +112,7 @@ test("keeps beginner guidance keyboard-accessible, responsive, and data-only", a
   try {
     app = await _electron.launch({ args: [".", `--user-data-dir=${profile}`], cwd: process.cwd() });
     const page = await app.firstWindow();
-    await setWindowViewport(app, page, VIEWPORTS[0].width, VIEWPORTS[0].height);
+    await setContentViewport(app, page, VIEWPORTS[0].width, VIEWPORTS[0].height);
     await page.evaluate(() => localStorage.clear());
     await page.reload();
     await createBusiness(page);
@@ -106,7 +122,7 @@ test("keeps beginner guidance keyboard-accessible, responsive, and data-only", a
     expect(readFileSync(database).subarray(0, 16).toString()).not.toBe("SQLite format 3\0");
     const initialDatabaseMtime = statSync(database).mtimeMs;
 
-    const welcome = page.getByRole("dialog", { name: "Welcome to Short-Stay Accounts" });
+    let welcome = page.getByRole("dialog", { name: "Welcome to Short-Stay Accounts" });
     await expect(welcome).toBeVisible();
     await expect(welcome.getByRole("button", { name: "Start" })).toBeVisible();
     await expect(welcome.getByRole("button", { name: "Explore independently" })).toBeVisible();
@@ -120,6 +136,29 @@ test("keeps beginner guidance keyboard-accessible, responsive, and data-only", a
     }
     await orientationTour.getByRole("button", { name: "Finish" }).click();
     await expect(orientationTour).toHaveCount(0);
+    expectDatabaseUnchanged(database, initialDatabaseMtime);
+
+    await resetGuidance(page);
+    welcome = page.getByRole("dialog", { name: "Welcome to Short-Stay Accounts" });
+    await expect(welcome).toBeVisible();
+    await welcome.getByRole("button", { name: "Open guide" }).click();
+    await expect(welcome).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Help Center", level: 1 })).toBeVisible();
+    await expect(page.getByRole("searchbox", { name: "Search guide" })).toBeFocused();
+    expectDatabaseUnchanged(database, initialDatabaseMtime);
+
+    await resetGuidance(page);
+    welcome = page.getByRole("dialog", { name: "Welcome to Short-Stay Accounts" });
+    await expect(welcome).toBeVisible();
+    await welcome.getByRole("button", { name: "Explore independently" }).click();
+    await expect(welcome).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Today", exact: true })).toBeFocused();
+    await page.getByRole("button", { name: "Bookings", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Bookings", level: 1 })).toBeVisible();
+    await page.getByLabel("Main navigation").getByRole("button", { name: "Today", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
+    expectDatabaseUnchanged(database, initialDatabaseMtime);
 
     await openHelp(page);
     const search = page.getByLabel("Search guide");
@@ -128,6 +167,7 @@ test("keeps beginner guidance keyboard-accessible, responsive, and data-only", a
     await expect(results).toContainText("Reports and Tax");
     await expect(results).toContainText("Rental-tax estimate");
     await search.fill("");
+    expectDatabaseUnchanged(database, initialDatabaseMtime);
 
     for (const [id, title] of CHAPTERS) {
       await page.getByRole("button", { name: `Start tour: ${id}` }).click();
@@ -138,9 +178,10 @@ test("keeps beginner guidance keyboard-accessible, responsive, and data-only", a
       await expect(page.getByRole("button", { name: "Help" })).toBeFocused();
       if (id !== CHAPTERS.at(-1)![0]) await openHelp(page);
     }
+    expectDatabaseUnchanged(database, initialDatabaseMtime);
 
     for (const { width, height } of VIEWPORTS) {
-      await setWindowViewport(app, page, width, height);
+      const viewport = await setContentViewport(app, page, width, height);
       await openHelp(page);
       const helpSearch = page.getByLabel("Search guide");
       const orientationButton = page.getByRole("button", { name: "Start tour: orientation" });
@@ -157,23 +198,26 @@ test("keeps beginner guidance keyboard-accessible, responsive, and data-only", a
           horizontalOverflow: Math.max(root.scrollWidth, document.body.scrollWidth) > window.innerWidth + 1,
           searchWithinViewport: withinViewport(searchRect),
           startTourWithinViewport: withinViewport(startTourRect),
+          viewport: { height: window.innerHeight, width: window.innerWidth },
         };
       });
       expect(helpLayout.horizontalOverflow).toBe(false);
       expect(helpLayout.searchWithinViewport).toBe(true);
       expect(helpLayout.startTourWithinViewport).toBe(true);
+      expect(helpLayout.viewport).toEqual(viewport);
 
       await orientationButton.click();
       for (let step = 0; step < 4; step += 1) {
-        await expectTourGeometry(page);
+        await expectTourGeometry(page, viewport);
         if (step < 3) await page.getByRole("dialog", { name: "Orientation" }).getByRole("button", { name: "Next" }).click();
       }
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog", { name: "Orientation" })).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Help" })).toBeFocused();
+      expectDatabaseUnchanged(database, initialDatabaseMtime);
     }
 
-    expect(statSync(database).mtimeMs).toBe(initialDatabaseMtime);
+    expectDatabaseUnchanged(database, initialDatabaseMtime);
   } finally {
     try {
       await app?.close();

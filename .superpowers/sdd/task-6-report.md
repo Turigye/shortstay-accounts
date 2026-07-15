@@ -51,3 +51,13 @@ Status: complete.
 - Added responsive assertions for requested native window sizes `1440x900`, `1280x720`, and `1024x640`: tour panel and spotlight containment, non-overlap, no horizontal overflow, and usable Help search and chapter controls.
 - Verified with `npx electron-forge package`, focused guidance E2E, full E2E (2 passed), and `npm run typecheck`.
 - macOS reserves seven pixels from the maximum screen height on this runner, so a requested `1440x900` native window is reported as `1440x893`. The test still requests all required native dimensions and performs strict containment and overlap checks against the renderer's live viewport.
+
+## Guidance G6 Review Follow-up
+
+Status: complete.
+
+- Exercised `Start`, completed Orientation, then independently reset only `shortstay-guidance:v1` and reloaded the unlocked renderer to exercise `Open guide` and `Explore independently`.
+- `Open guide` now proves Help Center opens and its search field receives focus. `Explore independently` proves the welcome closes, Today restores focus, and ordinary Today-to-Bookings navigation remains usable.
+- Replaced outer-window equality assertions with content viewport synchronization. The helper requests a content size, waits for the actual renderer dimensions, returns them, and all layout geometry assertions use those dimensions; width and height OS caps are accepted.
+- Added mtime assertions after first-unlock actions, Help navigation, chapter tours, and each responsive tour run. Guidance local storage, tutorials, and Help navigation do not mutate `business.db`.
+- Verification: focused guidance E2E passed; full Electron E2E passed (2 tests); `npm run typecheck` passed; `git diff --check` passed.
