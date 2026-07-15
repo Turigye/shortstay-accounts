@@ -35,3 +35,20 @@ Validation:
 - `git diff --check` passed.
 
 Concerns: none.
+
+## G5 Uniqueness Fix
+
+Status: complete
+
+Settings keeps the Backup tab visible and selected targets stable while assigning distinct semantic markers: `backup` is on the tab button, `restore` is on an inline-flex icon-and-label wrapper, and `excel-export` is on the visible label span. Settings still defaults to Units, and tab dimensions and click behavior are preserved.
+
+Guide content and the settings manifest now use the three distinct target values. The guide integrity test compares the full target sequence without de-duplication and asserts manifest uniqueness. The rendered Settings test verifies exactly one visible element for each target while Units remains active.
+
+Validation:
+
+- Focused guide and setup tests: 2 files, 15 tests passed
+- All renderer tests: 14 files, 74 tests passed
+- `npm run typecheck` passed
+- `git diff --check` passed
+
+Concerns: none.

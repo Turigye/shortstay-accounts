@@ -95,7 +95,7 @@ describe("business setup", () => {
 });
 
 describe("settings", () => {
-  it("maps backup, restore, and export tour steps to the visible Backup tab by default", () => {
+  it("maps backup, restore, and export tour steps to distinct visible Backup-tab elements by default", () => {
     render(
       <SettingsScreen
         business={business}
@@ -105,10 +105,20 @@ describe("settings", () => {
       />,
     );
 
-    const targets = document.querySelectorAll('[data-tour="backup-tools"]');
     const backupTab = screen.getByRole("tab", { name: "Backup" });
-    expect(targets).toHaveLength(1);
-    expect(targets[0]).toBe(backupTab);
+    for (const target of ["backup", "restore", "excel-export"]) {
+      const matches = document.querySelectorAll<HTMLElement>(`[data-tour="${target}"]`);
+      expect(matches).toHaveLength(1);
+      const style = getComputedStyle(matches[0]);
+      expect(
+        !matches[0].hidden &&
+          matches[0].getAttribute("aria-hidden") !== "true" &&
+          style.display !== "none" &&
+          style.visibility !== "hidden",
+      ).toBe(true);
+      expect(backupTab.contains(matches[0])).toBe(true);
+    }
+    expect(document.querySelector('[data-tour="backup"]')).toBe(backupTab);
     expect(screen.getByRole("heading", { name: "Units" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Backup and export" })).toBeNull();
     expect(
@@ -116,7 +126,7 @@ describe("settings", () => {
         .flatMap((tour) => tour.steps)
         .filter((step) => ["excel-export", "backup", "restore"].includes(step.id))
         .map((step) => step.target),
-    ).toEqual(["backup-tools", "backup-tools", "backup-tools"]);
+    ).toEqual(["excel-export", "backup", "restore"]);
   });
 
   it("exposes all specified settings tabs without later-task action placeholders", async () => {

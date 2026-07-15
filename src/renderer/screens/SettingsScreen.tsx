@@ -73,7 +73,6 @@ const TABS = [
 const tabTourTargets: Partial<Record<SettingsTab, string>> = {
   compensation: "effective-rates",
   tax: "tax-guidance",
-  backup: "backup-tools",
   security: "security",
 };
 
@@ -265,14 +264,19 @@ export function SettingsScreen({
             <button
               aria-selected={activeTab === id}
               className="settings-tab"
-              data-tour={tabTourTargets[id]}
+              data-tour={id === "backup" ? "backup" : tabTourTargets[id]}
               key={id}
               onClick={() => setActiveTab(id)}
               role="tab"
               type="button"
             >
-              <Icon aria-hidden="true" size={16} />
-              {label}
+              <span
+                className="settings-tab-content"
+                data-tour={id === "backup" ? "restore" : undefined}
+              >
+                <Icon aria-hidden="true" size={16} />
+                <span data-tour={id === "backup" ? "excel-export" : undefined}>{label}</span>
+              </span>
             </button>
           ))}
         </div>

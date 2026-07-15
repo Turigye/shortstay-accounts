@@ -95,13 +95,13 @@ export const tourDefinitions: TourDefinition[] = [
     { id: "report-period", screen: "reports", target: "report-period", title: "Choose the period", body: "Confirm the month before explaining, printing, or exporting a report." },
     { id: "report-tabs", screen: "reports", target: "report-tabs", title: "Read each view", body: "Income statement, balance sheet, cash flow, break-even, and ratios answer different questions." },
     { id: "tax-guidance", screen: "settings", target: "tax-guidance", title: "Understand the estimate", body: "Select Rental tax to review the individual-landlord estimate: 12% of annual gross rental income above UGX 2,820,000." },
-    { id: "excel-export", screen: "settings", target: "backup-tools", title: "Share a workbook", body: "Select Backup, then export the checked report period to Excel when a workbook is needed." },
+    { id: "excel-export", screen: "settings", target: "excel-export", title: "Share a workbook", body: "Select Backup, then export the checked report period to Excel when a workbook is needed." },
   ] },
   { id: "administration", title: "Administration and Safety", summary: "Maintain settings and secure local records.", steps: [
     { id: "unit-settings", screen: "settings", target: "unit-settings", title: "Manage units", body: "Keep active units and their details current." },
     { id: "effective-rates", screen: "settings", target: "effective-rates", title: "Date rate changes", body: "Select Compensation, Referral, or Rental tax before changing a rate; effective dates retain the calculation basis for historical periods." },
-    { id: "backup", screen: "settings", target: "backup-tools", title: "Create encrypted backups", body: "Select Backup, enter the local password, then create and store the encrypted copy separately." },
-    { id: "restore", screen: "settings", target: "backup-tools", title: "Restore deliberately", body: "Select Backup, then restore only after reviewing the overwrite confirmation because it replaces local data." },
+    { id: "backup", screen: "settings", target: "backup", title: "Create encrypted backups", body: "Select Backup, enter the local password, then create and store the encrypted copy separately." },
+    { id: "restore", screen: "settings", target: "restore", title: "Restore deliberately", body: "Select Backup, then restore only after reviewing the overwrite confirmation because it replaces local data." },
     { id: "security", screen: "settings", target: "security", title: "Keep the password safe", body: "Select Security to lock the application. Storage is local only, and the business owner is responsible for the password." },
   ] },
 ];

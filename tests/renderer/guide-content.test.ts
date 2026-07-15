@@ -22,7 +22,7 @@ const tourTargetManifest = {
   staff: ["staff-base", "staff-rates", "referral-earnings", "calculation-trace"],
   "financial-position": ["position-summary", "position-balances", "month-end", "reopen-period"],
   reports: ["report-period", "report-tabs"],
-  settings: ["tax-guidance", "backup-tools", "unit-settings", "effective-rates", "security"],
+  settings: ["tax-guidance", "excel-export", "unit-settings", "effective-rates", "backup", "restore", "security"],
 } as const;
 
 const targetSourceFiles: Record<string, string> = {
@@ -49,7 +49,9 @@ const targetSourceFiles: Record<string, string> = {
   "report-period": "src/renderer/screens/ReportsScreen.tsx",
   "report-tabs": "src/renderer/screens/ReportsScreen.tsx",
   "tax-guidance": "src/renderer/screens/SettingsScreen.tsx",
-  "backup-tools": "src/renderer/screens/SettingsScreen.tsx",
+  "backup": "src/renderer/screens/SettingsScreen.tsx",
+  restore: "src/renderer/screens/SettingsScreen.tsx",
+  "excel-export": "src/renderer/screens/SettingsScreen.tsx",
   "unit-settings": "src/renderer/screens/SettingsScreen.tsx",
   "effective-rates": "src/renderer/screens/SettingsScreen.tsx",
   security: "src/renderer/screens/SettingsScreen.tsx",
@@ -57,10 +59,12 @@ const targetSourceFiles: Record<string, string> = {
 
 const dynamicTargetMarkers: Partial<Record<string, readonly string[]>> = {
   "reopen-period": ['data-tour={item==="month-end"?"reopen-period":undefined}'],
-  "tax-guidance": ["data-tour={tabTourTargets[id]}", 'tax: "tax-guidance"'],
-  "backup-tools": ["data-tour={tabTourTargets[id]}", 'backup: "backup-tools"'],
-  "effective-rates": ["data-tour={tabTourTargets[id]}", 'compensation: "effective-rates"'],
-  security: ["data-tour={tabTourTargets[id]}", 'security: "security"'],
+  "tax-guidance": ['tax: "tax-guidance"'],
+  backup: ['data-tour={id === "backup" ? "backup" : tabTourTargets[id]}'],
+  restore: ['data-tour={id === "backup" ? "restore" : undefined}'],
+  "excel-export": ['data-tour={id === "backup" ? "excel-export" : undefined}'],
+  "effective-rates": ['compensation: "effective-rates"'],
+  security: ['security: "security"'],
 };
 
 describe("beginner guide content", () => {
@@ -104,13 +108,13 @@ describe("beginner guide content", () => {
         screen,
         tourDefinitions.flatMap((tour) => tour.steps)
           .filter((step) => step.screen === screen)
-          .map((step) => step.target)
-          .filter((target, index, targets) => targets.indexOf(target) === index),
+          .map((step) => step.target),
       ]),
     );
     const manifestTargets = Object.values(tourTargetManifest).flat();
 
     expect(targetsByScreen).toEqual(tourTargetManifest);
+    expect(new Set(manifestTargets).size).toBe(manifestTargets.length);
     expect(manifestTargets.every((target) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(target))).toBe(true);
     expect(Object.keys(targetSourceFiles).sort()).toEqual([...manifestTargets].sort());
 

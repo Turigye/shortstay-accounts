@@ -939,11 +939,9 @@ textarea:focus-visible {
 }
 
 .settings-tab {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
+  display: flex;
   min-height: 36px;
   align-items: center;
-  gap: var(--space-2);
   padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius-md);
@@ -952,6 +950,13 @@ textarea:focus-visible {
   cursor: pointer;
   font-size: var(--text-sm);
   text-align: left;
+}
+
+.settings-tab-content {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .settings-tab:hover {
