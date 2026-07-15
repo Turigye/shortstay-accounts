@@ -14,6 +14,7 @@
     "test": "node scripts/run-vitest-in-electron.mjs",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "guide:capture": "node scripts/capture-user-guide.mjs",
     "pretest:electron-create": "npm run rebuild:electron",
     "test:electron-create": "node scripts/probe-dev-business-creation.mjs",
     "typecheck": "tsc --noEmit",
