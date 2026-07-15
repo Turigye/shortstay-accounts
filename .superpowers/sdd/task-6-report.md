@@ -41,3 +41,13 @@ Complete. Task 6 is implemented in the short-stay desktop worktree and is ready 
 ## Concerns
 
 - None blocking. Visual browser polish was intentionally not expanded after the final scope-freeze instruction; renderer behavior is covered by the focused component tests.
+
+## Guidance G6 Electron E2E
+
+Status: complete.
+
+- Updated the original encrypted-business workflow E2E to dismiss the optional first-unlock welcome dialog before primary navigation.
+- Added isolated-profile Electron coverage for first-unlock choices, Orientation completion, Help reopening, rental-tax search, all seven Help chapter tours, Escape/focus restoration, and encrypted database mtime immutability.
+- Added responsive assertions for requested native window sizes `1440x900`, `1280x720`, and `1024x640`: tour panel and spotlight containment, non-overlap, no horizontal overflow, and usable Help search and chapter controls.
+- Verified with `npx electron-forge package`, focused guidance E2E, full E2E (2 passed), and `npm run typecheck`.
+- macOS reserves seven pixels from the maximum screen height on this runner, so a requested `1440x900` native window is reported as `1440x893`. The test still requests all required native dimensions and performs strict containment and overlap checks against the renderer's live viewport.
