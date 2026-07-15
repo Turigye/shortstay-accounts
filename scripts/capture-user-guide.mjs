@@ -37,6 +37,16 @@ const DEMONSTRATIONS = [
   "demo-month-close",
   "demo-backup",
 ];
+const NAVIGATION = {
+  Today: { target: "navigation-today", heading: "Today" },
+  Bookings: { target: "navigation-bookings", heading: "Bookings" },
+  Payments: { target: "navigation-payments", heading: "Payments" },
+  Expenses: { target: "navigation-expenses", heading: "Expenses" },
+  Staff: { target: "navigation-staff", heading: "Staff and referrals" },
+  "Financial Position": { target: "navigation-financial-position", heading: "Financial Position" },
+  Reports: { target: "navigation-reports", heading: "Reports" },
+  Settings: { target: "navigation-settings", heading: "Settings" },
+};
 
 let application;
 let profile;
@@ -221,6 +231,7 @@ async function removeCallouts(page) {
 
 async function captureWebp(page, destination, quality) {
   const source = `${destination}.png`;
+  await page.waitForTimeout(120);
   await page.screenshot({ path: source, type: "png" });
   const png = readFileSync(source).toString("base64");
   const webp = await page.evaluate(async ({ base64, compression }) => {
@@ -264,8 +275,8 @@ function encodeDemo(flow) {
   const flowDirectory = path.join(framesDirectory, flow);
   const webm = path.join(OUTPUT_DIRECTORY, `${flow}.webm`);
   const result = spawnSync(FFMPEG, [
-    "-y", "-framerate", "2", "-i", path.join(flowDirectory, "frame-%02d.webp"),
-    "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "34", "-an", webm,
+    "-y", "-framerate", "0.75", "-i", path.join(flowDirectory, "frame-%02d.webp"),
+    "-r", "12", "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "34", "-an", webm,
   ], { encoding: "utf8" });
   if (result.status !== 0) {
     throw new Error(`ffmpeg could not encode ${flow}: ${result.stderr || result.stdout}`);
@@ -275,8 +286,12 @@ function encodeDemo(flow) {
 }
 
 async function navigate(page, screen) {
-  await page.getByRole("button", { name: screen, exact: true }).click();
-  await page.getByRole("heading", { name: screen, level: 1 }).waitFor();
+  const destination = NAVIGATION[screen];
+  if (!destination) throw new Error(`No sidebar navigation target is defined for ${screen}.`);
+  await page.locator(`[data-tour='${destination.target}']`).click();
+  await page.locator(`[data-tour='${destination.target}'][data-active='true']`).waitFor();
+  await page.getByRole("heading", { name: destination.heading, exact: true, level: 1 }).waitFor();
+  await page.locator(".main-content").hover({ position: { x: 24, y: 24 } });
 }
 
 async function captureBookingDemo(page, fixture) {
