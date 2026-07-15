@@ -83,7 +83,9 @@ export function TourProvider({ children, navigate }: TourProviderProps) {
   const restoreOpenerFocus = () => {
     const opener = openerRef.current;
     openerRef.current = null;
-    if (opener) requestAnimationFrame(() => opener.focus());
+    if (opener?.isConnected) requestAnimationFrame(() => {
+      if (opener.isConnected) opener.focus();
+    });
   };
 
   const closeTour = (completed: boolean) => {

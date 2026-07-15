@@ -54,9 +54,11 @@ function getPanelPosition(rect: SpotlightRect, requested: Placement | undefined,
   };
   const requestedPlacement = requested ?? "bottom";
   const requiredSpace: Record<Placement, number> = { top: height + PANEL_GAP, right: width + PANEL_GAP, bottom: height + PANEL_GAP, left: width + PANEL_GAP };
+  const placements: Placement[] = ["top", "right", "bottom", "left"];
+  const fallbackPlacement = placements.find((candidate) => freeSpace[candidate] >= requiredSpace[candidate]);
   const placement = freeSpace[requestedPlacement] >= requiredSpace[requestedPlacement]
     ? requestedPlacement
-    : (Object.entries(freeSpace).sort(([, first], [, second]) => second - first)[0]?.[0] as Placement ?? "bottom");
+    : fallbackPlacement ?? (Object.entries(freeSpace).sort(([, first], [, second]) => second - first)[0]?.[0] as Placement ?? "bottom");
   const horizontalCenter = rect.left + (rect.width / 2) - (width / 2);
   const verticalCenter = rect.top + (rect.height / 2) - (height / 2);
 

@@ -2,7 +2,7 @@
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FirstUnlockWelcome } from "../../src/renderer/guidance/FirstUnlockWelcome";
@@ -30,7 +30,23 @@ function TourControls(): ReactNode {
   return <button onClick={(event) => startTour("orientation", event.currentTarget)} type="button">Begin tour</button>;
 }
 
-function renderGuidance(onOpenGuide = vi.fn(), targets: "all" | "second" = "all", onTargetAction = vi.fn()) {
+function WelcomeWithPersistentReturnTarget({ onOpenGuide }: { onOpenGuide: () => void }) {
+  const [returnFocusTarget, setReturnFocusTarget] = useState<HTMLElement | null>(null);
+
+  return (
+    <>
+      <button ref={setReturnFocusTarget} type="button">Persistent focus return</button>
+      <FirstUnlockWelcome onOpenGuide={onOpenGuide} returnFocusTarget={returnFocusTarget} />
+    </>
+  );
+}
+
+function renderGuidance(
+  onOpenGuide = vi.fn(),
+  targets: "all" | "second" = "all",
+  onTargetAction = vi.fn(),
+  includeWelcome: false | true | "with-persistent-return-target" = false,
+) {
   const navigate = vi.fn();
   render(
     <TourProvider navigate={navigate}>
@@ -38,7 +54,8 @@ function renderGuidance(onOpenGuide = vi.fn(), targets: "all" | "second" = "all"
       {targets === "all" ? <button data-tour="one" onClick={onTargetAction} type="button">First target</button> : null}
       <button data-tour="two" type="button">Second target</button>
       <GuidedTour />
-      <FirstUnlockWelcome onOpenGuide={onOpenGuide} />
+      {includeWelcome === true ? <FirstUnlockWelcome onOpenGuide={onOpenGuide} /> : null}
+      {includeWelcome === "with-persistent-return-target" ? <WelcomeWithPersistentReturnTarget onOpenGuide={onOpenGuide} /> : null}
     </TourProvider>,
   );
   return { navigate, onOpenGuide, onTargetAction };
@@ -132,6 +149,36 @@ describe("GuidedTour", () => {
     expect(onTargetAction).not.toHaveBeenCalled();
   });
 
+  it("uses a fitting placement before falling back to the largest raw gap", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1_000 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 600 });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains("tour-panel")) {
+        return {
+          x: 486, y: 68, top: 68, right: 846, bottom: 304, left: 486, width: 360, height: 236,
+          toJSON: () => ({}),
+        };
+      }
+
+      return {
+        x: 366, y: 316, top: 316, right: 966, bottom: 366, left: 366, width: 600, height: 50,
+        toJSON: () => ({}),
+      };
+    });
+    const user = userEvent.setup();
+    renderGuidance();
+
+    await user.click(screen.getByRole("button", { name: "Begin tour" }));
+
+    const panel = await waitFor(() => {
+      const element = document.querySelector<HTMLElement>(".tour-panel");
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    expect(panel.dataset.placement).toBe("top");
+    expect(Number.parseFloat(panel.style.top) + 236).toBeLessThanOrEqual(308);
+  });
+
   it("advances when a target remains missing beyond the bounded discovery wait", async () => {
     vi.useFakeTimers();
     renderGuidance(vi.fn(), "second");
@@ -151,7 +198,7 @@ describe("GuidedTour", () => {
 describe("FirstUnlockWelcome", () => {
   it("starts Orientation and then exposes the tour", async () => {
     const user = userEvent.setup();
-    const { navigate } = renderGuidance();
+    const { navigate } = renderGuidance(vi.fn(), "all", vi.fn(), true);
 
     await user.click(screen.getByRole("button", { name: "Start" }));
 
@@ -161,7 +208,7 @@ describe("FirstUnlockWelcome", () => {
 
   it("dismisses without starting when exploring independently", async () => {
     const user = userEvent.setup();
-    const { navigate } = renderGuidance();
+    const { navigate } = renderGuidance(vi.fn(), "all", vi.fn(), true);
 
     await user.click(screen.getByRole("button", { name: "Explore independently" }));
 
@@ -172,11 +219,57 @@ describe("FirstUnlockWelcome", () => {
   it("dismisses before opening the guide", async () => {
     const user = userEvent.setup();
     const onOpenGuide = vi.fn();
-    renderGuidance(onOpenGuide);
+    renderGuidance(onOpenGuide, "all", vi.fn(), true);
 
     await user.click(screen.getByRole("button", { name: "Open guide" }));
 
     expect(screen.queryByRole("dialog", { name: "Welcome to Short-Stay Accounts" })).toBeNull();
     expect(onOpenGuide).toHaveBeenCalledOnce();
+  });
+
+  it("traps focus in its controls and dismisses safely with Escape", async () => {
+    const user = userEvent.setup();
+    const { navigate } = renderGuidance(vi.fn(), "all", vi.fn(), true);
+
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Welcome to Short-Stay Accounts" }));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Start" }));
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Open guide" }));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Start" }));
+    await user.tab();
+    await user.tab();
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Start" }));
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "Welcome to Short-Stay Accounts" })).toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("blocks pointer access to app controls behind the full-screen backdrop", async () => {
+    const user = userEvent.setup();
+    const { navigate } = renderGuidance(vi.fn(), "all", vi.fn(), true);
+
+    await user.click(screen.getByRole("button", { name: "Begin tour" }));
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Welcome to Short-Stay Accounts" })).toBeTruthy();
+  });
+
+  it("restores Orientation focus to the persistent welcome return target", async () => {
+    const user = userEvent.setup();
+    renderGuidance(vi.fn(), "all", vi.fn(), "with-persistent-return-target");
+
+    const returnFocusTarget = screen.getByRole("button", { name: "Persistent focus return" });
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    await screen.findByRole("dialog", { name: "Test tour" });
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Test tour" })).toBeNull());
+    expect(document.activeElement).toBe(returnFocusTarget);
   });
 });
