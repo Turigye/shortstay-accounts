@@ -30,6 +30,7 @@ export const guideChapters: GuideChapter[] = [
     summary: "Understand staff allocations, referral commission, and calculation traces.",
     sections: [
       { heading: "Allocation base", paragraphs: ["Staff allocations use collected booking revenue, not booked totals or unpaid balances. The six default allocations are Operations 5%, Sales and Marketing 5%, Finance 10%, IT and Legal 2%, Security 5%, and CEO 10%.", "These six percentages total 37%. Earned amounts are calculated from the relevant collected-booking-revenue base."] },
+      { heading: "This business's configuration", paragraphs: ["The six allocations and their 37% total are this business's configured rates and categories. They are not fictional staff records and are not a universal accounting or legal standard.", "Tutorial names and amounts, when shown, are fictional examples; use this business's configured rates for its real calculations."] },
       { heading: "Referrals and payment", paragraphs: ["Referral commission is calculated for referred bookings using the configured referral rate. Earned shows what the calculation has produced; paid shows what has actually been settled.", "Open the calculation trace when explaining an amount to verify its base, rate, and result."] },
     ],
   },
@@ -80,7 +81,7 @@ export const tourDefinitions: TourDefinition[] = [
   ] },
   { id: "staff", title: "Staff and Referrals", summary: "Explain every earned and paid allocation.", steps: [
     { id: "staff-base", screen: "staff", target: "staff-base", title: "Use the right base", body: "Allocations use collected booking revenue, not unpaid balances." },
-    { id: "staff-rates", screen: "staff", target: "staff-rates", title: "Review six allocations", body: "The six default rates total 37%: 5%, 5%, 10%, 2%, 5%, and 10%." },
+    { id: "staff-rates", screen: "staff", target: "staff-rates", title: "Review six allocations", body: "This business's configured allocation rates total 37%: Operations 5%, Sales and Marketing 5%, Finance 10%, IT and Legal 2%, Security 5%, and CEO 10%. They are not fictional staff records or a universal accounting or legal standard." },
     { id: "referral-earnings", screen: "staff", target: "referral-earnings", title: "Track referrals", body: "Referral commission uses the configured rate for referred bookings." },
     { id: "calculation-trace", screen: "staff", target: "calculation-trace", title: "Explain the number", body: "Calculation traces show the base, rate, earned amount, and payment status." },
   ] },

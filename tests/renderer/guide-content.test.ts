@@ -27,6 +27,12 @@ describe("beginner guide content", () => {
     expect(results[0]?.searchText).toContain("600,000");
   });
 
+  it("keeps case-insensitive search stable across uppercase and lowercase queries", () => {
+    expect(searchGuide("IT LEGAL").map((result) => result.id)).toEqual(
+      searchGuide("it legal").map((result) => result.id),
+    );
+  });
+
   it("includes daily, booking, weekly, month-end, and recovery checklists", () => {
     expect(guideChecklists.map((item) => item.id)).toEqual(["daily", "booking", "weekly", "month-end", "recovery"]);
     expect(glossaryEntries.length).toBeGreaterThan(20);

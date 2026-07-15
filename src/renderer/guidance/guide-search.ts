@@ -2,7 +2,7 @@ import { guideChapters, guideChecklists, glossaryEntries } from "./guide-content
 import { GUIDE_VERSION, type GuidanceProgress, type GuideSearchResult } from "./types";
 
 function normalize(value: string): string[] {
-  return value.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  return value.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 }
 
 function createResult(id: string, kind: GuideSearchResult["kind"], title: string, summary: string, searchText: string): GuideSearchResult {
