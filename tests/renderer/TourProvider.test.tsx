@@ -158,10 +158,12 @@ describe("TourProvider", () => {
     const { context } = renderProvider();
     const opener = document.createElement("button");
     const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    document.body.append(opener);
 
     act(() => context().startTour("orientation", opener));
     act(() => context().skipTour());
 
     expect(focus).toHaveBeenCalledOnce();
+    opener.remove();
   });
 });

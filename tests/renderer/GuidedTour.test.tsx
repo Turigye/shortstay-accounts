@@ -208,12 +208,15 @@ describe("FirstUnlockWelcome", () => {
 
   it("dismisses without starting when exploring independently", async () => {
     const user = userEvent.setup();
-    const { navigate } = renderGuidance(vi.fn(), "all", vi.fn(), true);
+    const { navigate } = renderGuidance(vi.fn(), "all", vi.fn(), "with-persistent-return-target");
+
+    const returnFocusTarget = screen.getByRole("button", { name: "Persistent focus return" });
 
     await user.click(screen.getByRole("button", { name: "Explore independently" }));
 
     expect(screen.queryByRole("dialog", { name: "Welcome to Short-Stay Accounts" })).toBeNull();
     expect(navigate).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(returnFocusTarget);
   });
 
   it("dismisses before opening the guide", async () => {
@@ -227,9 +230,14 @@ describe("FirstUnlockWelcome", () => {
     expect(onOpenGuide).toHaveBeenCalledOnce();
   });
 
-  it("traps focus in its controls and dismisses safely with Escape", async () => {
+  it("traps focus in its controls and restores the live Today navigation target with Escape", async () => {
     const user = userEvent.setup();
-    const { navigate } = renderGuidance(vi.fn(), "all", vi.fn(), true);
+    render(
+      <TourProvider navigate={vi.fn()}>
+        <button data-tour="navigation-today" type="button">Today</button>
+        <FirstUnlockWelcome onOpenGuide={vi.fn()} />
+      </TourProvider>,
+    );
 
     expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Welcome to Short-Stay Accounts" }));
     await user.tab();
@@ -246,7 +254,7 @@ describe("FirstUnlockWelcome", () => {
     await user.keyboard("{Escape}");
 
     expect(screen.queryByRole("dialog", { name: "Welcome to Short-Stay Accounts" })).toBeNull();
-    expect(navigate).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Today" }));
   });
 
   it("blocks pointer access to app controls behind the full-screen backdrop", async () => {

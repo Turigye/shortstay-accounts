@@ -30,3 +30,16 @@ Complete. The unlocked application now has a command-bar Help Center that preser
 
 - Corrected the Go to screen ordering so the close-path restore cannot overwrite the requested destination.
 - No unresolved G4 concerns. Existing tour targets inside individual accounting screens remain owned by their respective screen work; this task wires the shared shell targets and mounts the tour layer.
+
+## G4 Review Follow-up
+
+- Shell navigation now closes Help before applying the requested accounting screen. The regression covers Help -> Reports via the shell and confirms the normal Help Back path still returns to Today.
+- First-unlock Explore independently and Escape now restore focus on `requestAnimationFrame` to the supplied persistent target or the live Today navigation fallback. Opening the guide enters Help and focuses its search field; Start continues to be owned by `TourProvider`.
+- The reported `TourProvider` focus failure reproduced in isolation, not only in the combined suite. Its fixture passed a detached opener even though the provider intentionally restores only connected targets; the test now mounts that opener and leaves provider behavior unchanged.
+
+## G4 Follow-up Verification
+
+- `npm test -- tests/renderer/AppShell.test.tsx tests/renderer/HelpCenterScreen.test.tsx tests/renderer/GuidedTour.test.tsx tests/renderer/TourProvider.test.tsx` passed: 30 tests in 4 files.
+- Combined renderer verification with the new App coverage passed: 33 tests in 5 files.
+- `npm run typecheck` passed.
+- `git diff --check` passed.

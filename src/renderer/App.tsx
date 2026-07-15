@@ -36,6 +36,10 @@ export function App() {
   const { phase, business, error, busy, hydrate, createBusiness, unlock, lock, manageUnits, setRate } = useAppStore();
 
   useEffect(() => { void hydrate(); }, [hydrate]);
+  useEffect(() => {
+    if (!helpOpen) return;
+    requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[aria-label="Search guide"]')?.focus());
+  }, [helpOpen]);
 
   if (phase === "booting") {
     return <main className="boot-screen" aria-label="Opening local business"><LoaderCircle aria-hidden="true" size={24} /></main>;
@@ -64,6 +68,10 @@ export function App() {
     setScreenBeforeHelp(screen);
     setActiveScreen(screen);
   };
+  const navigateFromShell = (screen: AppScreen) => {
+    if (helpOpen) setHelpOpen(false);
+    setActiveScreen(screen);
+  };
 
   return (
     <TourProvider navigate={setActiveScreen}>
@@ -72,7 +80,7 @@ export function App() {
         businessName={business.name}
         onHelp={openHelp}
         onLock={() => void lock()}
-        onScreenChange={setActiveScreen}
+        onScreenChange={navigateFromShell}
       >
         {helpOpen ? <HelpCenterScreen onClose={closeHelp} onNavigate={navigateFromHelp} /> : activeScreen === "bookings" ? (
           <BookingsScreen units={business.units} />

@@ -69,6 +69,14 @@ export function FirstUnlockWelcome({ onOpenGuide, returnFocusTarget }: FirstUnlo
     startTour("orientation", resolveReturnFocusTarget(returnFocusTarget));
   };
 
+  const dismissAndRestoreFocus = () => {
+    const focusTarget = resolveReturnFocusTarget(returnFocusTarget);
+    dismissWelcome();
+    requestAnimationFrame(() => {
+      if (focusTarget.isConnected) focusTarget.focus();
+    });
+  };
+
   const openGuide = () => {
     dismissWelcome();
     onOpenGuide();
@@ -77,7 +85,7 @@ export function FirstUnlockWelcome({ onOpenGuide, returnFocusTarget }: FirstUnlo
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
-      dismissWelcome();
+      dismissAndRestoreFocus();
       return;
     }
     if (event.key !== "Tab" || !dialogRef.current) return;
@@ -106,7 +114,7 @@ export function FirstUnlockWelcome({ onOpenGuide, returnFocusTarget }: FirstUnlo
         <p>Learn the workspace in a short tour, or continue working and open the guide whenever you need it.</p>
         <div className="welcome-actions">
           <button className="tour-next-button" onClick={startOrientation} type="button">Start</button>
-          <button className="tour-text-button" onClick={dismissWelcome} type="button">Explore independently</button>
+          <button className="tour-text-button" onClick={dismissAndRestoreFocus} type="button">Explore independently</button>
           <button className="tour-secondary-button" onClick={openGuide} type="button">Open guide</button>
         </div>
       </section>
