@@ -15,7 +15,7 @@ const { tour } = vi.hoisted(() => ({ tour: {
   title: "Test tour",
   summary: "A test-only tour.",
   steps: [
-    { id: "one", screen: "today", target: "one", title: "First step", body: "First guidance." },
+    { id: "one", screen: "today", target: "one", title: "First step", body: "First guidance.", placement: "right" },
     { id: "two", screen: "today", target: "two", title: "Second step", body: "Second guidance.", placement: "right" },
   ],
 } satisfies TourDefinition }));
@@ -149,9 +149,9 @@ describe("GuidedTour", () => {
     expect(onTargetAction).not.toHaveBeenCalled();
   });
 
-  it("uses a fitting placement before falling back to the largest raw gap", async () => {
+  it("chooses the most spacious fitting placement when the requested side does not fit", async () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1_000 });
-    Object.defineProperty(window, "innerHeight", { configurable: true, value: 600 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 800 });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
       if (this.classList.contains("tour-panel")) {
         return {
@@ -161,7 +161,7 @@ describe("GuidedTour", () => {
       }
 
       return {
-        x: 366, y: 316, top: 316, right: 966, bottom: 366, left: 366, width: 600, height: 50,
+        x: 300, y: 300, top: 300, right: 700, bottom: 350, left: 300, width: 400, height: 50,
         toJSON: () => ({}),
       };
     });
@@ -175,8 +175,8 @@ describe("GuidedTour", () => {
       expect(element).not.toBeNull();
       return element!;
     });
-    expect(panel.dataset.placement).toBe("top");
-    expect(Number.parseFloat(panel.style.top) + 236).toBeLessThanOrEqual(308);
+    expect(panel.dataset.placement).toBe("bottom");
+    expect(Number.parseFloat(panel.style.top)).toBe(370);
   });
 
   it("advances when a target remains missing beyond the bounded discovery wait", async () => {
@@ -271,5 +271,27 @@ describe("FirstUnlockWelcome", () => {
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Test tour" })).toBeNull());
     expect(document.activeElement).toBe(returnFocusTarget);
+  });
+
+  it.each(["Finish", "Skip"] as const)("uses the live navigation-today target by default on %s", async (action) => {
+    const user = userEvent.setup();
+    render(
+      <TourProvider navigate={vi.fn()}>
+        <button data-tour="navigation-today" type="button">Today</button>
+        <button data-tour="one" type="button">First target</button>
+        <button data-tour="two" type="button">Second target</button>
+        <GuidedTour />
+        <FirstUnlockWelcome onOpenGuide={vi.fn()} />
+      </TourProvider>,
+    );
+
+    const navigationToday = screen.getByRole("button", { name: "Today" });
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    await screen.findByRole("dialog", { name: "Test tour" });
+    if (action === "Finish") await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: action }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Test tour" })).toBeNull());
+    expect(document.activeElement).toBe(navigationToday);
   });
 });

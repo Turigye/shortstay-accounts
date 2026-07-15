@@ -11,6 +11,17 @@ function focusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"));
 }
 
+function resolveReturnFocusTarget(returnFocusTarget: HTMLElement | null | undefined): HTMLElement {
+  if (returnFocusTarget?.isConnected) return returnFocusTarget;
+
+  const navigationToday = document.querySelector<HTMLElement>('[data-tour="navigation-today"]');
+  if (navigationToday?.isConnected) return navigationToday;
+
+  // Body is persistent for the lifetime of the document and can receive programmatic focus.
+  document.body.tabIndex = -1;
+  return document.body;
+}
+
 export function FirstUnlockWelcome({ onOpenGuide, returnFocusTarget }: FirstUnlockWelcomeProps) {
   const { activeTour, dismissWelcome, progress, startTour } = useTour();
   const headingRef = useRef<HTMLHeadingElement | null>(null);
@@ -55,7 +66,7 @@ export function FirstUnlockWelcome({ onOpenGuide, returnFocusTarget }: FirstUnlo
 
   const startOrientation = () => {
     dismissWelcome();
-    startTour("orientation", returnFocusTarget);
+    startTour("orientation", resolveReturnFocusTarget(returnFocusTarget));
   };
 
   const openGuide = () => {
