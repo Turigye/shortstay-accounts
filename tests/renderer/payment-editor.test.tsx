@@ -226,6 +226,26 @@ describe("PaymentEditor", () => {
 });
 
 describe("PaymentsScreen", () => {
+  it("keeps the balance selector and payment history targets visible with no bookings", async () => {
+    const invoke = vi.fn(async (channel: string) => {
+      if (channel === IPC_CHANNELS.BOOKINGS_LIST) return { ok: true, data: [] };
+      if (channel === IPC_CHANNELS.ACCOUNTS_LIST) return { ok: true, data: [] };
+      if (channel === IPC_CHANNELS.PAYMENTS_LIST) return { ok: true, data: [] };
+      throw new Error(`Unexpected channel ${channel}`);
+    });
+    Object.defineProperty(window, "stayBooks", { configurable: true, value: { invoke } });
+    render(<PaymentsScreen />);
+
+    expect(await screen.findByRole("heading", { name: "No bookings available" })).toBeTruthy();
+    expect(screen.getByText(/no payment history to review/i)).toBeTruthy();
+    for (const target of ["payment-action", "payment-balance", "payment-history"]) {
+      const matches = document.querySelectorAll(`[data-tour="${target}"]`);
+      expect(matches).toHaveLength(1);
+      expect(matches[0]?.getAttribute("hidden")).toBeNull();
+      expect(matches[0]?.getAttribute("aria-hidden")).not.toBe("true");
+    }
+  });
+
   it("loads balances and recovers after a rejected receipt invoke", async () => {
     let receiptAttempts = 0;
     const saved = movement({ id: "payment-3", amount: 50_000 as Ugx });

@@ -444,6 +444,21 @@ describe("UnitSchedule", () => {
 });
 
 describe("BookingsScreen", () => {
+  it("maps the booking editor tour target to the visible New booking control", async () => {
+    const invoke = vi.fn(async (channel: string) => {
+      if (channel === IPC_CHANNELS.CUSTOMERS_LIST) return { ok: true, data: [] };
+      if (channel === IPC_CHANNELS.BOOKINGS_LIST) return { ok: true, data: [] };
+      throw new Error(`Unexpected channel ${channel}`);
+    });
+    Object.defineProperty(window, "stayBooks", { configurable: true, value: { invoke } });
+    render(<BookingsScreen today="2026-07-20" units={units} />);
+
+    const newBooking = await screen.findByRole("button", { name: "New booking" });
+    const targets = document.querySelectorAll('[data-tour="booking-editor"]');
+    expect(targets).toHaveLength(1);
+    expect(targets[0]).toBe(newBooking);
+  });
+
   it("opens one shared booking editor from both Schedule and List", async () => {
     const invoke = vi.fn(async (channel: string) => {
       if (channel === IPC_CHANNELS.CUSTOMERS_LIST) return { ok: true, data: customers };

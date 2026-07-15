@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SettingsScreen } from "../../src/renderer/screens/SettingsScreen";
 import { SetupScreen } from "../../src/renderer/screens/SetupScreen";
 import type { BusinessSettings } from "../../src/domain/types";
+import { tourDefinitions } from "../../src/renderer/guidance/guide-content";
 
 const business: BusinessSettings = {
   businessId: "business-1",
@@ -94,6 +95,30 @@ describe("business setup", () => {
 });
 
 describe("settings", () => {
+  it("maps backup, restore, and export tour steps to the visible Backup tab by default", () => {
+    render(
+      <SettingsScreen
+        business={business}
+        onLock={vi.fn()}
+        onManageUnits={vi.fn()}
+        onSetRate={vi.fn()}
+      />,
+    );
+
+    const targets = document.querySelectorAll('[data-tour="backup-tools"]');
+    const backupTab = screen.getByRole("tab", { name: "Backup" });
+    expect(targets).toHaveLength(1);
+    expect(targets[0]).toBe(backupTab);
+    expect(screen.getByRole("heading", { name: "Units" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Backup and export" })).toBeNull();
+    expect(
+      tourDefinitions
+        .flatMap((tour) => tour.steps)
+        .filter((step) => ["excel-export", "backup", "restore"].includes(step.id))
+        .map((step) => step.target),
+    ).toEqual(["backup-tools", "backup-tools", "backup-tools"]);
+  });
+
   it("exposes all specified settings tabs without later-task action placeholders", async () => {
     render(
       <SettingsScreen

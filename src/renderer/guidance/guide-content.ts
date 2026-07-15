@@ -68,15 +68,15 @@ export const tourDefinitions: TourDefinition[] = [
     { id: "lock", screen: "today", target: "lock", title: "Lock locally", body: "Lock before leaving the computer to protect local records." },
   ] },
   { id: "bookings", title: "Booking Lifecycle", summary: "Enter, monitor, and complete manual stays.", steps: [
-    { id: "booking-action", screen: "bookings", target: "booking-action", title: "Create a booking", body: "Bookings are entered manually; the app is not connected to Airbnb." },
-    { id: "booking-editor", screen: "bookings", target: "booking-editor", title: "Enter stay details", body: "Select New booking to open the form, then choose customer and unit, dates, nightly rate, and referral details." },
+    { id: "booking-action", screen: "bookings", target: "booking-action", title: "Create a booking", body: "Bookings are entered manually; the app is not connected to Airbnb. Use New booking to start a manual stay." },
+    { id: "booking-editor", screen: "bookings", target: "booking-editor", title: "Open the booking form", body: "Select New booking to open the form, then choose customer and unit, dates, nightly rate, and referral details." },
     { id: "booking-status", screen: "bookings", target: "booking-status", title: "Follow the lifecycle", body: "Choose List, select a booking, then update it from Draft through Confirmed, Checked in, and Completed, or cancel when needed." },
     { id: "booking-archive", screen: "bookings", target: "booking-archive", title: "Keep records tidy", body: "Choose List, open a booking, then edit facts or archive records that no longer belong in daily lists." },
   ] },
   { id: "money", title: "Money In and Money Out", summary: "Record money movements with a traceable history.", steps: [
     { id: "payment-action", screen: "payments", target: "payment-action", title: "Record a receipt", body: "Select the booking and account so the collection is allocated correctly." },
-    { id: "payment-balance", screen: "payments", target: "payment-balance", title: "Track balances", body: "Partial payments leave an outstanding balance until the booking is settled." },
-    { id: "payment-history", screen: "payments", target: "payment-history", title: "Correct transparently", body: "Use Record refund, or open a movement to reverse or correct it; those records preserve the audit trail rather than erase history." },
+    { id: "payment-balance", screen: "payments", target: "payment-balance", title: "Track balances", body: "Select a booking before reviewing its balance. Partial payments leave an outstanding balance until the booking is settled." },
+    { id: "payment-history", screen: "payments", target: "payment-history", title: "Correct transparently", body: "Select a booking before reviewing its history. Use Record refund, or open a movement to reverse or correct it; those records preserve the audit trail rather than erase history." },
     { id: "expense-action", screen: "expenses", target: "expense-action", title: "Record costs", body: "Record cash expenses, supplier credit, supplier payments, and recurring-expense reviews." },
   ] },
   { id: "staff", title: "Staff and Referrals", summary: "Explain every earned and paid allocation.", steps: [
@@ -95,13 +95,13 @@ export const tourDefinitions: TourDefinition[] = [
     { id: "report-period", screen: "reports", target: "report-period", title: "Choose the period", body: "Confirm the month before explaining, printing, or exporting a report." },
     { id: "report-tabs", screen: "reports", target: "report-tabs", title: "Read each view", body: "Income statement, balance sheet, cash flow, break-even, and ratios answer different questions." },
     { id: "tax-guidance", screen: "settings", target: "tax-guidance", title: "Understand the estimate", body: "Select Rental tax to review the individual-landlord estimate: 12% of annual gross rental income above UGX 2,820,000." },
-    { id: "excel-export", screen: "settings", target: "excel-export", title: "Share a workbook", body: "Select Backup and export, then export the checked report period to Excel when a workbook is needed." },
+    { id: "excel-export", screen: "settings", target: "backup-tools", title: "Share a workbook", body: "Select Backup, then export the checked report period to Excel when a workbook is needed." },
   ] },
   { id: "administration", title: "Administration and Safety", summary: "Maintain settings and secure local records.", steps: [
     { id: "unit-settings", screen: "settings", target: "unit-settings", title: "Manage units", body: "Keep active units and their details current." },
     { id: "effective-rates", screen: "settings", target: "effective-rates", title: "Date rate changes", body: "Select Compensation, Referral, or Rental tax before changing a rate; effective dates retain the calculation basis for historical periods." },
-    { id: "backup", screen: "settings", target: "backup", title: "Create encrypted backups", body: "Select Backup and export, enter the local password, then create and store the encrypted copy separately." },
-    { id: "restore", screen: "settings", target: "restore", title: "Restore deliberately", body: "Select Backup and export, then restore only after reviewing the overwrite confirmation because it replaces local data." },
+    { id: "backup", screen: "settings", target: "backup-tools", title: "Create encrypted backups", body: "Select Backup, enter the local password, then create and store the encrypted copy separately." },
+    { id: "restore", screen: "settings", target: "backup-tools", title: "Restore deliberately", body: "Select Backup, then restore only after reviewing the overwrite confirmation because it replaces local data." },
     { id: "security", screen: "settings", target: "security", title: "Keep the password safe", body: "Select Security to lock the application. Storage is local only, and the business owner is responsible for the password." },
   ] },
 ];

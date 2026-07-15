@@ -14,3 +14,24 @@ Validation:
 - `npm run typecheck` - passed
 
 Concerns: none. Closed editors, report/settings tabs, and month-end controls remain closed until the user explicitly opens them.
+
+## G5 Review Follow-up
+
+Status: complete
+
+Payments now keeps `payment-balance` on the booking selector and `payment-history` on the always-rendered content area. The empty state explicitly says there is no payment history to review. The obsolete balance marker was removed from `BookingBalance` so the selector remains the only balance target.
+
+Bookings now places `booking-editor` on the visible `New booking` button, while `booking-action` marks the surrounding header.
+
+Settings now uses the visible `Backup` tab as the shared `backup-tools` target for export, backup, and restore steps. The default Units panel no longer carries a restore marker.
+
+Rendered regression coverage verifies the empty Payments, default Bookings, and default Settings states. The guide-content test retains manifest, kebab-case, and source-binding checks, but labels source binding as structural rather than live-visibility proof.
+
+Validation:
+
+- Focused renderer tests: 4 files, 36 tests passed.
+- All renderer tests: 14 files, 74 tests passed.
+- `npm run typecheck` passed.
+- `git diff --check` passed.
+
+Concerns: none.

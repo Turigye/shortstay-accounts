@@ -255,12 +255,12 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
 
   return (
     <section className="bookings-screen">
-      <header className="bookings-header">
+      <header className="bookings-header" data-tour="booking-action">
         <div>
           <h1>Bookings</h1>
           <p>Manual stays, customer details, and live unit availability.</p>
         </div>
-        <button className="primary-button compact-button" data-tour="booking-action" onClick={() => openNew()} type="button">
+        <button className="primary-button compact-button" data-tour="booking-editor" onClick={() => openNew()} type="button">
           <Plus aria-hidden="true" size={16} /> New booking
         </button>
       </header>
@@ -292,7 +292,7 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
       </div>
 
       <div className="bookings-body" data-editor={editorOpen}>
-        <div className="bookings-content" data-tour="booking-editor">
+        <div className="bookings-content">
           {loading ? (
             <div aria-label="Loading bookings" className="bookings-skeleton">
               <span /><span /><span />

@@ -73,7 +73,7 @@ const TABS = [
 const tabTourTargets: Partial<Record<SettingsTab, string>> = {
   compensation: "effective-rates",
   tax: "tax-guidance",
-  backup: "excel-export",
+  backup: "backup-tools",
   security: "security",
 };
 
@@ -260,7 +260,7 @@ export function SettingsScreen({
       {error ? <div className="form-alert" role="alert">{error}</div> : null}
 
       <div className="settings-layout">
-        <div className="settings-tabs" data-tour="backup" role="tablist" aria-label="Settings sections">
+        <div className="settings-tabs" role="tablist" aria-label="Settings sections">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               aria-selected={activeTab === id}
@@ -277,7 +277,7 @@ export function SettingsScreen({
           ))}
         </div>
 
-        <section className="settings-panel" data-tour="restore" role="tabpanel">
+        <section className="settings-panel" role="tabpanel">
           {activeTab === "units" ? (
             <>
               <div className="panel-heading">
