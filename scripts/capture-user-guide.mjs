@@ -102,6 +102,8 @@ async function dismissWelcome(page) {
 
 async function createBusiness(page) {
   await page.getByLabel("Business name").fill("Eden Grove Learning Property");
+  await page.getByLabel("Unit 1 name").fill("Garden Studio");
+  await page.getByLabel("Unit 2 name").fill("Courtyard Suite");
   await page.getByLabel("Local password").fill(GUIDE_PASSWORD);
   await page.getByLabel("Confirm password").fill(GUIDE_PASSWORD);
   await page.getByRole("checkbox", { name: /approved defaults/i }).check();
@@ -116,16 +118,16 @@ async function seedFictionalRecords(page) {
   const cashAccount = await invoke(page, "accounts:create", { name: "Eden Grove Cash Desk", type: "cash" });
   await invoke(page, "accounts:create", { name: "Eden Grove Mobile Wallet", type: "mobileMoney" });
   const advanceGuest = await invoke(page, "customers:create", {
-    name: "Eden Grove Sample Guest A",
-    phone: "+256 700 000 101",
-    email: "sample-a@eden-grove.example",
-    notes: "Fictional guide record.",
+    name: "Amina Kato (Training)",
+    phone: "Training contact 01",
+    email: null,
+    notes: "Training record only.",
   });
   const returningGuest = await invoke(page, "customers:create", {
-    name: "Eden Grove Sample Guest B",
-    phone: "+256 700 000 102",
-    email: "sample-b@eden-grove.example",
-    notes: "Fictional guide record.",
+    name: "Daniel Okello (Training)",
+    phone: "Training contact 02",
+    email: null,
+    notes: "Training record only.",
   });
   const occupiedBooking = await invoke(page, "bookings:create", {
     unitId: secondUnit.id,
@@ -140,7 +142,7 @@ async function seedFictionalRecords(page) {
     referred: false,
     referrerId: null,
     referrerName: null,
-    notes: "Fictional occupied sample stay.",
+    notes: "Training stay in progress.",
   });
   await invoke(page, "bookings:transition", { id: occupiedBooking.id, status: "checkedIn" });
   const reportingBooking = await invoke(page, "bookings:create", {
@@ -156,7 +158,7 @@ async function seedFictionalRecords(page) {
     referred: false,
     referrerId: null,
     referrerName: null,
-    notes: "Fictional future sample stay.",
+    notes: "Training future stay.",
   });
   await invoke(page, "payments:receipt", {
     bookingId: reportingBooking.id,
@@ -308,7 +310,7 @@ async function captureBookingDemo(page, fixture) {
   await page.getByRole("button", { name: "Save booking" }).click();
   await page.getByRole("complementary", { name: "New booking" }).waitFor({ state: "detached" });
   await page.getByRole("tab", { name: "List" }).click();
-  await page.getByText("Eden Grove Sample Guest B").last().waitFor();
+  await page.getByText("Daniel Okello (Training)").last().waitFor();
   await recordFrame(page, "demo-booking", 3, ["[aria-label='Booking views']"]);
   await screenshot(page, "02-bookings.webp", ["[data-tour='booking-action']", "[aria-label='Booking filters']"]);
   encodeDemo("demo-booking");
@@ -366,6 +368,11 @@ async function captureMonthCloseDemo(page) {
   await closeButton.click();
   await page.getByText("closed", { exact: true }).waitFor();
   await recordFrame(page, "demo-month-close", 2, [".month-end"]);
+  await page.getByLabel("Reason for reopening").fill("Training correction after statement review.");
+  await recordFrame(page, "demo-month-close", 3, ["[name='reason']"]);
+  await page.getByRole("button", { name: /^Reopen / }).click();
+  await page.getByText("reopened", { exact: true }).waitFor();
+  await recordFrame(page, "demo-month-close", 4, [".month-end"]);
   await screenshot(page, "06-financial-position.webp", ["[aria-label='Financial position views']", ".month-end"]);
   encodeDemo("demo-month-close");
 }
@@ -392,7 +399,7 @@ async function captureBackupDemo(page) {
 
 async function captureRemainingScreens(page) {
   await navigate(page, "Today");
-  await page.getByText("Eden Grove Sample Guest A").waitFor();
+  await page.getByText("Amina Kato (Training)").waitFor();
   await screenshot(page, "01-today.webp", [".today-actions", ".today-workspace"]);
 
   await navigate(page, "Expenses");
