@@ -36,6 +36,23 @@ Validation:
 
 Concerns: none.
 
+## G5 Final Settings Visibility Fix
+
+Status: complete
+
+Settings now maps `effective-rates`, `tax-guidance`, `backup`, and `security` to their visible tab buttons through `tabTourTargets`. The hidden Compensation rate form, Rental tax definition list, and Security action row no longer carry those tour markers, preserving one target per identifier.
+
+Guide copy explicitly tells users to select Compensation, Rental tax, or Security before describing the content shown in that tab. The default Settings renderer test now asserts exactly one visible target and strict global uniqueness for effective rates, tax guidance, security, units, backup, restore, and Excel export.
+
+Validation:
+
+- Focused setup and guide tests: 2 files, 19 tests passed.
+- All renderer tests: 14 files, 79 tests passed.
+- `npm run typecheck` passed.
+- `git diff --check` passed.
+
+Concerns: none.
+
 ## G5 Final Settings Navigation Fix
 
 Status: complete

@@ -94,7 +94,7 @@ describe("business setup", () => {
 });
 
 describe("settings", () => {
-  it("shows three unique visible Backup navigation controls while Units is active", () => {
+  it("shows exactly one visible target for every default Settings tour step", () => {
     const onLock = vi.fn();
     const onManageUnits = vi.fn();
     const onSetRate = vi.fn();
@@ -112,6 +112,10 @@ describe("settings", () => {
     const exportShortcut = screen.getByRole("button", { name: "Open Backup section for Excel export" });
 
     for (const [target, control] of [
+      ["effective-rates", within(tablist).getByRole("tab", { name: "Compensation" })],
+      ["tax-guidance", within(tablist).getByRole("tab", { name: "Rental tax" })],
+      ["security", within(tablist).getByRole("tab", { name: "Security" })],
+      ["unit-settings", document.querySelector<HTMLElement>('[data-tour="unit-settings"]')!],
       ["backup", backupTab],
       ["restore", restoreShortcut],
       ["excel-export", exportShortcut],
@@ -124,6 +128,11 @@ describe("settings", () => {
       expect(getComputedStyle(control).display).not.toBe("none");
       expect(getComputedStyle(control).visibility).not.toBe("hidden");
     }
+
+    const renderedTargets = [...document.querySelectorAll<HTMLElement>("[data-tour]")].map((element) =>
+      element.dataset.tour,
+    );
+    expect(new Set(renderedTargets).size).toBe(renderedTargets.length);
 
     expect(tablist.contains(restoreShortcut)).toBe(false);
     expect(tablist.contains(exportShortcut)).toBe(false);

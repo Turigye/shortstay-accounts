@@ -70,6 +70,13 @@ const TABS = [
   { id: "security", label: "Security", icon: KeyRound },
 ] as const;
 
+const tabTourTargets: Partial<Record<SettingsTab, string>> = {
+  compensation: "effective-rates",
+  tax: "tax-guidance",
+  backup: "backup",
+  security: "security",
+};
+
 function todayDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -87,7 +94,6 @@ interface RateEditorProps {
   onSave: SettingsScreenProps["onSetRate"];
   busy: boolean;
   existingStaffTotal?: number;
-  tourTarget?: string;
 }
 
 function RateEditor({
@@ -99,7 +105,6 @@ function RateEditor({
   onSave,
   busy,
   existingStaffTotal = 0,
-  tourTarget,
 }: RateEditorProps) {
   const [value, setValue] = useState(String(currentValue));
   const [effectiveFrom, setEffectiveFrom] = useState(today);
@@ -137,7 +142,7 @@ function RateEditor({
   }
 
   return (
-    <form className="rate-editor" data-tour={tourTarget} onSubmit={handleSubmit}>
+    <form className="rate-editor" onSubmit={handleSubmit}>
       <div className="field-group">
         <label htmlFor={`${kind}-value`}>
           {kind === "taxProvision" ? "Monthly rental income per unit" : "Rate"}
@@ -261,7 +266,7 @@ export function SettingsScreen({
               <button
                 aria-selected={activeTab === id}
                 className="settings-tab"
-                data-tour={id === "backup" ? "backup" : undefined}
+                data-tour={tabTourTargets[id as SettingsTab]}
                 key={id}
                 onClick={() => setActiveTab(id)}
                 role="tab"
@@ -389,7 +394,6 @@ export function SettingsScreen({
                 closedMonths={business.closedMonths}
                 currentValue={business.staffRates[selectedRole]}
                 existingStaffTotal={staffTotal - business.staffRates[selectedRole]}
-                tourTarget="effective-rates"
                 kind="staff"
                 onSave={onSetRate}
                 role={selectedRole}
@@ -421,7 +425,7 @@ export function SettingsScreen({
                 <div><h2>Rental tax</h2><p>Annual estimate for an individual landlord</p></div>
                 <strong>UGX {formatNumber(annualRentalTax)} / year</strong>
               </div>
-              <dl className="settings-definition-list" data-tour="tax-guidance">
+              <dl className="settings-definition-list">
                 <div><dt>Annual gross rental basis</dt><dd>UGX {formatNumber(annualRentalIncome)}</dd></div>
                 <div><dt>Tax-free annual threshold</dt><dd>UGX {formatNumber(RENTAL_TAX_ANNUAL_THRESHOLD)}</dd></div>
                 <div><dt>Rental tax rate</dt><dd>{RENTAL_TAX_RATE_PERCENT}%</dd></div>
@@ -477,7 +481,7 @@ export function SettingsScreen({
           {activeTab === "security" ? (
             <>
               <div className="panel-heading"><h2>Security</h2><p>Encrypted local access</p></div>
-              <div className="security-setting-row" data-tour="security">
+              <div className="security-setting-row">
                 <div><strong>Business file</strong><span>Currently unlocked</span></div>
                 <button className="secondary-button" disabled={busy} onClick={() => void onLock()} type="button">
                   <KeyRound aria-hidden="true" size={16} /> Lock now

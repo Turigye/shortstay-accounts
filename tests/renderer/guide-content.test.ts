@@ -59,8 +59,10 @@ const targetSourceFiles: Record<string, string> = {
 
 const dynamicTargetMarkers: Partial<Record<string, readonly string[]>> = {
   "reopen-period": ['data-tour={item==="month-end"?"reopen-period":undefined}'],
-  "effective-rates": ["data-tour={tourTarget}"],
-  backup: ['data-tour={id === "backup" ? "backup" : undefined}'],
+  "effective-rates": ["tabTourTargets"],
+  "tax-guidance": ["tabTourTargets"],
+  backup: ["tabTourTargets"],
+  security: ["tabTourTargets"],
 };
 
 describe("beginner guide content", () => {
@@ -135,5 +137,16 @@ describe("beginner guide content", () => {
     expect(steps.find((step) => step.id === "backup")?.body).toMatch(/choose backup/i);
     expect(steps.find((step) => step.id === "restore")?.body).toMatch(/choose restore shortcut/i);
     expect(steps.find((step) => step.id === "excel-export")?.body).toMatch(/choose export excel shortcut/i);
+  });
+
+  it("tells users to select the visible Settings tabs before reviewing their content", () => {
+    const steps = tourDefinitions.flatMap((tour) => tour.steps);
+
+    expect(steps.find((step) => step.id === "effective-rates")?.body).toMatch(/select the compensation tab/i);
+    expect(steps.find((step) => step.id === "effective-rates")?.body).toMatch(/effective-dated/i);
+    expect(steps.find((step) => step.id === "tax-guidance")?.body).toMatch(/select the rental tax tab/i);
+    expect(steps.find((step) => step.id === "tax-guidance")?.body).toMatch(/individual-landlord estimate/i);
+    expect(steps.find((step) => step.id === "security")?.body).toMatch(/select the security tab/i);
+    expect(steps.find((step) => step.id === "security")?.body).toMatch(/encrypted local access/i);
   });
 });
