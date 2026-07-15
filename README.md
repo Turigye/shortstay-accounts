@@ -29,9 +29,17 @@ npm test
 npm run test:e2e
 ```
 
+## User guide
+
+Start with the [complete beginner handbook](docs/user-guide/short-stay-accounts-handbook.md) for an A-to-Z walkthrough with real app screenshots, recorded workflows, checklists, troubleshooting, and a client demonstration script.
+
+Inside the application, select **Help** in the command bar to search the guide or begin a guided tour of the current workflow.
+
 ## Windows installer
 
-Open the repository's **Actions** tab, run **Build Windows**, and download the `shortstay-accounts-windows-x64` artifact. Extract it and run the generated `Setup.exe` file.
+Download the current [Short-Stay Accounts v0.1.0 Windows installer](https://github.com/Turigye/shortstay-accounts/releases/download/v0.1.0/Short-Stay.Accounts-0.1.0.Setup.exe).
+
+To produce a fresh development build, open the repository's **Actions** tab, run **Build Windows**, and download the `shortstay-accounts-windows-x64` artifact. Extract it and run the generated `Setup.exe` file.
 
 The installer is currently unsigned, so Windows SmartScreen may show an unknown-publisher warning. Production signing requires a Windows code-signing certificate; the application itself and its encrypted native database are built and tested in the Windows workflow.
 
