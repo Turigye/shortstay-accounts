@@ -255,22 +255,22 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
 
   return (
     <section className="bookings-screen">
-      <header className="bookings-header">
+      <header className="bookings-header" data-tour="booking-action">
         <div>
           <h1>Bookings</h1>
           <p>Manual stays, customer details, and live unit availability.</p>
         </div>
-        <button className="primary-button compact-button" onClick={() => openNew()} type="button">
+        <button className="primary-button compact-button" data-tour="booking-editor" onClick={() => openNew()} type="button">
           <Plus aria-hidden="true" size={16} /> New booking
         </button>
       </header>
 
       <div className="bookings-toolbar">
-        <div aria-label="Booking views" className="view-tabs" role="tablist">
+        <div aria-label="Booking views" className="view-tabs" data-tour="booking-status" role="tablist">
           <button aria-selected={view === "schedule"} onClick={() => setView("schedule")} role="tab" type="button">
             <CalendarDays aria-hidden="true" size={16} /> Schedule
           </button>
-          <button aria-selected={view === "list"} onClick={() => setView("list")} role="tab" type="button">
+          <button aria-selected={view === "list"} data-tour="booking-archive" onClick={() => setView("list")} role="tab" type="button">
             <List aria-hidden="true" size={16} /> List
           </button>
         </div>

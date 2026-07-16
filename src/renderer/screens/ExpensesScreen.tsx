@@ -89,7 +89,7 @@ export function ExpensesScreen({ units }: { readonly units: BusinessUnit[] }) {
   const total = filtered.reduce((sum, expense) => sum + expense.amount, 0);
   const payable = filtered.reduce((sum, expense) => sum + expense.due, 0);
   return <section className="expenses-screen">
-    <header className="payments-header"><div><h1>Expenses</h1><p>Property costs, supplier credit, and recurring bill review.</p></div><div><button className="secondary-button compact-button" onClick={() => setPanel("supplier")} type="button"><Truck size={16}/>Supplier</button><button className="primary-button compact-button" onClick={() => setPanel("expense")} type="button"><Plus size={16}/>New expense</button></div></header>
+    <header className="payments-header"><div><h1>Expenses</h1><p>Property costs, supplier credit, and recurring bill review.</p></div><div data-tour="expense-action"><button className="secondary-button compact-button" onClick={() => setPanel("supplier")} type="button"><Truck size={16}/>Supplier</button><button className="primary-button compact-button" onClick={() => setPanel("expense")} type="button"><Plus size={16}/>New expense</button></div></header>
     <div className="expense-filters">
       <label>Month<input type="month" value={month} onChange={(event) => setMonth(event.target.value)}/></label>
       <label>Status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="paid">Paid</option><option value="partial">Partial</option><option value="unpaid">Unpaid</option></select></label>

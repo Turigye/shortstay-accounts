@@ -270,6 +270,7 @@ export function PaymentsScreen() {
           </button>
           <button
             className="primary-button compact-button"
+            data-tour="payment-action"
             disabled={!selectedBooking || accounts.length === 0}
             onClick={() => openEditor({ mode: "receipt", movement: null })}
             type="button"
@@ -280,7 +281,7 @@ export function PaymentsScreen() {
       </header>
 
       <div className="payments-toolbar">
-        <div className="field-group compact-select">
+        <div className="field-group compact-select" data-tour="payment-balance">
           <label htmlFor="payments-booking">Booking</label>
           <select id="payments-booking" onChange={(event) => setSelectedBookingId(event.target.value)} value={selectedBooking?.id ?? ""}>
             {bookings.map((booking) => (
@@ -300,7 +301,7 @@ export function PaymentsScreen() {
 
       {error ? <p className="form-alert payments-alert">{error}</p> : null}
       <div className="payments-workspace" data-panel={Boolean(editor || accountPanelOpen || reversing)}>
-        <div className="payments-content">
+        <div className="payments-content" data-tour="payment-history">
           {loading ? (
             <div aria-label="Loading payments" className="bookings-skeleton"><span /><span /><span /></div>
           ) : selectedBooking ? (
@@ -317,7 +318,7 @@ export function PaymentsScreen() {
               />
             </>
           ) : (
-            <div className="payments-empty"><WalletCards aria-hidden="true" size={24} /><h2>No bookings available</h2><p>Create a booking before recording a payment.</p></div>
+            <div className="payments-empty"><WalletCards aria-hidden="true" size={24} /><h2>No bookings available</h2><p>No payment history to review. Create a booking before recording a payment.</p></div>
           )}
         </div>
 

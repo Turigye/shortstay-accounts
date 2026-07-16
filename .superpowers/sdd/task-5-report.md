@@ -1,84 +1,109 @@
-# Task 5 Report: Customers, Manual Bookings, and Unit Schedule
+# Task 5 Report
 
-## Status
+Status: complete
 
-Complete. Task 5 is implemented and committed as one scoped feature change.
+Commit: `f6ba91c feat: connect tutorials to live workflow controls`
 
-## Delivered
+Implemented semantic `data-tour` markers for every tour target across the shell and workflow screens. Steps for editors and non-default tabs now point to visible opening controls or containers, and the guide copy tells the user what to open next without changing records or opening UI automatically.
 
-- Checkout-exclusive booking date rules, calendar-night calculation, exact whole-UGX totals, and legal booking transitions.
-- Business-scoped customer CRUD with archived-customer protection.
-- Business-scoped booking CRUD with active unit/customer/referrer validation.
-- Immediate SQLite transactions around booking create, update, confirm/transition, and archive operations.
-- Overlap rechecks inside the transaction for confirmed, checked-in, and completed stays.
-- Explicit non-blocking semantics for draft and cancelled bookings.
-- Typed, strict IPC contracts for customer and booking operations.
-- Compact manual booking editor with customer/contact, dates and times, nightly rate, adjustment, referral, referrer, initial payment metadata, notes, live nights, and live total.
-- Nonzero initial payments remain entered and produce field-level validation; Task 5 does not fake receipt persistence before Task 6 provides account-backed payments.
-- Shared booking editor/detail path from Schedule and List views.
-- Keyboard-accessible unit schedule with stable unit rows and checkout-exclusive day spans.
-- Booking list with status, unit, customer, stay, total, balance, and corresponding filters.
+Added a target manifest/integrity test that groups selectors by screen and verifies complete tour coverage, kebab-case naming, uniqueness, and renderer source bindings.
 
-## TDD Coverage
+Validation:
 
-- Adjacent and overlapping checkout-exclusive stays.
-- Invalid calendar dates and non-positive ranges.
-- Whole-UGX arithmetic, negative totals, and safe-integer overflow.
-- Draft/cancelled occupancy semantics and legal/illegal transitions.
-- Stale draft confirmation and overlapping confirmed updates.
-- Archived and cross-business unit/customer references.
-- Customer validation and archival.
-- Unpaid booking defaults.
-- Live editor totals, new customer creation, initial-payment retention, keyboard schedule controls, and shared List/Schedule detail path.
-- Strict IPC allowlisting, payload validation, and public repository errors.
+- `npm test -- tests/renderer` - 14 files, 70 tests passed
+- `npm run typecheck` - passed
 
-## Verification
+Concerns: none. Closed editors, report/settings tabs, and month-end controls remain closed until the user explicitly opens them.
 
-- Focused: `npm test -- tests/domain/bookings.test.ts tests/main/booking-repository.test.ts tests/renderer/booking-editor.test.tsx` - 3 files, 38 tests passed.
-- Full: `npm test` - 16 files, 117 tests passed.
-- Typecheck: `npm run typecheck` - passed.
-- Diff hygiene: `git diff --check` - passed.
-- Visual checks: Schedule, List, and editor rendered at 1280x720 with no document/main overflow or filter overlap.
+## G5 Review Follow-up
 
-## Self-Review
+Status: complete
 
-- No release-blocking defects found in the Task 5 scope.
-- Repository mutations preserve business boundaries and recheck occupancy while holding an immediate write transaction.
-- No platform import, Airbnb assumption, or synthetic payment row was introduced.
-- Task 6 must replace the current nonzero-initial-payment validation boundary with transactional account-backed receipt persistence.
+Payments now keeps `payment-balance` on the booking selector and `payment-history` on the always-rendered content area. The empty state explicitly says there is no payment history to review. The obsolete balance marker was removed from `BookingBalance` so the selector remains the only balance target.
 
-## Review Fixes
+Bookings now places `booking-editor` on the visible `New booking` button, while `booking-action` marks the surrounding header.
 
-- Persisted a newly created customer ID into booking-editor state before booking submission, so conflict and unexpected-error retries reuse the same customer instead of creating a duplicate.
-- Added renderer and repository regressions proving retries leave exactly one customer and submit the persisted customer ID again.
-- Made referral intent strict at IPC and repository boundaries: non-referrals reject entered referral details, while referrals require exactly one active business-scoped referrer ID or one nonblank new name.
-- Added IPC and repository coverage for contradictory payloads plus archived and cross-business referrer IDs.
-- Kept contradictory referral names visible in the editor and blocked submission until the user resolves them; no entered referral data is silently discarded.
-- Preserved the accepted field-level validation boundary for nonzero initial payments.
+Settings now uses the visible `Backup` tab as the shared `backup-tools` target for export, backup, and restore steps. The default Units panel no longer carries a restore marker.
 
-## Review Verification
+Rendered regression coverage verifies the empty Payments, default Bookings, and default Settings states. The guide-content test retains manifest, kebab-case, and source-binding checks, but labels source binding as structural rather than live-visibility proof.
 
-- Focused: `npm test -- tests/domain/bookings.test.ts tests/main/booking-repository.test.ts tests/main/ipc.test.ts tests/renderer/booking-editor.test.tsx` - 4 files, 74 tests passed.
-- Full: `npm test` - 16 files, 138 tests passed.
-- Typecheck: `npm run typecheck` - passed.
-- Self-review: no additional Task 5 defects or scope expansion found.
+Validation:
 
-## Busy-State Review Fix
+- Focused renderer tests: 4 files, 36 tests passed.
+- All renderer tests: 14 files, 74 tests passed.
+- `npm run typecheck` passed.
+- `git diff --check` passed.
 
-- Wrapped booking create/update IPC handling in `try/finally`, so the controlled busy state clears after success, structured failure, or a rejected invocation.
-- Preserved structured field errors and the editor's safe fallback for unexpected failures, allowing immediate retry.
-- Added a production `BookingsScreen` renderer regression proving a rejected first save re-enables Save, the second attempt succeeds, and the persisted new customer ID is reused without another customer creation.
+Concerns: none.
 
-## Busy-State Verification
+## G5 Final Settings Visibility Fix
 
-- Focused: `npm test -- tests/renderer/booking-editor.test.tsx` - 1 file, 10 tests passed.
-- Full: `npm test` - 16 files, 139 tests passed.
-- Typecheck: `npm run typecheck` - passed.
-- Diff hygiene and self-review: passed; no behavior outside the booking save lifecycle changed.
+Status: complete
 
-## Transition Busy-State Fix
+Settings now maps `effective-rates`, `tax-guidance`, `backup`, and `security` to their visible tab buttons through `tabTourTargets`. The hidden Compensation rate form, Rental tax definition list, and Security action row no longer carry those tour markers, preserving one target per identifier.
 
-- Wrapped booking transition IPC handling in `try/catch/finally`, preserving structured failures, surfacing a safe error for rejected invocations, and always restoring transition/save controls for retry.
-- Audited both `setBusy(true)` paths in `BookingsScreen`; booking save and booking transition now both have guaranteed `finally` cleanup.
-- Added a production `BookingsScreen` integration regression covering a rejected transition followed by a successful immediate retry.
-- Focused: `npm test -- tests/renderer/booking-editor.test.tsx` - 1 file, 11 tests passed.
+Guide copy explicitly tells users to select Compensation, Rental tax, or Security before describing the content shown in that tab. The default Settings renderer test now asserts exactly one visible target and strict global uniqueness for effective rates, tax guidance, security, units, backup, restore, and Excel export.
+
+Validation:
+
+- Focused setup and guide tests: 2 files, 19 tests passed.
+- All renderer tests: 14 files, 79 tests passed.
+- `npm run typecheck` passed.
+- `git diff --check` passed.
+
+Concerns: none.
+
+## G5 Final Settings Navigation Fix
+
+Status: complete
+
+Removed the App tour-to-Settings tab wiring and the Settings `guidanceTarget` input/effect. Tours no longer change a Settings panel automatically.
+
+Settings now keeps `backup` on the Backup tab and provides distinct, always-visible Restore and Export Excel shortcut buttons outside the Settings tablist. Both shortcuts only select the Backup panel; they do not restore, export, mutate records, or invoke IPC. The backup action rows no longer carry those tour markers.
+
+The navigation column remains 178px wide and now groups the valid tablist with a labeled Backup shortcuts section. Guide copy tells users to choose Backup, Restore shortcut, or Export Excel shortcut before using the corresponding actual control.
+
+Rendered tests cover visible target uniqueness, valid tablist separation, and inert shortcut behavior. App coverage confirms tour navigation leaves the default Units panel selected.
+
+Validation:
+
+- Focused App, Settings, and guide tests: 3 files, 22 tests passed.
+- All renderer tests: 14 files, 78 tests passed.
+- `npm run typecheck` passed.
+- `git diff --check` passed.
+
+Concerns: none.
+
+## G5 Uniqueness Fix
+
+Status: complete
+
+Settings keeps the Backup tab visible and selected targets stable while assigning distinct semantic markers: `backup` is on the tab button, `restore` is on an inline-flex icon-and-label wrapper, and `excel-export` is on the visible label span. Settings still defaults to Units, and tab dimensions and click behavior are preserved.
+
+Guide content and the settings manifest now use the three distinct target values. The guide integrity test compares the full target sequence without de-duplication and asserts manifest uniqueness. The rendered Settings test verifies exactly one visible element for each target while Units remains active.
+
+Validation:
+
+- Focused guide and setup tests: 2 files, 15 tests passed
+- All renderer tests: 14 files, 74 tests passed
+- `npm run typecheck` passed
+- `git diff --check` passed
+
+Concerns: none.
+
+## G5 Context-Aware Settings Targets
+
+Status: complete
+
+Settings now accepts an optional guidance target and changes only the visible Settings tab for guided targets. App renders a `GuidedSettingsScreen` inside `TourProvider`, which supplies the active Settings step target without coupling standalone Settings renders to tour context.
+
+Backup, restore, and Excel export targets now identify distinct action rows in the Backup panel. Tax guidance, effective rates, and security identify their actual panel content; unit settings remains on its form. The target manifest retains strict uniqueness and source-binding checks, and rendered tests verify target visibility, semantic content, disjoint regions, passive tab changes, and the App tour transition into Rental tax.
+
+Validation:
+
+- Focused App, Settings, and guide tests: 3 files, 20 tests passed.
+- All renderer tests: 14 files, 76 tests passed.
+- `npm run typecheck` passed.
+- `git diff --check` passed.
+
+Concerns: none.

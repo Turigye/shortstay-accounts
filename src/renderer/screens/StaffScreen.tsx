@@ -74,7 +74,7 @@ export function StaffScreen() {
       <div className="statement-toolbar">
         <div className="segmented-control" aria-label="Compensation statement">
           <button aria-pressed={tab === "staff"} onClick={() => setTab("staff")} type="button"><Calculator aria-hidden="true" size={16} />Staff</button>
-          <button aria-pressed={tab === "referrals"} onClick={() => setTab("referrals")} type="button"><HandCoins aria-hidden="true" size={16} />Referrals</button>
+          <button aria-pressed={tab === "referrals"} data-tour="referral-earnings" onClick={() => setTab("referrals")} type="button"><HandCoins aria-hidden="true" size={16} />Referrals</button>
         </div>
         <strong>{monthLabel(month)}</strong>
       </div>
@@ -82,14 +82,14 @@ export function StaffScreen() {
       {error ? <div className="form-alert" role="alert">{error}</div> : null}
       {loading ? <div className="statement-loading"><LoaderCircle aria-hidden="true" size={22} />Loading statement</div> : report ? (
         <>
-          <div className="statement-summary" aria-label="Statement totals">
+          <div className="statement-summary" aria-label="Statement totals" data-tour="staff-base">
             <div><span>Net collected booking revenue</span><strong>{formatUgx(report.ncbr)}</strong></div>
             <div><span>{tab === "staff" ? "Staff earned" : "Referral earned"}</span><strong>{formatUgx(totals.earned)}</strong></div>
             <div><span>Paid</span><strong>{formatUgx(totals.paid)}</strong></div>
             <div data-emphasis="true"><span>Due</span><strong>{formatUgx(totals.due)}</strong></div>
           </div>
 
-          <div className="statement-panel">
+          <div className="statement-panel" data-tour="staff-rates">
             <div className="table-scroll">
               {tab === "staff" ? (
                 <table className="statement-table">

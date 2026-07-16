@@ -94,6 +94,85 @@ describe("business setup", () => {
 });
 
 describe("settings", () => {
+  it("shows exactly one visible target for every default Settings tour step", () => {
+    const onLock = vi.fn();
+    const onManageUnits = vi.fn();
+    const onSetRate = vi.fn();
+    const invoke = vi.fn();
+    Object.defineProperty(window, "stayBooks", {
+      configurable: true,
+      value: { invoke },
+    });
+    render(<SettingsScreen business={business} onLock={onLock} onManageUnits={onManageUnits} onSetRate={onSetRate} />);
+
+    expect(screen.getByRole("heading", { name: "Units" })).toBeTruthy();
+    const tablist = screen.getByRole("tablist", { name: "Settings sections" });
+    const backupTab = within(tablist).getByRole("tab", { name: "Backup" });
+    const restoreShortcut = screen.getByRole("button", { name: "Open Backup section for Restore" });
+    const exportShortcut = screen.getByRole("button", { name: "Open Backup section for Excel export" });
+
+    for (const [target, control] of [
+      ["effective-rates", within(tablist).getByRole("tab", { name: "Compensation" })],
+      ["tax-guidance", within(tablist).getByRole("tab", { name: "Rental tax" })],
+      ["security", within(tablist).getByRole("tab", { name: "Security" })],
+      ["unit-settings", document.querySelector<HTMLElement>('[data-tour="unit-settings"]')!],
+      ["backup", backupTab],
+      ["restore", restoreShortcut],
+      ["excel-export", exportShortcut],
+    ] as const) {
+      const matches = document.querySelectorAll<HTMLElement>(`[data-tour="${target}"]`);
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toBe(control);
+      expect(control.hidden).toBe(false);
+      expect(control.getAttribute("aria-hidden")).not.toBe("true");
+      expect(getComputedStyle(control).display).not.toBe("none");
+      expect(getComputedStyle(control).visibility).not.toBe("hidden");
+    }
+
+    const renderedTargets = [...document.querySelectorAll<HTMLElement>("[data-tour]")].map((element) =>
+      element.dataset.tour,
+    );
+    expect(new Set(renderedTargets).size).toBe(renderedTargets.length);
+
+    expect(tablist.contains(restoreShortcut)).toBe(false);
+    expect(tablist.contains(exportShortcut)).toBe(false);
+    expect(restoreShortcut.title).toBe("Open Backup section for Restore");
+    expect(exportShortcut.title).toBe("Open Backup section for Excel export");
+
+    expect(onLock).not.toHaveBeenCalled();
+    expect(onManageUnits).not.toHaveBeenCalled();
+    expect(onSetRate).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Open Backup section for Restore", "Restore"],
+    ["Open Backup section for Excel export", "Export Excel"],
+  ])("opens Backup from the %s shortcut without invoking %s", async (shortcutName, actionName) => {
+    const onLock = vi.fn();
+    const onManageUnits = vi.fn();
+    const onSetRate = vi.fn();
+    const invoke = vi.fn();
+    Object.defineProperty(window, "stayBooks", {
+      configurable: true,
+      value: { invoke },
+    });
+    render(<SettingsScreen business={business} onLock={onLock} onManageUnits={onManageUnits} onSetRate={onSetRate} />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: shortcutName }));
+
+    expect(screen.getByRole("heading", { name: "Backup and export" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Units" })).toBeNull();
+    expect(screen.getByRole("tab", { name: "Backup" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("button", { name: actionName })).toBeTruthy();
+
+    expect(onLock).not.toHaveBeenCalled();
+    expect(onManageUnits).not.toHaveBeenCalled();
+    expect(onSetRate).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
   it("exposes all specified settings tabs without later-task action placeholders", async () => {
     render(
       <SettingsScreen

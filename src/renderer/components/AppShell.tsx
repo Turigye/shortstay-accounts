@@ -3,6 +3,7 @@ import {
   BedDouble,
   Building2,
   CalendarPlus,
+  CircleHelp,
   CalendarDays,
   CreditCard,
   LayoutDashboard,
@@ -49,6 +50,7 @@ interface AppShellProps {
   children: ReactNode;
   businessName?: string;
   onLock?: () => void;
+  onHelp?: (opener: HTMLButtonElement) => void;
 }
 
 export function AppShell({
@@ -57,10 +59,11 @@ export function AppShell({
   children,
   businessName,
   onLock,
+  onHelp,
 }: AppShellProps) {
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className="sidebar" data-tour="sidebar">
         <div className="product-lockup">
           <span className="product-mark" aria-hidden="true">
             <BedDouble size={20} strokeWidth={1.9} />
@@ -75,6 +78,7 @@ export function AppShell({
             <button
               className="navigation-item"
               data-active={activeScreen === screen}
+              data-tour={`navigation-${screen}`}
               key={screen}
               onClick={() => onScreenChange(screen)}
               type="button"
@@ -94,12 +98,17 @@ export function AppShell({
       <div className="workspace">
         <header className="command-bar" aria-label="Quick actions">
           {businessName ? <strong className="command-business-name">{businessName}</strong> : null}
-          <div className="command-actions">
+          <div className="command-actions" data-tour="quick-actions">
             <button className="command-quick-action" onClick={() => onScreenChange("bookings")} type="button"><CalendarPlus aria-hidden="true" size={15}/>Booking</button>
             <button className="command-quick-action" onClick={() => onScreenChange("payments")} type="button"><CreditCard aria-hidden="true" size={15}/>Payment</button>
             <button className="command-quick-action" onClick={() => onScreenChange("expenses")} type="button"><ReceiptText aria-hidden="true" size={15}/>Expense</button>
+          {onHelp ? (
+            <button aria-label="Help" className="command-button" data-tour="help" onClick={(event) => onHelp(event.currentTarget)} title="Help" type="button">
+              <CircleHelp aria-hidden="true" size={18} strokeWidth={1.9} />
+            </button>
+          ) : null}
           {onLock ? (
-            <button className="command-button" onClick={onLock} type="button">
+            <button className="command-button" data-tour="lock" onClick={onLock} type="button">
               <LockKeyhole aria-hidden="true" size={16} strokeWidth={1.9} />
               Lock
             </button>

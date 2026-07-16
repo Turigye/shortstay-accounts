@@ -70,6 +70,13 @@ const TABS = [
   { id: "security", label: "Security", icon: KeyRound },
 ] as const;
 
+const tabTourTargets: Partial<Record<SettingsTab, string>> = {
+  compensation: "effective-rates",
+  tax: "tax-guidance",
+  backup: "backup",
+  security: "security",
+};
+
 function todayDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -253,21 +260,52 @@ export function SettingsScreen({
       {error ? <div className="form-alert" role="alert">{error}</div> : null}
 
       <div className="settings-layout">
-        <div className="settings-tabs" role="tablist" aria-label="Settings sections">
-          {TABS.map(({ id, label, icon: Icon }) => (
+        <aside aria-label="Settings navigation" className="settings-navigation">
+          <div aria-label="Settings sections" className="settings-tabs" role="tablist">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                aria-selected={activeTab === id}
+                className="settings-tab"
+                data-tour={tabTourTargets[id as SettingsTab]}
+                key={id}
+                onClick={() => setActiveTab(id)}
+                role="tab"
+                type="button"
+              >
+                <span className="settings-tab-content">
+                  <Icon aria-hidden="true" size={16} />
+                  <span>{label}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <section aria-labelledby="backup-shortcuts-heading" className="settings-shortcuts">
+            <h2 id="backup-shortcuts-heading">Backup shortcuts</h2>
             <button
-              aria-selected={activeTab === id}
-              className="settings-tab"
-              key={id}
-              onClick={() => setActiveTab(id)}
-              role="tab"
+              aria-label="Open Backup section for Restore"
+              className="settings-shortcut"
+              data-tour="restore"
+              onClick={() => setActiveTab("backup")}
+              title="Open Backup section for Restore"
               type="button"
             >
-              <Icon aria-hidden="true" size={16} />
-              {label}
+              <Upload aria-hidden="true" size={16} />
+              <span>Restore</span>
             </button>
-          ))}
-        </div>
+            <button
+              aria-label="Open Backup section for Excel export"
+              className="settings-shortcut"
+              data-tour="excel-export"
+              onClick={() => setActiveTab("backup")}
+              title="Open Backup section for Excel export"
+              type="button"
+            >
+              <FileSpreadsheet aria-hidden="true" size={16} />
+              <span>Export Excel</span>
+            </button>
+          </section>
+        </aside>
 
         <section className="settings-panel" role="tabpanel">
           {activeTab === "units" ? (
@@ -276,7 +314,7 @@ export function SettingsScreen({
                 <h2>Units</h2>
                 <p>{units.length} active accommodation {units.length === 1 ? "unit" : "units"}</p>
               </div>
-              <form className="unit-settings-form" onSubmit={handleManageUnits}>
+              <form className="unit-settings-form" data-tour="unit-settings" onSubmit={handleManageUnits}>
                 {units.map((unit, index) => (
                   <div className="unit-setting-row" key={unit.id ?? `new-${index}`}>
                     <span className="unit-index">{index + 1}</span>

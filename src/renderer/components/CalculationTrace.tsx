@@ -8,7 +8,7 @@ function formatUgx(value: number): string {
 
 export function CalculationTrace({ traces }: { readonly traces: readonly CompensationTrace[] }) {
   return (
-    <details className="calculation-trace">
+    <details className="calculation-trace" data-tour="calculation-trace">
       <summary>
         <span>
           <ChevronDown aria-hidden="true" size={16} />

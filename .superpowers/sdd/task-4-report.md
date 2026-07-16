@@ -1,68 +1,45 @@
-# Task 4 Report
+# Guidance Task G4 Report
 
 ## Status
 
-Complete. Business setup, exactly two editable initial units, local encrypted create/unlock/lock, approved defaults, settings tabs, and effective-dated rate changes are implemented.
+Complete. The unlocked application now has a command-bar Help Center that preserves the active accounting screen, restores a persistent focus target, and integrates the existing first-unlock welcome and guided tours.
 
 ## Implementation
 
-- Added transactional business and unit persistence with approved staff, referral, and UGX 600,000 per-unit tax defaults.
-- Added effective-dated staff, referral, and tax histories; historical and closed-period changes require a reason.
-- Added a main-owned encrypted database session and strict typed IPC for status, create, unlock, lock, unit renaming, and rate updates.
-- Added compact keyboard-usable setup, unlock, and settings screens, including the visible UGX 1,200,000 monthly total.
-- Added Units, Compensation, Referral, Tax provision, Categories, Accounts, Backup, and Security settings surfaces without later-task action placeholders.
+- Added `HelpCenterScreen` with a compact search toolbar and keyboard-operable Learn, Checklists, and Glossary tabs.
+- Learn presents all seven guide chapters as bordered workflow rows with completion status, matching tour actions, and direct screen navigation.
+- Search combines chapter, checklist, and glossary material through the existing guide search index. Searching `partial payment` returns the Money In and Money Out chapter.
+- Added troubleshooting for incorrect balances, wrong payments, closed periods, missed steps, and backup recovery, plus clear accountant/URA boundaries.
+- Added the Help icon button only to the command bar and passed the actual button element to App for return-focus handling.
+- Wrapped the unlocked shell in `TourProvider`, mounted `FirstUnlockWelcome` and `GuidedTour` outside the shell's scrollable content, and registered the shell targets required by the orientation tour.
+- Kept Help state separate from `AppScreen` using `helpOpen` and `screenBeforeHelp`; closing restores the saved screen, while Go to screen closes first and then applies the requested destination.
 
-## Security Review
+## TDD Evidence
 
-- No cloud account or remote data path was added.
-- Plaintext passwords are not persisted or returned; renderer password fields and action variables are cleared around the request.
-- The main process owns the open database and closes/clears it on lock and application quit.
-- Wrong passwords fail closed with a sanitized public error and no database or stack details.
+- Added the shell and Help Center renderer specifications before implementation.
+- Initial focused run failed as expected because the Help command and `HelpCenterScreen` module did not yet exist.
+- Added explicit jsdom cleanup after discovering this runner retains rendered DOM between tests.
 
 ## Verification
 
-- Focused: 10 tests passed in 2 files.
-- Full: 65 tests passed in 13 files.
-- Typecheck: `tsc --noEmit` passed.
-- Diff check: clean.
-- 1280x720 setup and settings renders had no viewport overflow or console errors.
+- `npm test -- tests/renderer/AppShell.test.tsx tests/renderer/HelpCenterScreen.test.tsx tests/renderer/GuidedTour.test.tsx` passed: 22 tests in 3 files.
+- `npm run typecheck` passed.
+- `git diff --check` passed.
 
 ## Self-Review
 
-Resolved deterministic unit ordering and correct retrieval of an effective 0% referral rate. No unresolved Task 4 concerns.
+- Corrected the Go to screen ordering so the close-path restore cannot overwrite the requested destination.
+- No unresolved G4 concerns. Existing tour targets inside individual accounting screens remain owned by their respective screen work; this task wires the shared shell targets and mounts the tour layer.
 
-## Review Fix Evidence - 2026-07-14
+## G4 Review Follow-up
 
-- Same-effective-date rate saves now update the existing row deterministically; different effective dates remain separate history records.
-- Historical and closed-period updates still require a reason. Rate audit events include the effective rate row ID, before/after snapshots, and reason.
-- Repository validation and conflicts cross strict IPC as allowlisted structured failures with field errors.
-- First-run setup remains exactly two units. Post-setup settings reconcile any non-empty active-unit list, add units, rename all retained units, and archive omitted units without changing retained IDs.
-- Failed unlocks close a database handle opened before settings loading fails and leave the session locked. Successful unlocks retain one handle until lock.
-- Password fields and renderer action variables remain cleared around create/unlock requests; no password persistence was added.
-- Focused review suite: 25 tests passed in 3 files.
-- Full suite: 72 tests passed in 13 files.
-- Typecheck: `tsc --noEmit` passed.
-- Self-review and `git diff --check`: clean; no unresolved Task 4 findings.
+- Shell navigation now closes Help before applying the requested accounting screen. The regression covers Help -> Reports via the shell and confirms the normal Help Back path still returns to Today.
+- First-unlock Explore independently and Escape now restore focus on `requestAnimationFrame` to the supplied persistent target or the live Today navigation fallback. Opening the guide enters Help and focuses its search field; Start continues to be owned by `TourProvider`.
+- The reported `TourProvider` focus failure reproduced in isolation, not only in the combined suite. Its fixture passed a detached opener even though the provider intentionally restores only connected targets; the test now mounts that opener and leaves provider behavior unchanged.
 
-## Final Review Fix Evidence - 2026-07-14
+## G4 Follow-up Verification
 
-- Referral and tax history mutations now run one shared latest-applicable recomputation inside the same transaction as mutation and audit.
-- Backdated history no longer displaces a later applicable rate; future rows remain in history without changing today's denormalized business values.
-- IPC rate schemas are split by type: referral is finite 0..100 and tax provision is nonnegative whole safe-integer UGX.
-- Effective dates must be real ISO calendar dates. Impossible dates fail at `payload.effectiveFrom` before handler execution.
-- First-run unit names receive semantic duplicate-name validation; managed active-unit names use the same case-insensitive rule.
-- Invalid Task 4 payloads return field-level `VALIDATION_ERROR`, never `INTERNAL_ERROR`.
-- Focused Task 4 suite: 28 tests passed in 3 files.
-- Full suite: 75 tests passed in 13 files.
-- Typecheck: `tsc --noEmit` passed.
-- Self-review and `git diff --check`: clean; no remaining Task 4 findings.
-
-## Time Activation Evidence - 2026-07-14
-
-- Settings reads now reconcile denormalized referral and tax columns from the latest history rows effective on or before the injected current date.
-- A deterministic clock test proves future referral and tax rows remain inactive before their date, then activate in both returned settings and business columns without another write.
-- Time-based activation is idempotent and does not append duplicate audit events.
-- Focused Task 4 suite: 29 tests passed in 3 files.
-- Full suite: 76 tests passed in 13 files.
-- Typecheck: `tsc --noEmit` passed.
-- Self-review and `git diff --check`: clean; no unresolved Task 4 concerns.
+- `npm test -- tests/renderer/AppShell.test.tsx tests/renderer/HelpCenterScreen.test.tsx tests/renderer/GuidedTour.test.tsx tests/renderer/TourProvider.test.tsx` passed: 30 tests in 4 files.
+- Combined renderer verification with the new App coverage passed: 33 tests in 5 files.
+- `npm run typecheck` passed.
+- `git diff --check` passed.
