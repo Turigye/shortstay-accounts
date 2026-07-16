@@ -10,13 +10,13 @@ const VIEWPORTS = [
   { width: 1024, height: 640 },
 ];
 const CHAPTERS = [
-  ["orientation", "Orientation"],
-  ["bookings", "Booking Lifecycle"],
-  ["money", "Money In and Money Out"],
-  ["staff", "Staff and Referrals"],
-  ["month-end", "Financial Position and Month End"],
-  ["reports", "Reports and Tax"],
-  ["administration", "Administration and Safety"],
+  ["orientation", "Orientation", 4],
+  ["bookings", "Booking Lifecycle", 4],
+  ["money", "Money In and Money Out", 4],
+  ["staff", "Staff and Referrals", 4],
+  ["month-end", "Financial Position and Month End", 4],
+  ["reports", "Reports and Tax", 4],
+  ["administration", "Administration and Safety", 5],
 ] as const;
 
 interface Viewport {
@@ -169,13 +169,18 @@ test("keeps beginner guidance keyboard-accessible, responsive, and data-only", a
     await search.fill("");
     expectDatabaseUnchanged(database, initialDatabaseMtime);
 
-    for (const [id, title] of CHAPTERS) {
+    for (const [id, title, stepCount] of CHAPTERS) {
       await page.getByRole("button", { name: `Start tour: ${id}` }).click();
       const tour = page.getByRole("dialog", { name: title });
       await expect(tour).toBeVisible();
-      await page.keyboard.press("Escape");
+      for (let step = 1; step < stepCount; step += 1) {
+        await tour.getByRole("button", { name: "Next" }).click();
+      }
+      await tour.getByRole("button", { name: "Finish" }).click();
       await expect(tour).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Help" })).toBeFocused();
+      const completedTourIds = await page.evaluate(() => JSON.parse(localStorage.getItem("shortstay-guidance:v1") ?? "{}").completedTourIds ?? []);
+      expect(completedTourIds).toContain(id);
       if (id !== CHAPTERS.at(-1)![0]) await openHelp(page);
     }
     expectDatabaseUnchanged(database, initialDatabaseMtime);

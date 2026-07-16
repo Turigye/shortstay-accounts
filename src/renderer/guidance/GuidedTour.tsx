@@ -223,6 +223,7 @@ export function GuidedTour() {
         </div>
         <h2 id="guided-tour-title" ref={headingRef} tabIndex={-1}>{step.title}</h2>
         <p className="tour-body">{step.body}</p>
+        <p className="tour-mode-note">Use Next to continue. The highlighted area stays read-only during guidance.</p>
         <div className="tour-panel-actions">
           <button className="tour-text-button" onClick={skipTour} type="button">Skip</button>
           <span className="tour-action-spacer" />

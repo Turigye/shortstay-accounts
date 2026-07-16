@@ -94,6 +94,12 @@
   color: var(--color-ink-muted);
 }
 
+.tour-mode-note {
+  margin: var(--space-3) 0 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+}
+
 .tour-panel-actions,
 .welcome-actions {
   margin-top: var(--space-5);

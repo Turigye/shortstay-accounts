@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import path from "node:path";
 
 import { createBusinessSession, type BusinessSession } from "./business-session";
+import { createBusinessRepository } from "./db/repositories/business-repository";
 import {
   createBusinessIpcHandlers,
   registerIpcHandlers,
@@ -35,8 +36,16 @@ function createWindow(): BrowserWindow {
 }
 
 void app.whenReady().then(() => {
+  const captureDate = !app.isPackaged && /^\d{4}-\d{2}-\d{2}$/.test(process.env.SHORT_STAY_GUIDE_CAPTURE_DATE ?? "")
+    ? process.env.SHORT_STAY_GUIDE_CAPTURE_DATE
+    : undefined;
   businessSession = createBusinessSession({
     databasePath: path.join(app.getPath("userData"), "business.db"),
+    ...(captureDate ? {
+      createRepository: (database) => createBusinessRepository(database, {
+        now: () => new Date(`${captureDate}T12:00:00.000Z`),
+      }),
+    } : {}),
   });
   registerIpcHandlers(ipcMain, {
     ...createBusinessIpcHandlers(businessSession),

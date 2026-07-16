@@ -101,6 +101,7 @@ describe("GuidedTour", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Test tour" });
     expect(screen.getByText("Step 1 of 2")).toBeTruthy();
+    expect(screen.getByText("Use Next to continue. The highlighted area stays read-only during guidance.")).toBeTruthy();
     expect(document.activeElement).toBe(screen.getByRole("heading", { name: "First step" }));
     expect(dialog.querySelector<HTMLElement>(".tour-spotlight-focus")?.style.left).toBe("92px");
     expect(dialog.querySelector<HTMLElement>(".tour-spotlight-focus")?.style.top).toBe("112px");

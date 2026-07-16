@@ -18,6 +18,8 @@ import { _electron } from "playwright";
 const FFMPEG = "/opt/homebrew/bin/ffmpeg";
 const VIEWPORT = { width: 1440, height: 900 };
 const GUIDE_PASSWORD = "guide-local-key-2026";
+const GUIDE_DATE = "2026-07-16";
+const GUIDE_DATE_TIME = `${GUIDE_DATE}T12:00:00+03:00`;
 const OUTPUT_DIRECTORY = path.join(process.cwd(), "docs", "user-guide", "media");
 const SCREENSHOTS = [
   "01-today.webp",
@@ -59,8 +61,7 @@ function requireFfmpeg() {
 }
 
 function localDate(daysFromToday = 0) {
-  const date = new Date();
-  date.setHours(12, 0, 0, 0);
+  const date = new Date(GUIDE_DATE_TIME);
   date.setDate(date.getDate() + daysFromToday);
   return date.toISOString().slice(0, 10);
 }
@@ -440,8 +441,23 @@ try {
   application = await _electron.launch({
     args: [".", `--user-data-dir=${profile}`],
     cwd: process.cwd(),
+    env: { ...process.env, SHORT_STAY_GUIDE_CAPTURE_DATE: GUIDE_DATE },
   });
   const page = await application.firstWindow();
+  await page.addInitScript(({ dateTime }) => {
+    const NativeDate = Date;
+    const fixedTime = new NativeDate(dateTime).valueOf();
+    class GuideDate extends NativeDate {
+      constructor(...args) {
+        super(...(args.length ? args : [fixedTime]));
+      }
+      static now() {
+        return fixedTime;
+      }
+    }
+    globalThis.Date = GuideDate;
+  }, { dateTime: GUIDE_DATE_TIME });
+  await page.reload();
   process.stdout.write("Preparing the encrypted Eden Grove profile...\n");
   await setContentViewport(page);
   await createBusiness(page);
