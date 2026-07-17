@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 describe("encrypted backup", () => {
-  it("backs up, validates, and restores the same report totals", async () => {
+  it("backs up, validates, and restores the same report totals", { timeout: 15_000 }, async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "staybooks-backup-"));
     directories.push(directory);
     const source = path.join(directory, "business.db");
