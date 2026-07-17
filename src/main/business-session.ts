@@ -112,7 +112,9 @@ export interface BusinessSession {
   recordBalance(input:Parameters<FinanceRepository["recordBalance"]>[0]):FinancialPosition;
   recordInventory(input:Parameters<FinanceRepository["recordInventory"]>[0]):FinancialPosition;
   createAsset(input:Parameters<FinanceRepository["createAsset"]>[0]):AssetRecord;
+  updateAsset(id:string,input:Parameters<FinanceRepository["updateAsset"]>[1]):AssetRecord;
   createLoan(input:Parameters<FinanceRepository["createLoan"]>[0]):LoanRecord;
+  updateLoan(id:string,input:Parameters<FinanceRepository["updateLoan"]>[1]):LoanRecord;
   closeMonth(month:string):PeriodClose;
   reopenMonth(month:string,reason:string):PeriodClose;
   getMonthlyFinancialReport(month:string):ReturnType<FinanceRepository["getMonthlyReport"]>;
@@ -346,7 +348,9 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     recordBalance:(input:Parameters<FinanceRepository["recordBalance"]>[0])=>finance().recordBalance(input),
     recordInventory:(input:Parameters<FinanceRepository["recordInventory"]>[0])=>finance().recordInventory(input),
     createAsset:(input:Parameters<FinanceRepository["createAsset"]>[0])=>finance().createAsset(input),
+    updateAsset:(id:string,input:Parameters<FinanceRepository["updateAsset"]>[1])=>finance().updateAsset(id,input),
     createLoan:(input:Parameters<FinanceRepository["createLoan"]>[0])=>finance().createLoan(input),
+    updateLoan:(id:string,input:Parameters<FinanceRepository["updateLoan"]>[1])=>finance().updateLoan(id,input),
     closeMonth:(month:string)=>finance().closeMonth(month),
     reopenMonth:(month:string,reason:string)=>finance().reopenMonth(month,reason),
     getMonthlyFinancialReport:(month:string)=>finance().getMonthlyReport(month),

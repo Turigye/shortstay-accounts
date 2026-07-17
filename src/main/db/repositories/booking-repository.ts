@@ -33,6 +33,9 @@ export interface BookingInput {
   readonly checkInTime?: string;
   readonly checkOutTime?: string;
   readonly nightlyRate: number;
+  readonly occupancyMode?: "whole_unit" | "one_room";
+  readonly pricingMode?: "nightly" | "fixed";
+  readonly fixedAmount?: number | null;
   readonly adjustment?: number;
   readonly status?: BookingStatus;
   readonly referred?: boolean;
@@ -103,6 +106,9 @@ interface BookingRow {
   check_in_time: string;
   check_out_time: string;
   nightly_rate: number;
+  occupancy_mode: "whole_unit" | "one_room";
+  pricing_mode: "nightly" | "fixed";
+  fixed_amount: number | null;
   adjustment: number;
   total_amount: number;
   status: string;
@@ -224,6 +230,9 @@ function bookingFromRow(row: BookingRow): Booking {
     checkInTime: row.check_in_time,
     checkOutTime: row.check_out_time,
     nights,
+    occupancyMode: row.occupancy_mode,
+    pricingMode: row.pricing_mode,
+    fixedAmount: row.fixed_amount === null ? null : row.fixed_amount as Ugx,
     nightlyRate: row.nightly_rate as Ugx,
     adjustment: row.adjustment as Ugx,
     total: row.total_amount as Ugx,
@@ -254,7 +263,8 @@ export function createBookingRepository(
       b.customer_id, c.name AS customer_name, c.phone AS customer_phone,
       c.email AS customer_email, b.referrer_id, r.name AS referrer_name,
       b.check_in, b.check_out, b.check_in_time, b.check_out_time,
-      b.nightly_rate, b.adjustment, b.total_amount, b.status, b.notes,
+      b.nightly_rate, b.occupancy_mode, b.pricing_mode, b.fixed_amount,
+      b.adjustment, b.total_amount, b.status, b.notes,
       b.created_at, b.updated_at,
       COALESCE(SUM(CASE WHEN p.direction = 'receipt' THEN p.amount ELSE 0 END), 0) AS received,
       COALESCE(SUM(CASE WHEN p.direction = 'refund' THEN p.amount ELSE 0 END), 0) AS refunded
@@ -313,6 +323,7 @@ export function createBookingRepository(
     checkIn: string,
     checkOut: string,
     status: BookingStatus,
+    occupancyMode: "whole_unit" | "one_room",
     excludeId: string | null = null,
   ): void {
     if (!occupiesUnit(status)) return;
@@ -322,9 +333,12 @@ export function createBookingRepository(
         unitId: string;
         checkIn: string;
         checkOut: string;
+        occupancyMode: "whole_unit" | "one_room";
         excludeId: string | null;
-      }, { id: string; unit_name: string }>(`
-        SELECT b.id, u.name AS unit_name
+      }, { unit_name: string; overlapping_rooms: number }>(`
+        SELECT u.name AS unit_name,
+          COALESCE(SUM(CASE WHEN b.occupancy_mode = 'one_room' THEN 1 ELSE 2 END), 0)
+            AS overlapping_rooms
         FROM bookings b
         JOIN units u ON u.id = b.unit_id
         WHERE b.business_id = @businessId
@@ -334,9 +348,17 @@ export function createBookingRepository(
           AND b.check_in < @checkOut
           AND @checkIn < b.check_out
           AND (@excludeId IS NULL OR b.id <> @excludeId)
-        LIMIT 1
+        GROUP BY u.name
+        HAVING @occupancyMode = 'whole_unit' OR overlapping_rooms >= 2
       `)
-      .get({ businessId: scopedBusinessId, unitId, checkIn, checkOut, excludeId });
+      .get({
+        businessId: scopedBusinessId,
+        unitId,
+        checkIn,
+        checkOut,
+        occupancyMode,
+        excludeId,
+      });
     if (conflict) {
       throw new BookingRepositoryError(
         "CONFLICT",
@@ -427,11 +449,20 @@ export function createBookingRepository(
     const checkOut = input.checkOut;
     let nights: number;
     let total: Ugx;
+    const occupancyMode = input.occupancyMode ?? "whole_unit";
+    const pricingMode = input.pricingMode ?? "nightly";
+    const fixedAmount = input.fixedAmount ?? null;
+    if (!["whole_unit", "one_room"].includes(occupancyMode)) {
+      throw new BookingRepositoryError("VALIDATION_ERROR", "Choose a valid occupancy type.");
+    }
+    if (!["nightly", "fixed"].includes(pricingMode)) {
+      throw new BookingRepositoryError("VALIDATION_ERROR", "Choose a valid pricing type.");
+    }
     try {
       nights = calculateNights({ checkIn, checkOut });
       total = calculateBookingTotal({
-        nights,
-        nightlyRate: input.nightlyRate,
+        nights: pricingMode === "fixed" ? 1 : nights,
+        nightlyRate: pricingMode === "fixed" ? fixedAmount ?? -1 : input.nightlyRate,
         adjustment: input.adjustment ?? 0,
       });
     } catch (error) {
@@ -445,6 +476,9 @@ export function createBookingRepository(
       checkInTime: validateTime(input.checkInTime, "14:00", "checkInTime"),
       checkOutTime: validateTime(input.checkOutTime, "11:00", "checkOutTime"),
       nightlyRate: input.nightlyRate,
+      occupancyMode,
+      pricingMode,
+      fixedAmount: pricingMode === "fixed" ? fixedAmount : null,
       adjustment: input.adjustment ?? 0,
       total: total!,
       status,
@@ -536,6 +570,7 @@ export function createBookingRepository(
           normalized.checkIn,
           normalized.checkOut,
           normalized.status,
+          normalized.occupancyMode,
         );
         const inserted = database
           .prepare<{
@@ -548,6 +583,9 @@ export function createBookingRepository(
             checkInTime: string;
             checkOutTime: string;
             nightlyRate: number;
+            occupancyMode: "whole_unit" | "one_room";
+            pricingMode: "nightly" | "fixed";
+            fixedAmount: number | null;
             adjustment: number;
             total: number;
             status: string;
@@ -556,11 +594,11 @@ export function createBookingRepository(
             INSERT INTO bookings (
               business_id, unit_id, customer_id, referrer_id, check_in, check_out,
               check_in_time, check_out_time, nightly_rate, adjustment, total_amount,
-              status, notes
+              occupancy_mode, pricing_mode, fixed_amount, status, notes
             ) VALUES (
               @businessId, @unitId, @customerId, @referrerId, @checkIn, @checkOut,
               @checkInTime, @checkOutTime, @nightlyRate, @adjustment, @total,
-              @status, @notes
+              @occupancyMode, @pricingMode, @fixedAmount, @status, @notes
             ) RETURNING id
           `)
           .get({
@@ -605,6 +643,7 @@ export function createBookingRepository(
           normalized.checkIn,
           normalized.checkOut,
           before.status,
+          normalized.occupancyMode,
           id,
         );
         database.prepare(`
@@ -613,7 +652,8 @@ export function createBookingRepository(
             check_in = @checkIn, check_out = @checkOut,
             check_in_time = @checkInTime, check_out_time = @checkOutTime,
             nightly_rate = @nightlyRate, adjustment = @adjustment,
-            total_amount = @total, notes = @notes
+            occupancy_mode = @occupancyMode, pricing_mode = @pricingMode,
+            fixed_amount = @fixedAmount, total_amount = @total, notes = @notes
           WHERE id = @id AND business_id = @businessId AND archived_at IS NULL
         `).run({ id, businessId: scopedBusinessId, ...normalized, referrerId });
         refreshBookingCompensation(database, scopedBusinessId, id);
@@ -638,7 +678,14 @@ export function createBookingRepository(
           }
           throw error;
         }
-        requireNoOverlap(before.unitId, before.checkIn, before.checkOut, to, id);
+        requireNoOverlap(
+          before.unitId,
+          before.checkIn,
+          before.checkOut,
+          to,
+          before.occupancyMode,
+          id,
+        );
         database
           .prepare("UPDATE bookings SET status = ? WHERE id = ? AND business_id = ? AND archived_at IS NULL")
           .run(STATUS_TO_DATABASE[to], id, scopedBusinessId);
@@ -652,12 +699,20 @@ export function createBookingRepository(
     archiveBooking(id) {
       database.transaction(() => {
         const before = bookingFromRow(getBookingRow(id));
-        if (before.status !== "draft" && before.status !== "cancelled") {
+        const paymentCount = database
+          .prepare<[string, string], { count: number }>(
+            "SELECT COUNT(*) count FROM payments WHERE booking_id = ? AND business_id = ?",
+          )
+          .get(id, scopedBusinessId)?.count ?? 0;
+        if (paymentCount > 0) {
           throw new BookingRepositoryError(
-            "INVALID_TRANSITION",
-            "Only draft or cancelled bookings can be archived.",
+            "CONFLICT",
+            "This booking has payment history and cannot be removed. Cancel it or correct its payment instead.",
           );
         }
+        database.prepare("DELETE FROM staff_earnings WHERE booking_id = ?").run(id);
+        database.prepare("DELETE FROM referral_earnings WHERE booking_id = ?").run(id);
+        database.prepare("DELETE FROM booking_months WHERE booking_id = ?").run(id);
         database
           .prepare("UPDATE bookings SET archived_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND business_id = ?")
           .run(id, scopedBusinessId);

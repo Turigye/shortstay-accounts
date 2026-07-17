@@ -261,6 +261,50 @@ describe("encrypted database", () => {
     database.close();
   });
 
+  it("adds client-feedback fields without changing existing records", () => {
+    const database = openEncryptedDatabase(temporaryDatabasePath(), "migration-safe");
+    const business = database
+      .prepare<[], { id: string }>(
+        "INSERT INTO businesses (name) VALUES ('Existing Client') RETURNING id",
+      )
+      .get();
+    if (!business) throw new Error("business was not created");
+    const unit = database
+      .prepare<[string], { id: string }>(
+        "INSERT INTO units (business_id, name) VALUES (?, 'Unit 1') RETURNING id",
+      )
+      .get(business.id);
+    const customer = database
+      .prepare<[string], { id: string }>(
+        "INSERT INTO customers (business_id, name, phone) VALUES (?, 'Guest', '0700') RETURNING id",
+      )
+      .get(business.id);
+    if (!unit || !customer) throw new Error("fixture was not created");
+    database
+      .prepare(
+        `INSERT INTO bookings
+          (business_id, unit_id, customer_id, check_in, check_out, nightly_rate, total_amount)
+         VALUES (?, ?, ?, '2025-04-01', '2025-05-01', 100000, 3000000)`,
+      )
+      .run(business.id, unit.id, customer.id);
+
+    const booking = database
+      .prepare<[], { occupancy_mode: string; pricing_mode: string; fixed_amount: number | null }>(
+        "SELECT occupancy_mode, pricing_mode, fixed_amount FROM bookings LIMIT 1",
+      )
+      .get();
+
+    expect(booking).toEqual({
+      occupancy_mode: "whole_unit",
+      pricing_mode: "nightly",
+      fixed_amount: null,
+    });
+    expect(
+      database.prepare<[], { count: number }>("SELECT COUNT(*) count FROM businesses").get(),
+    ).toMatchObject({ count: 1 });
+    database.close();
+  });
+
   it("rolls back a migration if a later schema statement fails", () => {
     const database = new Database(":memory:");
     database.exec("create table units (marker text)");

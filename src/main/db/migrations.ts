@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3-multiple-ciphers";
 
-export const LATEST_SCHEMA_VERSION = 7;
+export const LATEST_SCHEMA_VERSION = 8;
 
 interface Migration {
   readonly version: number;
@@ -675,6 +675,29 @@ const CREATE_VERSION_SEVEN_SCHEMA = `
   BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
 `;
 
+const CREATE_VERSION_EIGHT_SCHEMA = `
+  ALTER TABLE bookings ADD COLUMN occupancy_mode TEXT NOT NULL DEFAULT 'whole_unit'
+    CHECK (occupancy_mode IN ('whole_unit', 'one_room'));
+  ALTER TABLE bookings ADD COLUMN pricing_mode TEXT NOT NULL DEFAULT 'nightly'
+    CHECK (pricing_mode IN ('nightly', 'fixed'));
+  ALTER TABLE bookings ADD COLUMN fixed_amount INTEGER
+    CHECK (fixed_amount IS NULL OR fixed_amount >= 0);
+  ALTER TABLE loans ADD COLUMN repayment_frequency TEXT NOT NULL DEFAULT 'monthly'
+    CHECK (repayment_frequency IN ('monthly', 'quarterly', 'annually', 'custom'));
+  ALTER TABLE loans ADD COLUMN installment_amount INTEGER
+    CHECK (installment_amount IS NULL OR installment_amount > 0);
+  ALTER TABLE loans ADD COLUMN term_months INTEGER
+    CHECK (term_months IS NULL OR term_months > 0);
+  CREATE TRIGGER assets_block_closed_month_update BEFORE UPDATE ON assets
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=OLD.business_id AND month=substr(OLD.purchase_date,1,7) AND status='closed')
+    OR EXISTS (SELECT 1 FROM period_closes WHERE business_id=NEW.business_id AND month=substr(NEW.purchase_date,1,7) AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+  CREATE TRIGGER loans_block_closed_month_update BEFORE UPDATE ON loans
+  WHEN EXISTS (SELECT 1 FROM period_closes WHERE business_id=OLD.business_id AND month=substr(OLD.start_date,1,7) AND status='closed')
+    OR EXISTS (SELECT 1 FROM period_closes WHERE business_id=NEW.business_id AND month=substr(NEW.start_date,1,7) AND status='closed')
+  BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
+`;
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -733,6 +756,14 @@ const migrations: readonly Migration[] = [
     version: 7,
     up(database) {
       database.exec(CREATE_VERSION_SEVEN_SCHEMA);
+      database.prepare("update app_meta set value = ? where key = 'schema_version'")
+        .run(String(LATEST_SCHEMA_VERSION));
+    },
+  },
+  {
+    version: 8,
+    up(database) {
+      database.exec(CREATE_VERSION_EIGHT_SCHEMA);
       database.prepare("update app_meta set value = ? where key = 'schema_version'")
         .run(String(LATEST_SCHEMA_VERSION));
     },
