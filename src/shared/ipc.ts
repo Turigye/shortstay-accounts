@@ -44,7 +44,8 @@ export const IPC_CHANNELS = {
   SUPPLIERS_LIST: "suppliers:list", SUPPLIER_CREATE: "suppliers:create", SUPPLIER_PAYMENT: "suppliers:payment",
   RECURRING_EXPENSES_LIST: "recurring-expenses:list", RECURRING_EXPENSE_CREATE: "recurring-expenses:create",
   FINANCE_OVERVIEW: "finance:overview", BALANCE_SAVE: "finance:balance-save", INVENTORY_SAVE: "finance:inventory-save",
-  ASSET_CREATE: "finance:asset-create", LOAN_CREATE: "finance:loan-create",
+  ASSET_CREATE: "finance:asset-create", ASSET_UPDATE: "finance:asset-update",
+  LOAN_CREATE: "finance:loan-create", LOAN_UPDATE: "finance:loan-update",
   PERIOD_CLOSE: "finance:period-close", PERIOD_REOPEN: "finance:period-reopen",
   REPORT_MONTHLY: "reports:monthly",
   TODAY_OVERVIEW: "today:overview",
@@ -275,6 +276,9 @@ const bookingInputShape = {
     checkOut: dateSchema,
     checkInTime: timeSchema.optional(),
     checkOutTime: timeSchema.optional(),
+    occupancyMode: z.enum(["whole_unit", "one_room"]).optional(),
+    pricingMode: z.enum(["nightly", "fixed"]).optional(),
+    fixedAmount: wholeUgxSchema.nonnegative().nullable().optional(),
     nightlyRate: wholeUgxSchema.nonnegative(),
     adjustment: wholeUgxSchema.optional(),
     status: bookingStatusSchema.optional(),
@@ -476,12 +480,16 @@ const expenseRequests=[
 ] as const;
 const monthSchema=z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/);
 const balanceCategorySchema=z.enum(["cash_on_hand","current_bank","mobile_money","long_term_deposit","customer_receivable","other_receivable","supplier_payable","staff_payable","referral_payable","tax_payable","pension_payable","owner_capital","owner_drawings"]);
+const assetInputSchema=z.object({category:z.enum(["furniture","machinery","equipment","vehicles","land","buildings"]),description:z.string().trim().min(1).max(300),purchaseDate:dateSchema,purchaseAmount:wholeUgxSchema.nonnegative(),unitId:idSchema.nullable().optional(),supplierId:idSchema.nullable().optional(),paymentMethod:z.string().max(100).nullable().optional(),usefulLifeMonths:z.number().int().positive().nullable().optional()}).strict();
+const loanInputSchema=z.object({lender:z.string().trim().min(1).max(300),kind:z.enum(["bank","non_bank","interest_free"]),classification:z.enum(["current","non_current"]),principal:wholeUgxSchema.nonnegative(),outstandingBalance:wholeUgxSchema.nonnegative(),interestRateBasisPoints:z.number().int().nonnegative().optional(),startDate:dateSchema,dueDate:dateSchema.nullable().optional(),notes:z.string().max(2000).nullable().optional(),repaymentFrequency:z.enum(["monthly","quarterly","annually","custom"]).optional(),installmentAmount:positiveWholeUgxSchema.nullable().optional(),termMonths:z.number().int().positive().nullable().optional()}).strict();
 const financeRequests=[
  z.object({channel:z.literal(IPC_CHANNELS.FINANCE_OVERVIEW),payload:z.object({month:monthSchema}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.BALANCE_SAVE),payload:z.object({month:monthSchema,category:balanceCategorySchema,amount:wholeUgxSchema.nonnegative(),accountId:idSchema.nullable().optional(),unitId:idSchema.nullable().optional(),notes:z.string().max(2000).nullable().optional()}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.INVENTORY_SAVE),payload:z.object({month:monthSchema,unitId:idSchema.nullable().optional(),value:wholeUgxSchema.nonnegative(),notes:z.string().max(2000).nullable().optional()}).strict()}).strict(),
- z.object({channel:z.literal(IPC_CHANNELS.ASSET_CREATE),payload:z.object({category:z.enum(["furniture","machinery","equipment","vehicles","land","buildings"]),description:z.string().trim().min(1).max(300),purchaseDate:dateSchema,purchaseAmount:wholeUgxSchema.nonnegative(),unitId:idSchema.nullable().optional(),supplierId:idSchema.nullable().optional(),paymentMethod:z.string().max(100).nullable().optional(),usefulLifeMonths:z.number().int().positive().nullable().optional()}).strict()}).strict(),
- z.object({channel:z.literal(IPC_CHANNELS.LOAN_CREATE),payload:z.object({lender:z.string().trim().min(1).max(300),kind:z.enum(["bank","non_bank","interest_free"]),classification:z.enum(["current","non_current"]),principal:wholeUgxSchema.nonnegative(),outstandingBalance:wholeUgxSchema.nonnegative(),interestRateBasisPoints:z.number().int().nonnegative().optional(),startDate:dateSchema,dueDate:dateSchema.nullable().optional(),notes:z.string().max(2000).nullable().optional()}).strict()}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.ASSET_CREATE),payload:assetInputSchema}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.ASSET_UPDATE),payload:assetInputSchema.extend({id:idSchema}).strict()}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.LOAN_CREATE),payload:loanInputSchema}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.LOAN_UPDATE),payload:loanInputSchema.extend({id:idSchema}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.PERIOD_CLOSE),payload:z.object({month:monthSchema}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.PERIOD_REOPEN),payload:z.object({month:monthSchema,reason:z.string().trim().min(1).max(500)}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.REPORT_MONTHLY),payload:z.object({month:monthSchema}).strict()}).strict(),
@@ -612,6 +620,9 @@ const bookingSchema = z
     checkInTime: timeSchema,
     checkOutTime: timeSchema,
     nights: z.number().int().positive(),
+    occupancyMode: z.enum(["whole_unit", "one_room"]),
+    pricingMode: z.enum(["nightly", "fixed"]),
+    fixedAmount: wholeUgxSchema.nonnegative().nullable(),
     nightlyRate: wholeUgxSchema.nonnegative(),
     adjustment: wholeUgxSchema,
     total: wholeUgxSchema.nonnegative(),
@@ -703,7 +714,7 @@ const supplierSchema=z.object({id:z.string(),name:z.string(),phone:z.string().nu
 const recurringExpenseSchema=z.object({id:z.string(),categoryId:z.string(),scope:expenseScopeSchema,unitId:z.string().nullable(),supplierId:z.string().nullable(),expectedAmount:wholeUgxSchema.nonnegative().nullable(),cadence:z.enum(["monthly","quarterly","annually"]),nextReviewMonth:z.string(),notes:z.string().nullable()}).strict();
 const positionSchema=z.object({month:monthSchema,cashAndCurrentAccounts:wholeUgxSchema.nonnegative(),longTermDeposits:wholeUgxSchema.nonnegative(),receivables:wholeUgxSchema.nonnegative(),inventory:wholeUgxSchema.nonnegative(),fixedAssets:wholeUgxSchema.nonnegative(),payables:wholeUgxSchema.nonnegative(),loans:wholeUgxSchema.nonnegative(),ownerEquity:wholeUgxSchema,totalAssets:wholeUgxSchema.nonnegative(),totalLiabilitiesAndEquity:wholeUgxSchema,difference:wholeUgxSchema,balanced:z.boolean()}).strict();
 const assetSchema=z.object({id:z.string(),category:z.enum(["furniture","machinery","equipment","vehicles","land","buildings"]),description:z.string(),purchaseDate:dateSchema,purchaseAmount:wholeUgxSchema.nonnegative(),unitId:z.string().nullable(),supplierId:z.string().nullable(),paymentMethod:z.string().nullable(),usefulLifeMonths:z.number().int().positive().nullable(),status:z.enum(["active","disposed"])}).strict();
-const loanSchema=z.object({id:z.string(),lender:z.string(),kind:z.enum(["bank","non_bank","interest_free"]),classification:z.enum(["current","non_current"]),principal:wholeUgxSchema.nonnegative(),outstandingBalance:wholeUgxSchema.nonnegative(),interestRateBasisPoints:z.number().int().nonnegative(),startDate:dateSchema,dueDate:dateSchema.nullable(),notes:z.string().nullable()}).strict();
+const loanSchema=z.object({id:z.string(),lender:z.string(),kind:z.enum(["bank","non_bank","interest_free"]),classification:z.enum(["current","non_current"]),principal:wholeUgxSchema.nonnegative(),outstandingBalance:wholeUgxSchema.nonnegative(),interestRateBasisPoints:z.number().int().nonnegative(),startDate:dateSchema,dueDate:dateSchema.nullable(),notes:z.string().nullable(),repaymentFrequency:z.enum(["monthly","quarterly","annually","custom"]),installmentAmount:wholeUgxSchema.positive().nullable(),termMonths:z.number().int().positive().nullable()}).strict();
 const periodSchema=z.object({month:monthSchema,status:z.enum(["open","closed","reopened"]),reason:z.string().nullable()}).strict();
 const metricSchema=z.discriminatedUnion("state",[z.object({state:z.literal("available"),value:z.number()}).strict(),z.object({state:z.literal("unavailable"),reason:z.string()}).strict()]);
 const reportSchema=z.object({incomeStatement:z.object({revenue:wholeUgxSchema,purchases:wholeUgxSchema,grossProfit:wholeUgxSchema,operatingExpenses:wholeUgxSchema,financialExpenses:wholeUgxSchema,profitBeforeTax:wholeUgxSchema,taxExpense:wholeUgxSchema,netIncome:wholeUgxSchema}).strict(),balanceSheet:z.object({currentAssets:wholeUgxSchema,fixedAssets:wholeUgxSchema,totalAssets:wholeUgxSchema,currentLiabilities:wholeUgxSchema,nonCurrentLiabilities:wholeUgxSchema,totalLiabilities:wholeUgxSchema,equity:wholeUgxSchema,totalLiabilitiesAndEquity:wholeUgxSchema,difference:wholeUgxSchema}).strict(),cashFlow:z.object({openingCash:wholeUgxSchema,cashReceipts:wholeUgxSchema,cashPayments:wholeUgxSchema,netChange:wholeUgxSchema,closingCash:wholeUgxSchema}).strict(),breakEven:metricSchema,ratios:z.object({inventoryTurnover:metricSchema,receivablesTurnover:metricSchema,currentRatio:metricSchema,quickRatio:metricSchema,debtToAssets:metricSchema,debtToEquity:metricSchema,returnOnAssets:metricSchema,returnOnEquity:metricSchema,workingCapital:metricSchema,netProfitMargin:metricSchema}).strict()}).strict();
@@ -749,7 +760,8 @@ const responseSchemas = {
   [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: responseSchema(z.array(recurringExpenseSchema)), [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: responseSchema(recurringExpenseSchema),
   [IPC_CHANNELS.FINANCE_OVERVIEW]: responseSchema(z.object({position:positionSchema,assets:z.array(assetSchema),loans:z.array(loanSchema),period:periodSchema}).strict()),
   [IPC_CHANNELS.BALANCE_SAVE]:responseSchema(positionSchema),[IPC_CHANNELS.INVENTORY_SAVE]:responseSchema(positionSchema),
-  [IPC_CHANNELS.ASSET_CREATE]:responseSchema(assetSchema),[IPC_CHANNELS.LOAN_CREATE]:responseSchema(loanSchema),
+  [IPC_CHANNELS.ASSET_CREATE]:responseSchema(assetSchema),[IPC_CHANNELS.ASSET_UPDATE]:responseSchema(assetSchema),
+  [IPC_CHANNELS.LOAN_CREATE]:responseSchema(loanSchema),[IPC_CHANNELS.LOAN_UPDATE]:responseSchema(loanSchema),
   [IPC_CHANNELS.PERIOD_CLOSE]:responseSchema(periodSchema),[IPC_CHANNELS.PERIOD_REOPEN]:responseSchema(periodSchema),
   [IPC_CHANNELS.REPORT_MONTHLY]:responseSchema(reportSchema),
   [IPC_CHANNELS.TODAY_OVERVIEW]:responseSchema(todaySchema),
@@ -803,7 +815,8 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: RecurringExpenseTemplate[]; [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: RecurringExpenseTemplate;
   [IPC_CHANNELS.FINANCE_OVERVIEW]: {position:FinancialPosition;assets:AssetRecord[];loans:LoanRecord[];period:PeriodClose};
   [IPC_CHANNELS.BALANCE_SAVE]:FinancialPosition;[IPC_CHANNELS.INVENTORY_SAVE]:FinancialPosition;
-  [IPC_CHANNELS.ASSET_CREATE]:AssetRecord;[IPC_CHANNELS.LOAN_CREATE]:LoanRecord;
+  [IPC_CHANNELS.ASSET_CREATE]:AssetRecord;[IPC_CHANNELS.ASSET_UPDATE]:AssetRecord;
+  [IPC_CHANNELS.LOAN_CREATE]:LoanRecord;[IPC_CHANNELS.LOAN_UPDATE]:LoanRecord;
   [IPC_CHANNELS.PERIOD_CLOSE]:PeriodClose;[IPC_CHANNELS.PERIOD_REOPEN]:PeriodClose;
   [IPC_CHANNELS.REPORT_MONTHLY]:FinancialReport;
   [IPC_CHANNELS.TODAY_OVERVIEW]:TodayOverview;

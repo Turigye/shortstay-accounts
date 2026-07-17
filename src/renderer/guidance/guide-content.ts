@@ -10,11 +10,11 @@ export const guideChapters: GuideChapter[] = [
     ],
   },
   {
-    id: "bookings", title: "Booking Lifecycle", screen: "bookings", keywords: ["booking", "guest", "customer", "check in", "check out", "nightly rate", "airbnb", "archive"],
+    id: "bookings", title: "Booking Lifecycle", screen: "bookings", keywords: ["booking", "guest", "customer", "check in", "check out", "nightly rate", "fixed", "one room", "monthly rent", "remove", "airbnb"],
     summary: "Enter and manage a guest stay from draft through checkout.",
     sections: [
-      { heading: "Create a manual booking", paragraphs: ["Select the customer and unit, then enter check-in, check-out, nightly rate, and any adjustment. The total is based on occupied nights; checkout is not an occupied night.", "Bookings are entered manually. Short-Stay Accounts is not connected to Airbnb or another booking platform."] },
-      { heading: "Track the stay", paragraphs: ["Use Draft, Confirmed, Checked in, Completed, and Cancelled to describe the booking lifecycle. A cancelled booking releases the unit for future stays.", "Add referral details when they apply, edit a booking when facts change, and archive records only when they are no longer needed in everyday lists."] },
+      { heading: "Create a manual booking", paragraphs: ["Select the customer and unit, then choose Whole two-bedroom unit or One room only. Use a nightly rate for ordinary stays or a fixed amount for monthly and negotiated rent.", "Bookings are entered manually. Short-Stay Accounts is not connected to Airbnb or another booking platform."] },
+      { heading: "Track and correct the stay", paragraphs: ["Use Draft, Confirmed, Checked in, Completed, and Cancelled to describe the booking lifecycle. A cancelled booking releases the unit for future stays.", "Open an unpaid mistaken booking and select Remove to exclude it from schedules and reports. A booking with payment history is protected; correct or reverse its payments instead."] },
     ],
   },
   {
@@ -22,7 +22,7 @@ export const guideChapters: GuideChapter[] = [
     summary: "Record collections and costs while preserving the audit trail.",
     sections: [
       { heading: "Collections", paragraphs: ["Choose the account and booking when recording a receipt. Partial payments leave an outstanding balance; payment allocation keeps each booking balance accurate.", "Record a refund when money is returned to a customer. Use a reversal or correction to correct a recorded movement instead of silently replacing history."] },
-      { heading: "Costs and suppliers", paragraphs: ["Record cash expenses against the payment account used. Supplier credit records an amount due for later supplier payment.", "Review recurring expenses regularly so expected costs remain current. Corrections preserve the audit trail and should include a clear reason."] },
+      { heading: "Costs and suppliers", paragraphs: ["Add Visa or another card in Settings > Accounts, then choose it when recording the expense. Supplier credit records an amount due for later supplier payment.", "For Netflix, Yaka service fees, and similar costs, open Expenses > Recurring review > New template, choose Monthly, and confirm the real bill when due."] },
     ],
   },
   {
@@ -38,7 +38,7 @@ export const guideChapters: GuideChapter[] = [
     id: "month-end", title: "Financial Position and Month End", screen: "financial-position", keywords: ["cash", "receivable", "inventory", "asset", "loan", "payable", "equity", "balance", "close", "reopen"],
     summary: "Review financial position, balance the books, and close a month carefully.",
     sections: [
-      { heading: "Financial position", paragraphs: ["Review cash and account balances, receivables, guest-supply inventory, assets, loans, payables, and owner equity. The position is balanced when total assets equal liabilities plus equity.", "Use the relevant register for assets and loans, and record balances with notes so later review has context."] },
+      { heading: "Financial position", paragraphs: ["Review cash and account balances, receivables, guest-supply inventory, assets, loans, payables, and owner equity. The position is balanced when total assets equal liabilities plus equity.", "Use the pencil action to correct an asset or loan. A loan can record annual interest, repayment frequency, installment amount, term, due date, and outstanding balance."] },
       { heading: "Close and reopen", paragraphs: ["Complete month-end checks before closing a period. Closing protects a completed month from ordinary changes.", "Reopen only when a real correction is necessary and provide the reason. The reason-gated reopening records why the protected period changed."] },
     ],
   },
@@ -54,7 +54,7 @@ export const guideChapters: GuideChapter[] = [
     id: "administration", title: "Administration and Safety", screen: "settings", keywords: ["units", "rate", "category", "account", "backup", "restore", "export", "lock", "password", "local"],
     summary: "Maintain settings and protect the local accounting file.",
     sections: [
-      { heading: "Configuration", paragraphs: ["Manage units, effective-dated rates, categories, and accounts from Settings. Use effective dates so historical calculations retain the rate that applied at the time.", "Changing a historical or closed-period rate requires a reason."] },
+      { heading: "Configuration", paragraphs: ["Manage units, effective-dated rates, categories, and payment accounts from Settings. Add a Card / Visa account before recording card-paid expenses.", "Changing a historical or closed-period rate requires a reason."] },
       { heading: "Safety", paragraphs: ["Create encrypted backups regularly and keep them somewhere separate from the computer. Restore requires explicit overwrite confirmation because it replaces local data.", "Export creates a workbook for review. Data is stored locally only; password responsibility remains with the business owner."] },
     ],
   },

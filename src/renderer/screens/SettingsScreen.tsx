@@ -25,6 +25,7 @@ import {
   RENTAL_TAX_RATE_PERCENT,
 } from "../../domain/rental-tax";
 import type { BusinessSettings, RoleKey } from "../../domain/types";
+import type { PaymentAccount } from "../../main/db/repositories/payment-repository";
 import type { SetRatePayload } from "../../shared/ipc";
 import { IPC_CHANNELS } from "../../shared/ipc";
 
@@ -219,10 +220,13 @@ export function SettingsScreen({
   const [exportMonth,setExportMonth]=useState(today.slice(0,7));
   const [fileBusy,setFileBusy]=useState(false);
   const [fileMessage,setFileMessage]=useState<string|null>(null);
+  const [accounts,setAccounts]=useState<PaymentAccount[]>([]);
+  const [accountMessage,setAccountMessage]=useState<string|null>(null);
 
   useEffect(() => {
     setUnits(business.units.map(({ id, name }) => ({ id, name })));
   }, [business.units]);
+  useEffect(()=>{if(activeTab!=="accounts")return;void Promise.resolve(window.stayBooks.invoke(IPC_CHANNELS.ACCOUNTS_LIST,{})).then((result)=>{if(result?.ok)setAccounts(result.data);});},[activeTab]);
 
   const staffTotal = useMemo(
     () => Object.values(business.staffRates).reduce((sum, value) => sum + value, 0),
@@ -246,6 +250,7 @@ export function SettingsScreen({
   async function createBackup(){setFileBusy(true);setFileMessage(null);try{const result=await window.stayBooks.invoke(IPC_CHANNELS.BACKUP_CREATE,{password:filePassword});if(!result.ok)return setFileMessage(result.message);if(!result.data.cancelled)setFileMessage("Encrypted backup created.");}finally{setFileBusy(false);setFilePassword("");}}
   async function restoreBackup(){if(!restoreConfirmed)return;setFileBusy(true);setFileMessage(null);try{const result=await window.stayBooks.invoke(IPC_CHANNELS.BACKUP_RESTORE,{password:filePassword,confirmOverwrite:true});if(!result.ok)return setFileMessage(result.message);if(!result.data.cancelled)window.location.reload();}finally{setFileBusy(false);setFilePassword("");}}
   async function exportExcel(){setFileBusy(true);setFileMessage(null);const result=await window.stayBooks.invoke(IPC_CHANNELS.EXPORT_EXCEL,{month:exportMonth});setFileBusy(false);if(!result.ok)return setFileMessage(result.message);if(!result.data.cancelled)setFileMessage("Excel workbook exported.");}
+  async function addAccount(event:FormEvent<HTMLFormElement>){event.preventDefault();setAccountMessage(null);const form=new FormData(event.currentTarget);const result=await window.stayBooks.invoke(IPC_CHANNELS.ACCOUNT_CREATE,{name:String(form.get("name")),type:String(form.get("type")) as "cash"|"bank"|"mobileMoney"|"card"});if(!result.ok)return setAccountMessage(result.message);setAccounts((current)=>[...current,result.data].sort((a,b)=>a.name.localeCompare(b.name)));event.currentTarget.reset();setAccountMessage("Account added.");}
 
   return (
     <div className="settings-screen">
@@ -458,12 +463,14 @@ export function SettingsScreen({
 
           {activeTab === "accounts" ? (
             <>
-              <div className="panel-heading"><h2>Accounts</h2><p>Available local account classifications</p></div>
-              <dl className="settings-definition-list">
-                <div><dt>Money accounts</dt><dd>Cash, bank, mobile money, card</dd></div>
-                <div><dt>Working balances</dt><dd>Receivable, payable</dd></div>
-                <div><dt>Ownership</dt><dd>Equity and other balances</dd></div>
-              </dl>
+              <div className="panel-heading"><h2>Payment accounts</h2><p>Add the real places used to receive or spend money</p></div>
+              <form className="rate-editor" onSubmit={addAccount}>
+                <label className="field-group"><span>Account name</span><input name="name" placeholder="Visa card" required/></label>
+                <label className="field-group"><span>Type</span><select name="type"><option value="cash">Cash</option><option value="bank">Bank</option><option value="mobileMoney">Mobile money</option><option value="card">Card / Visa</option></select></label>
+                <button className="primary-button compact-button" type="submit"><Plus size={16}/>Add account</button>
+              </form>
+              {accountMessage?<p className="inline-message" role="status">{accountMessage}</p>:null}
+              <div className="settings-table-wrap"><table><thead><tr><th>Account</th><th>Type</th></tr></thead><tbody>{accounts.map((account)=><tr key={account.id}><td><strong>{account.name}</strong></td><td>{account.type==="mobileMoney"?"Mobile money":account.type==="card"?"Card / Visa":account.type}</td></tr>)}</tbody></table></div>
             </>
           ) : null}
 

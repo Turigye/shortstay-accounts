@@ -70,6 +70,8 @@ On the setup screen, enter the business name, the first two unit names, and a lo
 
 Before entering the first stay, open **Settings > Accounts** and identify the account classifications available for the business: cash, bank, mobile money, card, receivable, payable, equity, and other balances. When a real collection or payment is recorded, choose the real account used. This is what lets cash and account balances reconcile later.
 
+To add Visa, open **Settings > Accounts**, enter a name such as **Visa card**, choose **Card / Visa**, and select **Add account**. The new account then appears in expense and payment account choices.
+
 Then create one test-quality real booking, or use the fictional Eden Grove media only for learning. Check that the nights, rate, total, payment account, and balance make sense before recording any payment. Do not invent a booking simply to make the dashboard look populated.
 
 ## Today
@@ -100,11 +102,12 @@ For Eden Grove, begin each morning by checking whether Garden Studio or Courtyar
 1. Select **New booking**, or select an available day in the schedule for Garden Studio or Courtyard Suite.
 2. Select the unit. Only active units can be used.
 3. Select an existing customer, or choose **+ New customer** and enter the customer's name and phone. Email is optional.
-4. Enter check-in and checkout dates, and, when needed, check-in and checkout times. Checkout must be after check-in.
-5. Enter the nightly rate in whole UGX and review the automatic total. The formula is `occupied nights x nightly rate + adjustment`. The checkout date is excluded from occupied nights.
-6. Enter a positive adjustment for an added charge or a negative adjustment for a discount. Explain the adjustment in notes when it is not obvious.
-7. Mark the booking as referred only when a real referrer applies, then enter the referrer's name.
-8. Choose **Confirmed** or **Draft** and save. A draft is started but not accepted; confirmed is accepted for the selected unit and dates.
+4. Choose **Whole two-bedroom unit** or **One room only**. Two one-room stays may share a unit on the same dates; a whole-unit stay blocks both rooms.
+5. Enter check-in and checkout dates. Choose **Nightly rate** for ordinary stays or **Fixed stay or monthly amount** for negotiated and historic monthly rent.
+6. Enter the rate or fixed amount and review the automatic total. For nightly pricing the formula is `occupied nights x nightly rate + adjustment`.
+7. Enter a positive adjustment for an added charge or a negative adjustment for a discount. Explain the adjustment in notes when it is not obvious.
+8. Mark the booking as referred only when a real referrer applies, then enter the referrer's name.
+9. Choose **Confirmed** or **Draft** and save. A draft is started but not accepted; confirmed is accepted for the selected unit and dates.
 
 For a new booking, an optional **Initial payment** section lets you record a receipt at the same time. Enter the amount, payment date and time, method, destination account, and reference. Select the overpayment confirmation only when you intentionally receive more than the booking total. A receipt created here is still a payment movement and will appear in the booking balance.
 
@@ -128,7 +131,9 @@ Use the visible status command in the booking panel only when the real event has
 
 The list filters are for finding records, not changing them. Search by customer or unit, select a status, unit, customer, balance state, date range, or minimum total. **Unpaid** means no money has been recorded. **Outstanding** means the balance is greater than zero. **Paid** in this filter means no balance remains.
 
-Archive a record only when it no longer belongs in daily lists but must be retained. Archive does not erase accounting history. Before archiving, make sure the booking is complete or otherwise intentionally retained, and that any necessary payment correction has already been made. Do not archive a booking to hide a mistake.
+To enter the old monthly rent from April to November 2025, create one booking for each rental month, choose **Fixed stay or monthly amount**, enter that month's real rent, complete the booking, and record the receipt in the month it was received. This keeps monthly return and cash reports correctly dated.
+
+To remove a mistaken test booking, open it and select **Remove**, then confirm. It disappears from schedules and reports. A booking with payment history cannot be removed because that would break the audit trail; correct or reverse the payment first, or cancel the booking when the record must remain.
 
 ## Payments
 
@@ -209,7 +214,7 @@ Use **Supplier** to add a supplier name and optional phone before recording a cr
 
 ### Recurring expense review
 
-The recurring area is a review list, not an automatic payment engine. Select its add command to create a template with category, Unit or Shared scope, expected amount, cadence (monthly, quarterly, or annually), next review month, and notes. When a template becomes due for review, confirm the real bill and record the actual expense separately. Adjust the template when the future expectation changes. Do not assume that a template means cash was paid.
+The recurring area is a review list, not an automatic payment engine. Open **Expenses > Recurring review > New template** to create Netflix, the monthly Yaka service fee, or another repeated cost. Choose **Monthly**, set the next review month, and add the expected amount. When due, confirm the real bill and record the actual expense separately. Do not assume that a template means cash was paid.
 
 ## Staff and Referrals
 
@@ -241,7 +246,9 @@ If it says **Balanced**, the two sides agree. If it shows a difference, investig
 
 The position summary includes cash and current accounts, long-term deposits, receivables, guest-supply inventory, fixed assets, provider and other payables, loans, owner equity, and a calculated monthly rental-tax provision. Use **Add balance** to record an applicable balance type, amount, optional unit, and clear notes. Choose a unit only when the balance belongs to that one unit; use consolidated/shared for a property-wide figure.
 
-Use **Inventory value** to record the value of guest supplies for a unit or shared stock. This is a value record, not a purchase transaction; record the actual purchase in Expenses as appropriate. The **Assets** tab has a fixed asset register: choose **New asset** and record its date, description, category, unit/shared scope, and purchase amount. The **Loans** tab has a loan register: choose **New loan** and record lender, type, classification (under or over 12 months), principal, outstanding balance, dates, and notes as requested. The display distinguishes the original principal from what remains outstanding.
+Use **Inventory value** to record the value of guest supplies for a unit or shared stock. This is a value record, not a purchase transaction; record the actual purchase in Expenses as appropriate. The **Assets** tab has a fixed asset register: choose **New asset** to add one or use the pencil button to correct an existing asset.
+
+The **Loans** tab records lender, type, classification, principal, outstanding balance, annual interest, repayment frequency, installment amount, term, dates, and notes. Use the pencil button to correct a loan. For Aurevia Enterprise at 3%, enter `3` in Interest rate, then record the agreed frequency, installment, and term. The application shows the repayment plan separately from business break-even; the Reports screen calculates business break-even from operating figures.
 
 ## Month End
 

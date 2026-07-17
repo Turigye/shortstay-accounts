@@ -1,4 +1,4 @@
-import { ChevronDown, Plus, X } from "lucide-react";
+import { ChevronDown, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import {
@@ -23,6 +23,9 @@ export interface BookingEditorValue {
   readonly checkOut: string;
   readonly checkInTime: string;
   readonly checkOutTime: string;
+  readonly occupancyMode: "whole_unit" | "one_room";
+  readonly pricingMode: "nightly" | "fixed";
+  readonly fixedAmount: number | null;
   readonly nightlyRate: number;
   readonly adjustment: number;
   readonly status: BookingStatus;
@@ -61,6 +64,7 @@ interface BookingEditorProps {
   onCreateCustomer?: (input: NewCustomerValue) => Customer | Promise<Customer>;
   onCancel: () => void;
   onTransition?: (status: BookingStatus) => void | Promise<void>;
+  onRemove?: () => void | Promise<void>;
 }
 
 interface FormState {
@@ -73,6 +77,9 @@ interface FormState {
   checkOut: string;
   checkInTime: string;
   checkOutTime: string;
+  occupancyMode: "whole_unit" | "one_room";
+  pricingMode: "nightly" | "fixed";
+  fixedAmount: string;
   nightlyRate: string;
   adjustment: string;
   status: "draft" | "confirmed";
@@ -114,6 +121,9 @@ function initialState(
     checkOut: booking?.checkOut ?? (initialCheckIn ? addOneDay(initialCheckIn) : ""),
     checkInTime: booking?.checkInTime ?? "14:00",
     checkOutTime: booking?.checkOutTime ?? "11:00",
+    occupancyMode: booking?.occupancyMode ?? "whole_unit",
+    pricingMode: booking?.pricingMode ?? "nightly",
+    fixedAmount: booking?.fixedAmount == null ? "" : String(booking.fixedAmount),
     nightlyRate: booking ? String(booking.nightlyRate) : "",
     adjustment: booking ? String(booking.adjustment) : "0",
     status: booking?.status === "draft" ? "draft" : "confirmed",
@@ -169,6 +179,7 @@ export function BookingEditor({
   onCreateCustomer,
   onCancel,
   onTransition,
+  onRemove,
 }: BookingEditorProps) {
   const [form, setForm] = useState<FormState>(() =>
     initialState(booking, initialUnitId, initialCheckIn),
@@ -184,13 +195,19 @@ export function BookingEditor({
 
   const calculation = useMemo(() => {
     const nightlyRate = parseWholeUgx(form.nightlyRate);
+    const fixedAmount = parseWholeUgx(form.fixedAmount);
     const adjustment = parseWholeUgx(form.adjustment);
-    if (!form.checkIn || !form.checkOut || nightlyRate === null || adjustment === null) {
+    if (!form.checkIn || !form.checkOut || adjustment === null ||
+      (form.pricingMode === "nightly" ? nightlyRate === null : fixedAmount === null)) {
       return { nights: 0, total: 0, error: null };
     }
     try {
       const nights = calculateNights({ checkIn: form.checkIn, checkOut: form.checkOut });
-      const total = calculateBookingTotal({ nights, nightlyRate, adjustment });
+      const total = calculateBookingTotal({
+        nights: form.pricingMode === "fixed" ? 1 : nights,
+        nightlyRate: form.pricingMode === "fixed" ? fixedAmount! : nightlyRate!,
+        adjustment,
+      });
       return { nights, total, error: null };
     } catch (calculationError) {
       return {
@@ -202,7 +219,7 @@ export function BookingEditor({
             : "Check the booking dates and amounts.",
       };
     }
-  }, [form.adjustment, form.checkIn, form.checkOut, form.nightlyRate]);
+  }, [form.adjustment, form.checkIn, form.checkOut, form.fixedAmount, form.nightlyRate, form.pricingMode]);
 
   function update<Key extends keyof FormState>(key: Key, value: FormState[Key]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -232,9 +249,13 @@ export function BookingEditor({
     if (!form.checkIn) errors.checkIn = "Choose a check-in date.";
     if (!form.checkOut) errors.checkOut = "Choose a check-out date.";
     const nightlyRate = parseWholeUgx(form.nightlyRate);
+    const fixedAmount = parseWholeUgx(form.fixedAmount);
     const adjustment = parseWholeUgx(form.adjustment);
-    if (nightlyRate === null || nightlyRate < 0) {
+    if (form.pricingMode === "nightly" && (nightlyRate === null || nightlyRate < 0)) {
       errors.nightlyRate = "Enter a whole UGX amount of zero or more.";
+    }
+    if (form.pricingMode === "fixed" && (fixedAmount === null || fixedAmount < 0)) {
+      errors.fixedAmount = "Enter the fixed UGX amount.";
     }
     if (adjustment === null) errors.adjustment = "Enter a whole UGX amount.";
     if (calculation.error) errors.checkOut = calculation.error;
@@ -279,7 +300,10 @@ export function BookingEditor({
         checkOut: form.checkOut,
         checkInTime: form.checkInTime,
         checkOutTime: form.checkOutTime,
-        nightlyRate: nightlyRate!,
+        occupancyMode: form.occupancyMode,
+        pricingMode: form.pricingMode,
+        fixedAmount: form.pricingMode === "fixed" ? fixedAmount! : null,
+        nightlyRate: form.pricingMode === "nightly" ? nightlyRate! : 0,
         adjustment: adjustment!,
         status: booking?.status ?? form.status,
         referred: form.referred,
@@ -389,14 +413,31 @@ export function BookingEditor({
           </div>
         </div>
 
+        <div className="booking-form-grid">
+          <div className="field-group">
+            <label htmlFor="booking-occupancy">Space rented</label>
+            <select id="booking-occupancy" onChange={(event) => update("occupancyMode", event.target.value as FormState["occupancyMode"])} value={form.occupancyMode}>
+              <option value="whole_unit">Whole two-bedroom unit</option>
+              <option value="one_room">One room only</option>
+            </select>
+          </div>
+          <div className="field-group">
+            <label htmlFor="booking-pricing">Pricing</label>
+            <select id="booking-pricing" onChange={(event) => update("pricingMode", event.target.value as FormState["pricingMode"])} value={form.pricingMode}>
+              <option value="nightly">Nightly rate</option>
+              <option value="fixed">Fixed stay or monthly amount</option>
+            </select>
+          </div>
+        </div>
+
         <div className="booking-rate-row">
-          <div className="field-group" data-invalid={Boolean(errorFor("nightlyRate"))}>
-            <label htmlFor="booking-nightly-rate">Nightly rate</label>
+          <div className="field-group" data-invalid={Boolean(errorFor(form.pricingMode === "nightly" ? "nightlyRate" : "fixedAmount"))}>
+            <label htmlFor="booking-rate">{form.pricingMode === "nightly" ? "Nightly rate" : "Fixed amount"}</label>
             <div className="money-input-wrap">
               <span aria-hidden="true">UGX</span>
-              <input id="booking-nightly-rate" inputMode="numeric" min={0} onChange={(event) => update("nightlyRate", event.target.value)} step={1} type="number" value={form.nightlyRate} />
+              <input id="booking-rate" inputMode="numeric" min={0} onChange={(event) => update(form.pricingMode === "nightly" ? "nightlyRate" : "fixedAmount", event.target.value)} step={1} type="number" value={form.pricingMode === "nightly" ? form.nightlyRate : form.fixedAmount} />
             </div>
-            {errorFor("nightlyRate") ? <small className="field-error">{errorFor("nightlyRate")}</small> : null}
+            {errorFor(form.pricingMode === "nightly" ? "nightlyRate" : "fixedAmount") ? <small className="field-error">{errorFor(form.pricingMode === "nightly" ? "nightlyRate" : "fixedAmount")}</small> : null}
           </div>
           <output aria-label="Booking total" className="booking-total" htmlFor="booking-check-in booking-check-out booking-nightly-rate">
             <span>{calculation.nights === 1 ? "1 night" : `${calculation.nights} nights`}</span>
@@ -529,6 +570,11 @@ export function BookingEditor({
             </div>
           ) : <span />}
           <div>
+            {booking && onRemove ? (
+              <button className="secondary-button" disabled={busy} onClick={() => void onRemove()} type="button">
+                <Trash2 aria-hidden="true" size={16} /> Remove
+              </button>
+            ) : null}
             <button className="secondary-button" onClick={onCancel} type="button">Cancel</button>
             <button className="primary-button" disabled={busy} type="submit">{busy ? "Saving…" : "Save booking"}</button>
           </div>

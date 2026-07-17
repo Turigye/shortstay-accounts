@@ -39,6 +39,9 @@ export interface Booking {
   readonly checkInTime: string;
   readonly checkOutTime: string;
   readonly nights: number;
+  readonly occupancyMode: "whole_unit" | "one_room";
+  readonly pricingMode: "nightly" | "fixed";
+  readonly fixedAmount: Ugx | null;
   readonly nightlyRate: Ugx;
   readonly adjustment: Ugx;
   readonly total: Ugx;

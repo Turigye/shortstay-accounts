@@ -253,6 +253,28 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
     }
   }
 
+  async function removeBooking() {
+    if (!selectedBooking) return;
+    if (!window.confirm(
+      `Remove the booking for ${selectedBooking.customerName}? It will stop affecting schedules and reports. Bookings with payment history cannot be removed.`,
+    )) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await window.stayBooks.invoke(IPC_CHANNELS.BOOKING_ARCHIVE, {
+        id: selectedBooking.id,
+      });
+      if (!result.ok) {
+        setError(firstError(result));
+        return;
+      }
+      setBookings((current) => current.filter(({ id }) => id !== selectedBooking.id));
+      closeEditor();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="bookings-screen">
       <header className="bookings-header" data-tour="booking-action">
@@ -380,6 +402,7 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
             initialUnitId={editorSeed?.unitId}
             onCancel={closeEditor}
             onCreateCustomer={createCustomer}
+            onRemove={removeBooking}
             onSave={saveBooking}
             onTransition={transitionBooking}
             movements={movements.filter(({ bookingId }) => bookingId === selectedBooking?.id)}

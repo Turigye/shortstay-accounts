@@ -47,6 +47,52 @@ describe("financial position and month close", () => {
     });
   });
 
+  it("edits assets and loans with a clear repayment plan", () => {
+    const { finance } = fixture();
+    const asset = finance.createAsset({
+      category: "furniture",
+      description: "Wrong bed",
+      purchaseDate: "2026-07-02",
+      purchaseAmount: 800_000,
+    });
+    const loan = finance.createLoan({
+      lender: "Aurevia Enterprise",
+      kind: "non_bank",
+      classification: "non_current",
+      principal: 10_000_000,
+      outstandingBalance: 10_000_000,
+      interestRateBasisPoints: 300,
+      startDate: "2026-07-01",
+      repaymentFrequency: "monthly",
+      installmentAmount: 500_000,
+      termMonths: 24,
+    });
+
+    expect(finance.updateAsset(asset.id, {
+      category: "furniture",
+      description: "Guest room bed",
+      purchaseDate: "2026-07-02",
+      purchaseAmount: 750_000,
+    })).toMatchObject({ description: "Guest room bed", purchaseAmount: 750_000 });
+    expect(finance.updateLoan(loan.id, {
+      lender: "Aurevia Enterprise",
+      kind: "non_bank",
+      classification: "non_current",
+      principal: 10_000_000,
+      outstandingBalance: 9_500_000,
+      interestRateBasisPoints: 300,
+      startDate: "2026-07-01",
+      repaymentFrequency: "monthly",
+      installmentAmount: 500_000,
+      termMonths: 24,
+    })).toMatchObject({
+      outstandingBalance: 9_500_000,
+      repaymentFrequency: "monthly",
+      installmentAmount: 500_000,
+      termMonths: 24,
+    });
+  });
+
   it("blocks an unbalanced close, locks a closed month, and audits reopening", () => {
     const { database, finance } = fixture();
     finance.recordBalance({ month: "2026-07", category: "cash_on_hand", amount: 1_000_000 });

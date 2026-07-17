@@ -146,6 +146,63 @@ describe("booking repository", () => {
     );
   });
 
+  it("allows two one-room stays but blocks a third or a whole-unit overlap", () => {
+    const fixture = createFixture();
+    fixture.repository.createBooking(
+      bookingInput(fixture, { occupancyMode: "one_room" }),
+    );
+    fixture.repository.createBooking(
+      bookingInput(fixture, {
+        customerId: fixture.repository.createCustomer({
+          name: "Brian K.",
+          phone: "0700000001",
+        }).id,
+        occupancyMode: "one_room",
+      }),
+    );
+
+    expect(() =>
+      fixture.repository.createBooking(
+        bookingInput(fixture, {
+          customerId: fixture.repository.createCustomer({
+            name: "Carol A.",
+            phone: "0700000002",
+          }).id,
+          occupancyMode: "one_room",
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: "CONFLICT" }));
+    expect(() =>
+      fixture.repository.createBooking(
+        bookingInput(fixture, {
+          checkIn: "2026-07-21",
+          checkOut: "2026-07-23",
+          occupancyMode: "whole_unit",
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: "CONFLICT" }));
+  });
+
+  it("supports a fixed total for historic monthly and partial-room rent", () => {
+    const fixture = createFixture();
+    const booking = fixture.repository.createBooking(
+      bookingInput(fixture, {
+        pricingMode: "fixed",
+        fixedAmount: 650_000,
+        nightlyRate: 0,
+        adjustment: -50_000,
+        occupancyMode: "one_room",
+      }),
+    );
+
+    expect(booking).toMatchObject({
+      pricingMode: "fixed",
+      fixedAmount: 650_000,
+      occupancyMode: "one_room",
+      total: 600_000,
+    });
+  });
+
   it("lets drafts overlap but rechecks inside the confirm transaction", () => {
     const fixture = createFixture();
     const staleDraft = fixture.repository.createBooking(
@@ -206,6 +263,47 @@ describe("booking repository", () => {
 
     expect(fixture.repository.listBookings({ scheduleFrom: "2026-07-20", scheduleTo: "2026-07-23" }))
       .toHaveLength(1);
+  });
+
+  it("removes a mistaken unpaid booking and all derived report rows", () => {
+    const fixture = createFixture();
+    const booking = fixture.repository.createBooking(bookingInput(fixture));
+
+    fixture.repository.archiveBooking(booking.id);
+
+    expect(fixture.repository.listBookings()).toEqual([]);
+    for (const table of ["booking_months", "staff_earnings", "referral_earnings"]) {
+      expect(
+        fixture.database
+          .prepare(`SELECT COUNT(*) count FROM ${table} WHERE booking_id = ?`)
+          .get(booking.id),
+      ).toMatchObject({ count: 0 });
+    }
+  });
+
+  it("refuses to remove a booking that has payment history", () => {
+    const fixture = createFixture();
+    const account = fixture.database
+      .prepare<[string], { id: string }>(
+        "INSERT INTO accounts (business_id, name, type) VALUES (?, 'Test Mobile Money', 'mobile_money') RETURNING id",
+      )
+      .get(fixture.businessId);
+    if (!account) throw new Error("default account was not created");
+    const booking = fixture.repository.createBooking(
+      bookingInput(fixture, {
+        initialPayment: {
+          amount: 100_000,
+          paidAt: "2026-07-14T09:00:00.000Z",
+          method: "mobileMoney",
+          accountId: account.id,
+        },
+      }),
+    );
+
+    expect(() => fixture.repository.archiveBooking(booking.id)).toThrowError(
+      expect.objectContaining({ code: "CONFLICT" }),
+    );
+    expect(fixture.repository.getBooking(booking.id).id).toBe(booking.id);
   });
 
   it("enforces legal transitions and terminal states", () => {
