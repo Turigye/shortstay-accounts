@@ -55,7 +55,7 @@ export const IPC_CHANNELS = {
   SUPPLIERS_LIST: "suppliers:list", SUPPLIER_CREATE: "suppliers:create", SUPPLIER_PAYMENT: "suppliers:payment",
   RECURRING_EXPENSES_LIST: "recurring-expenses:list", RECURRING_EXPENSE_CREATE: "recurring-expenses:create",
   FINANCE_OVERVIEW: "finance:overview", BALANCE_SAVE: "finance:balance-save", INVENTORY_SAVE: "finance:inventory-save",
-  ASSET_CREATE: "finance:asset-create", ASSET_UPDATE: "finance:asset-update",
+  ASSET_CREATE: "finance:asset-create", ASSET_UPDATE: "finance:asset-update", ASSET_ARCHIVE: "finance:asset-archive",
   LOAN_CREATE: "finance:loan-create", LOAN_UPDATE: "finance:loan-update",
   PERIOD_CLOSE: "finance:period-close", PERIOD_REOPEN: "finance:period-reopen",
   REPORT_MONTHLY: "reports:monthly",
@@ -561,6 +561,7 @@ const financeRequests=[
  z.object({channel:z.literal(IPC_CHANNELS.INVENTORY_SAVE),payload:z.object({month:monthSchema,unitId:idSchema.nullable().optional(),value:wholeUgxSchema.nonnegative(),notes:z.string().max(2000).nullable().optional()}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.ASSET_CREATE),payload:assetInputSchema}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.ASSET_UPDATE),payload:assetInputSchema.extend({id:idSchema}).strict()}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.ASSET_ARCHIVE),payload:z.object({id:idSchema}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.LOAN_CREATE),payload:loanInputSchema}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.LOAN_UPDATE),payload:loanInputSchema.extend({id:idSchema}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.PERIOD_CLOSE),payload:z.object({month:monthSchema}).strict()}).strict(),
@@ -896,7 +897,7 @@ const responseSchemas = {
   [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: responseSchema(z.array(recurringExpenseSchema)), [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: responseSchema(recurringExpenseSchema),
   [IPC_CHANNELS.FINANCE_OVERVIEW]: responseSchema(z.object({position:positionSchema,assets:z.array(assetSchema),loans:z.array(loanSchema),period:periodSchema}).strict()),
   [IPC_CHANNELS.BALANCE_SAVE]:responseSchema(positionSchema),[IPC_CHANNELS.INVENTORY_SAVE]:responseSchema(positionSchema),
-  [IPC_CHANNELS.ASSET_CREATE]:responseSchema(assetSchema),[IPC_CHANNELS.ASSET_UPDATE]:responseSchema(assetSchema),
+  [IPC_CHANNELS.ASSET_CREATE]:responseSchema(assetSchema),[IPC_CHANNELS.ASSET_UPDATE]:responseSchema(assetSchema),[IPC_CHANNELS.ASSET_ARCHIVE]:responseSchema(z.object({archived:z.literal(true)}).strict()),
   [IPC_CHANNELS.LOAN_CREATE]:responseSchema(loanSchema),[IPC_CHANNELS.LOAN_UPDATE]:responseSchema(loanSchema),
   [IPC_CHANNELS.PERIOD_CLOSE]:responseSchema(periodSchema),[IPC_CHANNELS.PERIOD_REOPEN]:responseSchema(periodSchema),
   [IPC_CHANNELS.REPORT_MONTHLY]:responseSchema(reportSchema),
@@ -977,7 +978,7 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: RecurringExpenseTemplate[]; [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: RecurringExpenseTemplate;
   [IPC_CHANNELS.FINANCE_OVERVIEW]: {position:FinancialPosition;assets:AssetRecord[];loans:LoanRecord[];period:PeriodClose};
   [IPC_CHANNELS.BALANCE_SAVE]:FinancialPosition;[IPC_CHANNELS.INVENTORY_SAVE]:FinancialPosition;
-  [IPC_CHANNELS.ASSET_CREATE]:AssetRecord;[IPC_CHANNELS.ASSET_UPDATE]:AssetRecord;
+  [IPC_CHANNELS.ASSET_CREATE]:AssetRecord;[IPC_CHANNELS.ASSET_UPDATE]:AssetRecord;[IPC_CHANNELS.ASSET_ARCHIVE]:{archived:true};
   [IPC_CHANNELS.LOAN_CREATE]:LoanRecord;[IPC_CHANNELS.LOAN_UPDATE]:LoanRecord;
   [IPC_CHANNELS.PERIOD_CLOSE]:PeriodClose;[IPC_CHANNELS.PERIOD_REOPEN]:PeriodClose;
   [IPC_CHANNELS.REPORT_MONTHLY]:FinancialReport;
