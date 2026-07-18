@@ -219,6 +219,9 @@ for (const size of SIZES) {
     await capture(page, directory, "settings-users");
 
     await navigate(page, "Bookings");
+    await page.getByRole("tab", { name: "List" }).click();
+    await assertLayout(page, "Booking list", size);
+    await capture(page, directory, "booking-list");
     await page.getByRole("button", { name: "New booking", exact: true }).click();
     await page.getByRole("heading", { name: "New booking", level: 2 }).waitFor();
     await assertLayout(page, "Booking editor", size);

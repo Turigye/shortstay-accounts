@@ -334,17 +334,19 @@ export function PaymentsScreen() {
             <div aria-label="Loading payments" className="bookings-skeleton"><span /><span /><span /></div>
           ) : selectedBooking ? (
             <>
-              <div className="selected-booking-heading">
-                <div><strong>{selectedBooking.customerName}</strong><span>{selectedBooking.unitName}</span></div>
-                <span>{selectedBooking.checkIn} to {selectedBooking.checkOut}</span>
-              </div>
-              <BookingBalance
-                booking={selectedBooking}
-                movements={selectedMovements}
-                onCorrect={isEditor ? undefined : (movement) => openEditor({ mode: "correction", movement })}
-                onReverse={isEditor ? undefined : beginReversal}
-                onPrint={(movement) => void openReceipt(movement.id)}
-              />
+              <section className="selected-payment-panel" aria-label="Selected booking payments">
+                <div className="selected-booking-heading">
+                  <div><strong>{selectedBooking.customerName}</strong><span>{selectedBooking.unitName}</span></div>
+                  <span>{selectedBooking.checkIn} to {selectedBooking.checkOut}</span>
+                </div>
+                <BookingBalance
+                  booking={selectedBooking}
+                  movements={selectedMovements}
+                  onCorrect={isEditor ? undefined : (movement) => openEditor({ mode: "correction", movement })}
+                  onReverse={isEditor ? undefined : beginReversal}
+                  onPrint={(movement) => void openReceipt(movement.id)}
+                />
+              </section>
               <section className="payment-history-panel" aria-label="All payment history">
                 <header>
                   <div><h2>Payment history</h2><p>All recorded receipts, refunds, corrections, and reversals.</p></div>
