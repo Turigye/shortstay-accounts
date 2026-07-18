@@ -11,6 +11,8 @@ import {
   migrateDatabase,
 } from "../../src/main/db/migrations";
 import { createAuditRepository } from "../../src/main/db/repositories/audit-repository";
+import { createBusinessRepository } from "../../src/main/db/repositories/business-repository";
+import { createUserRepository } from "../../src/main/db/repositories/user-repository";
 
 const REQUIRED_TABLES = [
   "accounts",
@@ -36,6 +38,7 @@ const REQUIRED_TABLES = [
   "suppliers",
   "tax_provision_rates",
   "units",
+  "users",
 ] as const;
 
 const MUTABLE_ARCHIVABLE_TABLES = [
@@ -332,7 +335,13 @@ describe("encrypted database", () => {
 describe("audit repository", () => {
   it("appends serialized audit events without exposing mutation operations", () => {
     const database = openEncryptedDatabase(temporaryDatabasePath(), "audit key");
-    const audit = createAuditRepository(database);
+    const business = createBusinessRepository(database).create({
+      name: "Audit Business",
+      password: "audit key password",
+    });
+    const actor = createUserRepository(database, business.businessId)
+      .bootstrapAdmin("audit key password");
+    const audit = createAuditRepository(database, actor.id);
 
     audit.append({
       entityType: "booking",
@@ -347,7 +356,7 @@ describe("audit repository", () => {
     expect(
       database
         .prepare<[], Record<string, string | null>>(
-          "select entity_type, entity_id, action, reason, before_json, after_json from audit_events",
+          "select entity_type, entity_id, action, reason, before_json, after_json, actor_user_id from audit_events where entity_type = 'booking'",
         )
         .get(),
     ).toEqual({
@@ -357,6 +366,7 @@ describe("audit repository", () => {
       reason: "Correct checkout date",
       before_json: '{"checkOut":"2026-07-13"}',
       after_json: '{"checkOut":"2026-07-14"}',
+      actor_user_id: actor.id,
     });
 
     database.close();

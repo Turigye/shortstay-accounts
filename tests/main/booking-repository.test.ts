@@ -8,6 +8,7 @@ import {
   type BookingRepository,
 } from "../../src/main/db/repositories/booking-repository";
 import { migrateDatabase } from "../../src/main/db/migrations";
+import { createUserRepository } from "../../src/main/db/repositories/user-repository";
 
 interface Fixture {
   database: Database.Database;
@@ -99,6 +100,26 @@ describe("customers", () => {
 });
 
 describe("booking repository", () => {
+  it("attributes new booking audit events to the active user", () => {
+    const fixture = createFixture();
+    const actor = createUserRepository(fixture.database, fixture.businessId)
+      .bootstrapAdmin("long local password");
+    const repository = createBookingRepository(
+      fixture.database,
+      fixture.businessId,
+      actor.id,
+    );
+
+    const booking = repository.createBooking(bookingInput(fixture));
+    expect(
+      fixture.database
+        .prepare<[string], { actor_user_id: string | null }>(
+          "SELECT actor_user_id FROM audit_events WHERE entity_type = 'booking' AND entity_id = ?",
+        )
+        .get(booking.id),
+    ).toEqual({ actor_user_id: actor.id });
+  });
+
   it("creates an exact unpaid booking and preserves manual fields", () => {
     const fixture = createFixture();
     const booking = fixture.repository.createBooking({

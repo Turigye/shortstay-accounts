@@ -9,6 +9,7 @@ import {
   type PaymentRepository,
 } from "../../src/main/db/repositories/payment-repository";
 import { migrateDatabase } from "../../src/main/db/migrations";
+import { createUserRepository } from "../../src/main/db/repositories/user-repository";
 
 interface Fixture {
   database: Database.Database;
@@ -133,6 +134,33 @@ describe("payment accounts", () => {
 });
 
 describe("booking movements", () => {
+  it("attributes a receipt and its audit event to the active user", () => {
+    const fixture = createFixture();
+    const actor = createUserRepository(fixture.database, fixture.businessId)
+      .bootstrapAdmin("long local password");
+    const repository = createPaymentRepository(
+      fixture.database,
+      fixture.businessId,
+      actor.id,
+    );
+
+    const receipt = repository.recordReceipt(movementInput(fixture));
+    expect(
+      fixture.database
+        .prepare<[string], { created_by_user_id: string | null }>(
+          "SELECT created_by_user_id FROM payments WHERE id = ?",
+        )
+        .get(receipt.id),
+    ).toEqual({ created_by_user_id: actor.id });
+    expect(
+      fixture.database
+        .prepare<[string], { actor_user_id: string | null }>(
+          "SELECT actor_user_id FROM audit_events WHERE entity_type = 'payment' AND entity_id = ?",
+        )
+        .get(receipt.id),
+    ).toEqual({ actor_user_id: actor.id });
+  });
+
   it("records multiple receipts and a refund in chronological order", () => {
     const fixture = createFixture();
     fixture.repository.recordReceipt(movementInput(fixture));

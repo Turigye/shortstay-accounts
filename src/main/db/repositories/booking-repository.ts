@@ -252,10 +252,11 @@ function bookingFromRow(row: BookingRow): Booking {
 export function createBookingRepository(
   database: Database.Database,
   businessId: string,
+  actorUserId: string | null = null,
 ): BookingRepository {
   const scopedBusinessId = requiredText(businessId, "businessId", "Business");
-  const audit = createAuditRepository(database);
-  const payments = createPaymentRepository(database, scopedBusinessId);
+  const audit = createAuditRepository(database, actorUserId);
+  const payments = createPaymentRepository(database, scopedBusinessId, actorUserId);
 
   const bookingSelect = `
     SELECT
