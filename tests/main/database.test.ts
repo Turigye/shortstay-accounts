@@ -78,7 +78,7 @@ function temporaryDatabasePath(): string {
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { force: true, recursive: true });
+    rmSync(directory, { force: true, recursive: true, maxRetries: 5, retryDelay: 100 });
   }
 });
 
