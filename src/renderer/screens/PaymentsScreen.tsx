@@ -129,6 +129,11 @@ export function PaymentsScreen() {
     if (!result.ok) setError(firstError(result));
   }
 
+  async function saveReceiptPdf(paymentId: string) {
+    const result = await window.stayBooks.invoke(IPC_CHANNELS.RECEIPT_EXPORT_PDF, { paymentId });
+    if (!result.ok) setError(firstError(result));
+  }
+
   async function recordPayment(value: PaymentEditorValue): Promise<void> {
     if (!selectedBooking) return;
     setError(null);
@@ -323,7 +328,7 @@ export function PaymentsScreen() {
       </div>
 
       {error ? <p className="form-alert payments-alert">{error}</p> : null}
-      <div className="payments-workspace" data-panel={Boolean(editor || accountPanelOpen || reversing)}>
+      <div className="payments-workspace" data-panel={Boolean(editor || accountPanelOpen || reversing)} data-payment-editor={Boolean(editor)}>
         <div className="payments-content" data-tour="payment-history">
           {loading ? (
             <div aria-label="Loading payments" className="bookings-skeleton"><span /><span /><span /></div>
@@ -415,6 +420,7 @@ export function PaymentsScreen() {
         <ReceiptDialog
           onClose={() => setReceipt(null)}
           onPrint={printReceipt}
+          onSavePdf={saveReceiptPdf}
           receipt={receipt}
         />
       ) : null}

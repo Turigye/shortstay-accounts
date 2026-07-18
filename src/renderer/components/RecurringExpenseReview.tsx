@@ -1,4 +1,4 @@
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Plus } from "lucide-react";
 
 import { EXPENSE_CATEGORIES } from "../../domain/categories";
 import type { RecurringExpenseTemplate } from "../../main/db/repositories/expense-repository";
@@ -8,7 +8,7 @@ const formatUgx = (value: number | null) => value === null ? "Amount not set" : 
 
 export function RecurringExpenseReview({ templates, onAdd }: { readonly templates: readonly RecurringExpenseTemplate[]; readonly onAdd: () => void }) {
   return <section className="recurring-review" aria-labelledby="recurring-title">
-    <header><div><h2 id="recurring-title">Recurring review</h2><p>Templates remain pending until you confirm the actual bill.</p></div><div className="recurring-actions"><span>{templates.length} due</span><button className="text-button" onClick={onAdd} type="button">New template</button></div></header>
-    {templates.length ? <ul>{templates.map(template => <li key={template.id}><CalendarClock aria-hidden="true" size={17}/><div><strong>{labels.get(template.categoryId) ?? template.categoryId}</strong><span>{template.cadence} · review {template.nextReviewMonth}</span></div><b>{formatUgx(template.expectedAmount)}</b></li>)}</ul> : <p className="inline-message">No recurring expenses need review this month.</p>}
+    <header><div><span className="section-eyebrow">Scheduled costs</span><h2 id="recurring-title">Recurring bills</h2><p>Set up Netflix, Yaka, service fees, and other repeating costs. Confirm the actual amount when each bill is due.</p></div><div className="recurring-actions"><span className="due-count">{templates.length} due</span><button className="primary-button compact-button" onClick={onAdd} type="button"><Plus size={16}/>Add recurring bill</button></div></header>
+    {templates.length ? <ul>{templates.map(template => <li key={template.id}><CalendarClock aria-hidden="true" size={19}/><div><strong>{labels.get(template.categoryId) ?? template.categoryId}</strong><span>{template.cadence} · next confirmation {template.nextReviewMonth}</span></div><b>{formatUgx(template.expectedAmount)}</b></li>)}</ul> : <p className="inline-message">No recurring bills need confirmation this month.</p>}
   </section>;
 }

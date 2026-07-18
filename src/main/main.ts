@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, safeStorage } from "electron";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { createBusinessSession, type BusinessSession } from "./business-session";
@@ -21,6 +22,7 @@ let businessSession: BusinessSession | undefined;
 async function printReceipt(receipt: ReceiptDocument): Promise<{ cancelled: boolean }> {
   const printWindow = new BrowserWindow({
     show: false,
+    title: receipt.reference,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -31,6 +33,8 @@ async function printReceipt(receipt: ReceiptDocument): Promise<{ cancelled: bool
     await printWindow.loadURL(
       `data:text/html;charset=utf-8,${encodeURIComponent(renderReceiptHtml(receipt))}`,
     );
+    printWindow.show();
+    printWindow.focus();
     return await new Promise((resolve, reject) => {
       printWindow.webContents.print(
         { printBackground: true },
@@ -44,6 +48,33 @@ async function printReceipt(receipt: ReceiptDocument): Promise<{ cancelled: bool
         },
       );
     });
+  } finally {
+    printWindow.destroy();
+  }
+}
+
+async function exportReceiptPdf(receipt: ReceiptDocument): Promise<{ cancelled: boolean; path: string | null }> {
+  const result = await dialog.showSaveDialog({
+    title: "Save receipt as PDF",
+    defaultPath: `${receipt.reference}.pdf`,
+    filters: [{ name: "PDF document", extensions: ["pdf"] }],
+  });
+  if (result.canceled || !result.filePath) return { cancelled: true, path: null };
+  const printWindow = new BrowserWindow({
+    show: false,
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  try {
+    await printWindow.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(renderReceiptHtml(receipt))}`,
+    );
+    const pdf = await printWindow.webContents.printToPDF({
+      pageSize: "A4",
+      printBackground: true,
+      margins: { marginType: "default" },
+    });
+    await writeFile(result.filePath, pdf);
+    return { cancelled: false, path: result.filePath };
   } finally {
     printWindow.destroy();
   }
@@ -97,6 +128,8 @@ void app.whenReady().then(() => {
     },
     [IPC_CHANNELS.RECEIPT_PRINT]: async ({ paymentId }) =>
       printReceipt(businessSession!.getReceipt(paymentId)),
+    [IPC_CHANNELS.RECEIPT_EXPORT_PDF]: async ({ paymentId }) =>
+      exportReceiptPdf(businessSession!.getReceipt(paymentId)),
   });
   createWindow();
 

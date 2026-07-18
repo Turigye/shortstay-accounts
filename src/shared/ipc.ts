@@ -50,6 +50,7 @@ export const IPC_CHANNELS = {
   PAYMENT_REVERSE: "payments:reverse",
   RECEIPT_GET: "receipts:get",
   RECEIPT_PRINT: "receipts:print",
+  RECEIPT_EXPORT_PDF: "receipts:export-pdf",
   COMPENSATION_MONTHLY: "compensation:monthly",
   EXPENSES_LIST: "expenses:list", EXPENSE_CREATE: "expenses:create",
   SUPPLIERS_LIST: "suppliers:list", SUPPLIER_CREATE: "suppliers:create", SUPPLIER_PAYMENT: "suppliers:payment",
@@ -532,6 +533,12 @@ const receiptPrintRequestSchema = z
     payload: z.object({ paymentId: idSchema }).strict(),
   })
   .strict();
+const receiptExportPdfRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.RECEIPT_EXPORT_PDF),
+    payload: z.object({ paymentId: idSchema }).strict(),
+  })
+  .strict();
 const compensationMonthlyRequestSchema = z
   .object({
     channel: z.literal(IPC_CHANNELS.COMPENSATION_MONTHLY),
@@ -609,6 +616,7 @@ export const ipcRequestSchema = z.discriminatedUnion("channel", [
   paymentReverseRequestSchema,
   receiptGetRequestSchema,
   receiptPrintRequestSchema,
+  receiptExportPdfRequestSchema,
   compensationMonthlyRequestSchema,
   ...expenseRequests,
   ...financeRequests,
@@ -891,6 +899,7 @@ const responseSchemas = {
   [IPC_CHANNELS.PAYMENT_REVERSE]: responseSchema(paymentMovementSchema),
   [IPC_CHANNELS.RECEIPT_GET]: responseSchema(receiptDocumentSchema),
   [IPC_CHANNELS.RECEIPT_PRINT]: responseSchema(z.object({ cancelled: z.boolean() }).strict()),
+  [IPC_CHANNELS.RECEIPT_EXPORT_PDF]: responseSchema(z.object({ cancelled: z.boolean(), path: z.string().nullable() }).strict()),
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: responseSchema(monthlyCompensationReportSchema),
   [IPC_CHANNELS.EXPENSES_LIST]: responseSchema(z.array(expenseSchema)), [IPC_CHANNELS.EXPENSE_CREATE]: responseSchema(expenseSchema),
   [IPC_CHANNELS.SUPPLIERS_LIST]: responseSchema(z.array(supplierSchema)), [IPC_CHANNELS.SUPPLIER_CREATE]: responseSchema(supplierSchema), [IPC_CHANNELS.SUPPLIER_PAYMENT]: responseSchema(expenseSchema),
@@ -972,6 +981,7 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.PAYMENT_REVERSE]: PaymentMovement;
   [IPC_CHANNELS.RECEIPT_GET]: ReceiptDocument;
   [IPC_CHANNELS.RECEIPT_PRINT]: { readonly cancelled: boolean };
+  [IPC_CHANNELS.RECEIPT_EXPORT_PDF]: { readonly cancelled: boolean; readonly path: string | null };
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: MonthlyCompensationReport;
   [IPC_CHANNELS.EXPENSES_LIST]: ExpenseRecord[]; [IPC_CHANNELS.EXPENSE_CREATE]: ExpenseRecord;
   [IPC_CHANNELS.SUPPLIERS_LIST]: Supplier[]; [IPC_CHANNELS.SUPPLIER_CREATE]: Supplier; [IPC_CHANNELS.SUPPLIER_PAYMENT]: ExpenseRecord;
