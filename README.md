@@ -37,9 +37,9 @@ Inside the application, select **Help** in the command bar to search the guide o
 
 ## Windows installer
 
-Download the current [Short-Stay Accounts v0.3.3 Windows installer](https://github.com/Turigye/shortstay-accounts/releases/download/v0.3.3/Short-Stay.Accounts-0.3.3.Setup.exe).
+Download the current [Short-Stay Accounts v0.3.4 Windows installer](https://github.com/Turigye/shortstay-accounts/releases/download/v0.3.4/Short-Stay.Accounts-0.3.4.Setup.exe).
 
-Installing v0.3.3 over an earlier version keeps the existing encrypted local business file, password, profiles, bookings, reports, and settings. Create an encrypted backup before any software update as normal operating practice.
+Installing v0.3.4 over an earlier version keeps the existing encrypted local business file, password, profiles, bookings, reports, and settings. Create an encrypted backup before any software update as normal operating practice.
 
 To produce a fresh development build, open the repository's **Actions** tab, run **Build Windows**, and download the `shortstay-accounts-windows-x64` artifact. Extract it and run the generated `Setup.exe` file.
 

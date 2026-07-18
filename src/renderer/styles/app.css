@@ -541,12 +541,13 @@ textarea:focus-visible {
 .expense-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:var(--space-4); overflow:hidden; border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); }
 .expense-summary div { display:grid; gap:var(--space-1); padding:var(--space-3) var(--space-4); border-right:1px solid var(--color-border); }
 .expense-summary div:last-child { border-right:0; }.expense-summary span{color:var(--color-ink-muted);font-size:var(--text-xs);font-weight:650}.expense-summary strong{font-family:var(--font-mono);font-size:var(--text-lg)}
-.expense-layout { display:grid; grid-template-columns:minmax(0,1fr) 310px; gap:var(--space-4); align-items:start; }.expense-table{min-width:920px}
+.expense-layout { display:grid; grid-template-columns:minmax(0,1fr); gap:0; align-items:start; }.expense-table{min-width:920px}
 .expense-status{display:inline-flex;padding:2px var(--space-2);border-radius:var(--radius-sm);background:var(--color-surface-subtle);font-size:var(--text-xs);font-weight:750;text-transform:capitalize}.expense-status.unpaid{color:var(--color-danger);background:var(--color-danger-surface)}.expense-status.partial{color:var(--color-warning);background:var(--color-warning-surface)}
 .text-button{border:0;background:transparent;color:var(--color-primary);cursor:pointer;font-weight:700}
-.recurring-review{margin-top:var(--space-5);overflow:hidden;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface)}.recurring-review>header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-5);padding:var(--space-4);border-bottom:1px solid var(--color-border);background:var(--color-surface-subtle)}.recurring-review h2{margin:2px 0 0;font-size:var(--text-lg)}.recurring-review p{max-width:520px;margin:var(--space-1) 0 0;color:var(--color-ink-muted);font-size:var(--text-xs)}.recurring-review ul{list-style:none;margin:0;padding:0}.recurring-review li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:var(--space-3);align-items:center;padding:var(--space-4);border-bottom:1px solid var(--color-border)}.recurring-review li:last-child{border-bottom:0}.recurring-review li>svg{color:var(--color-primary)}.recurring-review li div{display:grid;gap:2px}.recurring-review li span{color:var(--color-ink-muted);font-size:var(--text-xs)}.recurring-review li b{font-family:var(--font-mono);font-size:var(--text-sm)}.inline-message{padding:var(--space-4)}.section-eyebrow{color:var(--color-primary);font-size:var(--text-xs);font-weight:800;text-transform:uppercase}.recurring-actions{display:flex;align-items:center;gap:var(--space-3)}.due-count{padding:var(--space-1) var(--space-2);border-radius:var(--radius-sm);background:var(--color-warning-surface);color:var(--color-warning);font-size:var(--text-xs);font-weight:800}
+.recurring-review{margin-top:var(--space-5);overflow:hidden;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface)}.recurring-review>header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-6);padding:var(--space-5);border-bottom:1px solid var(--color-border);background:var(--color-surface-subtle)}.recurring-review h2{margin:2px 0 0;font-size:var(--text-lg)}.recurring-review p{max-width:620px;margin:var(--space-1) 0 0;color:var(--color-ink-muted);font-size:var(--text-sm)}.recurring-review ul{list-style:none;margin:0;padding:0}.recurring-review li{display:grid;grid-template-columns:28px minmax(220px,1fr) minmax(150px,auto) auto;gap:var(--space-4);align-items:center;padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--color-border)}.recurring-review li:last-child{border-bottom:0}.recurring-review li>svg{color:var(--color-primary)}.recurring-review li div{display:grid;gap:2px}.recurring-review li span{color:var(--color-ink-muted);font-size:var(--text-xs)}.recurring-review li b{font-family:var(--font-mono);font-size:var(--text-sm)}.recurring-bill-amount{text-align:right}.recurring-empty{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-5);color:var(--color-success)}.recurring-empty>div{display:grid;gap:2px}.recurring-empty span{color:var(--color-ink-muted);font-size:var(--text-xs)}.inline-message{padding:var(--space-4)}.section-eyebrow{color:var(--color-primary);font-size:var(--text-xs);font-weight:800;text-transform:uppercase}.recurring-actions{display:flex;align-items:center;gap:var(--space-3);flex-shrink:0}.due-count{padding:var(--space-1) var(--space-2);border-radius:var(--radius-sm);background:var(--color-warning-surface);color:var(--color-warning);font-size:var(--text-xs);font-weight:800;white-space:nowrap}
 .expense-side-panel{position:fixed;z-index:var(--z-modal);top:var(--toolbar-height);right:0;width:min(440px,calc(100vw - var(--sidebar-width)));height:calc(100dvh - var(--toolbar-height));overflow:auto;padding:var(--space-5);border-left:1px solid var(--color-border);background:var(--color-surface);box-shadow:-12px 0 30px oklch(0.2 0.01 110 / 12%)}.expense-side-panel>header{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-5)}.expense-side-panel h2{margin:0;font-size:var(--text-xl)}.expense-editor{display:grid;gap:var(--space-4)}.expense-editor textarea{min-height:84px;padding:var(--space-2);border:1px solid var(--color-border-strong);border-radius:var(--radius-md);background:var(--color-surface);color:var(--color-ink)}
 @media(max-width:1400px){.expense-layout{grid-template-columns:1fr}.expense-filters{flex-wrap:wrap}.expense-table{min-width:900px}}
+@media(max-width:900px){.recurring-review>header{align-items:flex-start;flex-direction:column}.recurring-review li{grid-template-columns:24px minmax(0,1fr) auto}.recurring-bill-amount{display:none!important}.recurring-review li .primary-button{grid-column:2/-1;justify-self:start}}
 
 .financial-screen{min-width:0}.month-control{display:grid;gap:var(--space-1);color:var(--color-ink-muted);font-size:var(--text-xs);font-weight:700}.month-control input{height:38px;padding:0 var(--space-2);border:1px solid var(--color-border-strong);border-radius:var(--radius-md);background:var(--color-surface);color:var(--color-ink)}
 .section-tabs{display:flex;gap:var(--space-5);margin:var(--space-5) 0;border-bottom:1px solid var(--color-border)}.section-tabs button{padding:0 0 var(--space-3);border:0;border-bottom:2px solid transparent;background:transparent;color:var(--color-ink-muted);cursor:pointer;font-weight:700}.section-tabs button[data-active="true"]{border-color:var(--color-primary);color:var(--color-ink)}
@@ -1387,9 +1388,10 @@ textarea:focus-visible {
 /* Bookings */
 .bookings-screen {
   display: grid;
-  height: 100%;
+  align-content: start;
+  min-height: 100%;
   min-width: 0;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
 }
 
 .bookings-header {
@@ -1490,7 +1492,7 @@ textarea:focus-visible {
   min-width: 0;
   min-height: 0;
   grid-template-columns: minmax(0, 1fr);
-  background: var(--color-surface);
+  background: transparent;
 }
 
 .bookings-body[data-editor="true"] {
@@ -1502,6 +1504,20 @@ textarea:focus-visible {
   min-height: 0;
   overflow: auto;
   padding-top: var(--space-4);
+}
+
+.bookings-schedule-view .bookings-toolbar {
+  margin-top: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-bottom: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--color-surface);
+}
+
+.bookings-schedule-view .bookings-content {
+  padding-top: 0;
+  overflow: visible;
 }
 
 .bookings-skeleton {
@@ -1525,6 +1541,10 @@ textarea:focus-visible {
   background: var(--color-surface);
 }
 
+.bookings-schedule-view .unit-schedule-wrap {
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
 .unit-schedule {
   min-width: calc(148px + var(--schedule-days) * 68px);
 }
@@ -1538,7 +1558,7 @@ textarea:focus-visible {
   position: sticky;
   z-index: 3;
   top: 0;
-  min-height: 52px;
+  min-height: 44px;
   border-bottom: 1px solid var(--color-border-strong);
   background: var(--color-surface-subtle);
 }
@@ -1581,8 +1601,8 @@ textarea:focus-visible {
 
 .schedule-unit-row {
   position: relative;
-  min-height: 58px;
-  grid-auto-rows: 58px;
+  min-height: 50px;
+  grid-auto-rows: 50px;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -1617,7 +1637,7 @@ textarea:focus-visible {
 .schedule-empty-cell {
   display: grid;
   min-width: 0;
-  height: 58px;
+  height: 50px;
   grid-row: 1;
   place-items: center;
   border: 0;
@@ -1641,7 +1661,7 @@ textarea:focus-visible {
   z-index: 1;
   display: grid;
   min-width: 0;
-  height: 46px;
+  height: 38px;
   align-self: center;
   align-content: center;
   grid-row: 1;
