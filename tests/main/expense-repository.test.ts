@@ -53,7 +53,7 @@ describe("property expenses and supplier payables", () => {
     expect(repository.getSupplierBalance(supplier.id)).toBe(300_000);
   });
 
-  it("keeps recurring templates in review until explicitly posted", () => {
+  it("advances recurring templates only after the bill is recorded", () => {
     const { repository } = fixture();
     const template = repository.createRecurringTemplate({
       categoryId: "netflix", scope: "shared", expectedAmount: 45_000,
@@ -63,6 +63,11 @@ describe("property expenses and supplier payables", () => {
     expect(repository.listRecurringForReview("2026-08")).toEqual([
       expect.objectContaining({ id: template.id, categoryId: "netflix", expectedAmount: 45_000 }),
     ]);
+    expect(repository.advanceRecurringTemplate(template.id)).toMatchObject({
+      id: template.id,
+      nextReviewMonth: "2026-09",
+    });
+    expect(repository.listRecurringForReview("2026-08")).toEqual([]);
   });
 
   it("rejects impossible dates and cross-business supplier payments", () => {

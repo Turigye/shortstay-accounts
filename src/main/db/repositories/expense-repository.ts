@@ -38,6 +38,11 @@ function category(value: string): ExpenseCategoryId {
   if (!categories.has(value)) throw new Error("Choose a valid expense category.");
   return value as ExpenseCategoryId;
 }
+function addMonths(month: string, count: number): string {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const date = new Date(Date.UTC(year, monthNumber - 1 + count, 1));
+  return date.toISOString().slice(0, 7);
+}
 
 export function createExpenseRepository(database: Database.Database, businessId: string) {
   function requireBusinessEntity(table: "units" | "suppliers" | "accounts", id: string): void {
@@ -113,6 +118,14 @@ export function createExpenseRepository(database: Database.Database, businessId:
       const row=database.prepare<any,any>(`INSERT INTO recurring_expenses (business_id,unit_id,supplier_id,category_id,scope,expected_amount,cadence,next_review_month,notes) VALUES (@businessId,@unitId,@supplierId,@categoryId,@scope,@expectedAmount,@cadence,@nextReviewMonth,@notes) RETURNING id,category_id,scope,unit_id,supplier_id,expected_amount,cadence,next_review_month,notes`).get({businessId,unitId:input.scope==="unit"?input.unitId:null,supplierId:input.supplierId??null,categoryId,scope:input.scope,expectedAmount:input.expectedAmount==null?null:money(input.expectedAmount),cadence:input.cadence,nextReviewMonth:input.nextReviewMonth,notes:text(input.notes)});
       return {id:row.id,categoryId:row.category_id,scope:row.scope,unitId:row.unit_id,supplierId:row.supplier_id,expectedAmount:row.expected_amount==null?null:ugx(row.expected_amount),cadence:row.cadence,nextReviewMonth:row.next_review_month,notes:row.notes};
     },
-    listRecurringForReview(month:string): RecurringExpenseTemplate[] { if(!monthPattern.test(month))throw new Error("Month must use YYYY-MM."); return database.prepare<[string,string],any>("SELECT * FROM recurring_expenses WHERE business_id=? AND next_review_month<=? AND archived_at IS NULL ORDER BY next_review_month,id").all(businessId,month).map(row=>({id:row.id,categoryId:row.category_id,scope:row.scope,unitId:row.unit_id,supplierId:row.supplier_id,expectedAmount:row.expected_amount==null?null:ugx(row.expected_amount),cadence:row.cadence,nextReviewMonth:row.next_review_month,notes:row.notes})); }
+    listRecurringForReview(month:string): RecurringExpenseTemplate[] { if(!monthPattern.test(month))throw new Error("Month must use YYYY-MM."); return database.prepare<[string,string],any>("SELECT * FROM recurring_expenses WHERE business_id=? AND next_review_month<=? AND archived_at IS NULL ORDER BY next_review_month,id").all(businessId,month).map(row=>({id:row.id,categoryId:row.category_id,scope:row.scope,unitId:row.unit_id,supplierId:row.supplier_id,expectedAmount:row.expected_amount==null?null:ugx(row.expected_amount),cadence:row.cadence,nextReviewMonth:row.next_review_month,notes:row.notes})); },
+    advanceRecurringTemplate(id:string): RecurringExpenseTemplate {
+      const row=database.prepare<[string,string],any>("SELECT * FROM recurring_expenses WHERE id=? AND business_id=? AND archived_at IS NULL").get(id,businessId);
+      if(!row) throw new Error("Recurring bill not found.");
+      const months=row.cadence==="monthly"?1:row.cadence==="quarterly"?3:12;
+      const nextReviewMonth=addMonths(row.next_review_month,months);
+      database.prepare("UPDATE recurring_expenses SET next_review_month=? WHERE id=? AND business_id=?").run(nextReviewMonth,id,businessId);
+      return {id:row.id,categoryId:row.category_id,scope:row.scope,unitId:row.unit_id,supplierId:row.supplier_id,expectedAmount:row.expected_amount==null?null:ugx(row.expected_amount),cadence:row.cadence,nextReviewMonth,notes:row.notes};
+    }
   });
 }

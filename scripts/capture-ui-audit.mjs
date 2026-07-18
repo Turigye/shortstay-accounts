@@ -157,6 +157,16 @@ async function seed(page) {
     note: null,
     confirmOverpayment: false,
   });
+  await invoke(page, "recurring-expenses:create", {
+    categoryId: "netflix",
+    scope: "shared",
+    unitId: null,
+    supplierId: null,
+    expectedAmount: 36748,
+    cadence: "monthly",
+    nextReviewMonth: "2026-07",
+    notes: "Monthly streaming service",
+  });
   await invoke(page, "users:create-editor", {
     name: "Front Desk",
     username: "desk",
@@ -223,10 +233,15 @@ for (const size of SIZES) {
     await page.getByRole("button", { name: "Close payment editor" }).click();
 
     await navigate(page, "Expenses");
-    await page.getByRole("button", { name: "Add recurring bill" }).click();
+    await page.getByRole("button", { name: "New schedule" }).click();
     await page.getByRole("heading", { name: "New recurring bill", level: 2 }).waitFor();
     await assertLayout(page, "Recurring bill editor", size);
     await capture(page, directory, "recurring-bill-editor");
+    await page.getByRole("button", { name: "Close panel" }).click();
+    await page.getByRole("button", { name: "Record bill" }).click();
+    await page.getByRole("heading", { name: "Record recurring bill", level: 2 }).waitFor();
+    await assertLayout(page, "Record recurring bill", size);
+    await capture(page, directory, "recurring-bill-record");
     await page.getByRole("button", { name: "Close panel" }).click();
 
     await navigate(page, "Payments");

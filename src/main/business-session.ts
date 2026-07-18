@@ -155,6 +155,7 @@ export interface BusinessSession {
   recordSupplierPayment(input: Parameters<ExpenseRepository["recordSupplierPayment"]>[0]): ExpenseRecord;
   listRecurringExpenses(month: string): RecurringExpenseTemplate[];
   createRecurringExpense(input: Parameters<ExpenseRepository["createRecurringTemplate"]>[0]): RecurringExpenseTemplate;
+  advanceRecurringExpense(id: string): RecurringExpenseTemplate;
   getFinanceOverview(month:string):{position:FinancialPosition;assets:AssetRecord[];loans:LoanRecord[];period:PeriodClose};
   recordBalance(input:Parameters<FinanceRepository["recordBalance"]>[0]):FinancialPosition;
   recordInventory(input:Parameters<FinanceRepository["recordInventory"]>[0]):FinancialPosition;
@@ -525,6 +526,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     recordSupplierPayment(input) { requireCapability("admin.all"); return expenses().recordSupplierPayment(input); },
     listRecurringExpenses(month) { requireCapability("admin.all"); return expenses().listRecurringForReview(month); },
     createRecurringExpense(input) { requireCapability("admin.all"); return expenses().createRecurringTemplate(input); },
+    advanceRecurringExpense(id) { requireCapability("admin.all"); return expenses().advanceRecurringTemplate(id); },
     getFinanceOverview(month) { requireCapability("admin.all"); return {position:finance().getPosition(month),assets:finance().listAssets(),loans:finance().listLoans(),period:finance().getPeriodStatus(month)}; },
     recordBalance(input) { requireCapability("admin.all"); return finance().recordBalance(input); },
     recordInventory(input) { requireCapability("admin.all"); return finance().recordInventory(input); },

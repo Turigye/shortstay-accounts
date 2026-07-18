@@ -54,7 +54,7 @@ export const IPC_CHANNELS = {
   COMPENSATION_MONTHLY: "compensation:monthly",
   EXPENSES_LIST: "expenses:list", EXPENSE_CREATE: "expenses:create",
   SUPPLIERS_LIST: "suppliers:list", SUPPLIER_CREATE: "suppliers:create", SUPPLIER_PAYMENT: "suppliers:payment",
-  RECURRING_EXPENSES_LIST: "recurring-expenses:list", RECURRING_EXPENSE_CREATE: "recurring-expenses:create",
+  RECURRING_EXPENSES_LIST: "recurring-expenses:list", RECURRING_EXPENSE_CREATE: "recurring-expenses:create", RECURRING_EXPENSE_ADVANCE: "recurring-expenses:advance",
   FINANCE_OVERVIEW: "finance:overview", BALANCE_SAVE: "finance:balance-save", INVENTORY_SAVE: "finance:inventory-save",
   ASSET_CREATE: "finance:asset-create", ASSET_UPDATE: "finance:asset-update", ASSET_ARCHIVE: "finance:asset-archive",
   LOAN_CREATE: "finance:loan-create", LOAN_UPDATE: "finance:loan-update",
@@ -557,6 +557,7 @@ const expenseRequests=[
  z.object({channel:z.literal(IPC_CHANNELS.SUPPLIER_PAYMENT),payload:z.object({expenseId:idSchema,amount:positiveWholeUgxSchema,paidAt:dateSchema,accountId:idSchema,method:paymentMethodSchema,reference:z.string().max(500).nullable().optional(),notes:z.string().max(2000).nullable().optional()}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.RECURRING_EXPENSES_LIST),payload:z.object({month:z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/)}).strict()}).strict(),
  z.object({channel:z.literal(IPC_CHANNELS.RECURRING_EXPENSE_CREATE),payload:recurringInputSchema}).strict(),
+ z.object({channel:z.literal(IPC_CHANNELS.RECURRING_EXPENSE_ADVANCE),payload:z.object({id:idSchema}).strict()}).strict(),
 ] as const;
 const monthSchema=z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/);
 const balanceCategorySchema=z.enum(["cash_on_hand","current_bank","mobile_money","long_term_deposit","customer_receivable","other_receivable","supplier_payable","staff_payable","referral_payable","tax_payable","pension_payable","owner_capital","owner_drawings"]);
@@ -903,7 +904,7 @@ const responseSchemas = {
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: responseSchema(monthlyCompensationReportSchema),
   [IPC_CHANNELS.EXPENSES_LIST]: responseSchema(z.array(expenseSchema)), [IPC_CHANNELS.EXPENSE_CREATE]: responseSchema(expenseSchema),
   [IPC_CHANNELS.SUPPLIERS_LIST]: responseSchema(z.array(supplierSchema)), [IPC_CHANNELS.SUPPLIER_CREATE]: responseSchema(supplierSchema), [IPC_CHANNELS.SUPPLIER_PAYMENT]: responseSchema(expenseSchema),
-  [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: responseSchema(z.array(recurringExpenseSchema)), [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: responseSchema(recurringExpenseSchema),
+  [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: responseSchema(z.array(recurringExpenseSchema)), [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: responseSchema(recurringExpenseSchema), [IPC_CHANNELS.RECURRING_EXPENSE_ADVANCE]: responseSchema(recurringExpenseSchema),
   [IPC_CHANNELS.FINANCE_OVERVIEW]: responseSchema(z.object({position:positionSchema,assets:z.array(assetSchema),loans:z.array(loanSchema),period:periodSchema}).strict()),
   [IPC_CHANNELS.BALANCE_SAVE]:responseSchema(positionSchema),[IPC_CHANNELS.INVENTORY_SAVE]:responseSchema(positionSchema),
   [IPC_CHANNELS.ASSET_CREATE]:responseSchema(assetSchema),[IPC_CHANNELS.ASSET_UPDATE]:responseSchema(assetSchema),[IPC_CHANNELS.ASSET_ARCHIVE]:responseSchema(z.object({archived:z.literal(true)}).strict()),
@@ -985,7 +986,7 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: MonthlyCompensationReport;
   [IPC_CHANNELS.EXPENSES_LIST]: ExpenseRecord[]; [IPC_CHANNELS.EXPENSE_CREATE]: ExpenseRecord;
   [IPC_CHANNELS.SUPPLIERS_LIST]: Supplier[]; [IPC_CHANNELS.SUPPLIER_CREATE]: Supplier; [IPC_CHANNELS.SUPPLIER_PAYMENT]: ExpenseRecord;
-  [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: RecurringExpenseTemplate[]; [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: RecurringExpenseTemplate;
+  [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: RecurringExpenseTemplate[]; [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: RecurringExpenseTemplate; [IPC_CHANNELS.RECURRING_EXPENSE_ADVANCE]: RecurringExpenseTemplate;
   [IPC_CHANNELS.FINANCE_OVERVIEW]: {position:FinancialPosition;assets:AssetRecord[];loans:LoanRecord[];period:PeriodClose};
   [IPC_CHANNELS.BALANCE_SAVE]:FinancialPosition;[IPC_CHANNELS.INVENTORY_SAVE]:FinancialPosition;
   [IPC_CHANNELS.ASSET_CREATE]:AssetRecord;[IPC_CHANNELS.ASSET_UPDATE]:AssetRecord;[IPC_CHANNELS.ASSET_ARCHIVE]:{archived:true};

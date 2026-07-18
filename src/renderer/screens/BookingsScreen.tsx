@@ -278,7 +278,7 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
   }
 
   return (
-    <section className="bookings-screen">
+    <section className={`bookings-screen bookings-${view}-view`}>
       <header className="bookings-header" data-tour="booking-action">
         <div>
           <h1>Bookings</h1>
