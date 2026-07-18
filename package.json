@@ -1,7 +1,7 @@
 {
   "name": "short-stay-accounts",
   "productName": "Short-Stay Accounts",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Private desktop accounting for short-stay accommodation",
   "author": "Turigye",
@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "test:ui-audit": "npm run package && node scripts/capture-ui-audit.mjs --packaged",
     "guide:capture": "node scripts/capture-user-guide.mjs",
+    "icons:generate": "node scripts/generate-app-icons.mjs",
     "pretest:electron-create": "npm run rebuild:electron",
     "test:electron-create": "node scripts/probe-dev-business-creation.mjs",
     "typecheck": "tsc --noEmit",

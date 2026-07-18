@@ -267,7 +267,7 @@ describe("PaymentsScreen", () => {
     render(<PaymentsScreen />);
     const user = userEvent.setup();
 
-    expect(await screen.findByText("Amina N.")).toBeTruthy();
+    expect((await screen.findAllByText("Amina N.")).length).toBeGreaterThan(0);
     await user.click(screen.getByRole("button", { name: "Accounts" }));
     expect(screen.getByLabelText("Payment accounts")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Record payment" }));

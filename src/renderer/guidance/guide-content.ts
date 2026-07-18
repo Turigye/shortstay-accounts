@@ -13,7 +13,7 @@ export const guideChapters: GuideChapter[] = [
     id: "bookings", title: "Booking Lifecycle", screen: "bookings", keywords: ["booking", "guest", "customer", "check in", "check out", "nightly rate", "fixed", "one room", "monthly rent", "remove", "airbnb"],
     summary: "Enter and manage a guest stay from draft through checkout.",
     sections: [
-      { heading: "Create a manual booking", paragraphs: ["Select the customer and unit, then choose Whole two-bedroom unit or One room only. Use a nightly rate for ordinary stays or a fixed amount for monthly and negotiated rent.", "Bookings are entered manually. Short-Stay Accounts is not connected to Airbnb or another booking platform."] },
+      { heading: "Create a manual booking", paragraphs: ["Select the customer and unit, then choose Two bedrooms or One room only. Use a nightly rate for ordinary stays or Monthly rent for monthly and negotiated rent.", "Bookings are entered manually. Short-Stay Accounts is not connected to Airbnb or another booking platform."] },
       { heading: "Track and correct the stay", paragraphs: ["Use Draft, Confirmed, Checked in, Completed, and Cancelled to describe the booking lifecycle. A cancelled booking releases the unit for future stays.", "Open an unpaid mistaken booking and select Remove to exclude it from schedules and reports. A booking with payment history is protected; correct or reverse its payments instead."] },
     ],
   },
@@ -38,7 +38,7 @@ export const guideChapters: GuideChapter[] = [
     id: "month-end", title: "Financial Position and Month End", screen: "financial-position", keywords: ["cash", "receivable", "inventory", "asset", "loan", "payable", "equity", "balance", "close", "reopen"],
     summary: "Review financial position, balance the books, and close a month carefully.",
     sections: [
-      { heading: "Financial position", paragraphs: ["Review cash and account balances, receivables, guest-supply inventory, assets, loans, payables, and owner equity. The position is balanced when total assets equal liabilities plus equity.", "Use the pencil action to correct an asset or loan. A loan can record annual interest, repayment frequency, installment amount, term, due date, and outstanding balance."] },
+      { heading: "Financial position", paragraphs: ["Review cash and account balances, receivables, guest-supply inventory, assets, loans, payables, and owner equity. The position is balanced when total assets equal liabilities plus equity.", "For land, buildings, or capital renovations, add the item under Assets at historical cost, then record how it was funded as Owner capital or a Loan. Investment is not rental income.", "Use the pencil action to correct an asset or loan. A loan can record annual interest, repayment frequency, installment amount, term, due date, and outstanding balance."] },
       { heading: "Close and reopen", paragraphs: ["Complete month-end checks before closing a period. Closing protects a completed month from ordinary changes.", "Reopen only when a real correction is necessary and provide the reason. The reason-gated reopening records why the protected period changed."] },
     ],
   },

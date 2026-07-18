@@ -1,4 +1,4 @@
-import { Archive, Pencil, Plus, RotateCw, WalletCards, X } from "lucide-react";
+import { Archive, Pencil, Plus, Printer, RotateCw, WalletCards, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import type { Booking } from "../../domain/bookings";
@@ -89,6 +89,11 @@ export function PaymentsScreen() {
   const selectedMovements = useMemo(
     () => movements.filter(({ bookingId }) => bookingId === selectedBooking?.id),
     [movements, selectedBooking?.id],
+  );
+  const paymentHistory = useMemo(
+    () => [...movements].sort((left, right) =>
+      right.paidAt.localeCompare(left.paidAt) || right.createdAt.localeCompare(left.createdAt)),
+    [movements],
   );
 
   function applyMovement(movement: PaymentMovement) {
@@ -282,7 +287,7 @@ export function PaymentsScreen() {
           <h1>Payments</h1>
           <p>Collections, refunds, account routing, and customer balances.</p>
         </div>
-        <div>
+        <div className="page-actions">
           {!isEditor ? <button className="secondary-button compact-button" onClick={openAccounts} type="button">
             <WalletCards aria-hidden="true" size={16} /> Accounts
           </button> : null}
@@ -335,6 +340,32 @@ export function PaymentsScreen() {
                 onReverse={isEditor ? undefined : beginReversal}
                 onPrint={(movement) => void openReceipt(movement.id)}
               />
+              <section className="payment-history-panel" aria-label="All payment history">
+                <header>
+                  <div><h2>Payment history</h2><p>All recorded receipts, refunds, corrections, and reversals.</p></div>
+                  <span>{paymentHistory.length} record{paymentHistory.length === 1 ? "" : "s"}</span>
+                </header>
+                <div className="table-scroll">
+                  <table className="statement-table payment-history-table">
+                    <thead><tr><th>Date</th><th>Customer</th><th>Unit</th><th>Type</th><th>Account</th><th>Reference</th><th>Amount</th><th><span className="visually-hidden">Actions</span></th></tr></thead>
+                    <tbody>
+                      {paymentHistory.length ? paymentHistory.map((movement) => {
+                        const booking = bookings.find(({ id }) => id === movement.bookingId);
+                        return <tr key={movement.id}>
+                          <td>{new Date(movement.paidAt).toLocaleDateString("en-UG")}</td>
+                          <td><strong>{movement.customerName}</strong></td>
+                          <td>{booking?.unitName ?? "—"}</td>
+                          <td className="payment-history-type">{movement.recordType}</td>
+                          <td>{movement.accountName}</td>
+                          <td>{movement.reference ?? "—"}</td>
+                          <td className="money-cell" data-direction={movement.direction}>{movement.direction === "receipt" ? "+" : "−"}{new Intl.NumberFormat("en-UG").format(movement.amount)}</td>
+                          <td>{movement.recordType === "receipt" ? <button aria-label={`Print receipt ${movement.reference ?? movement.id}`} className="icon-button" onClick={() => void openReceipt(movement.id)} title="Print receipt" type="button"><Printer size={15} /></button> : null}</td>
+                        </tr>;
+                      }) : <tr><td className="table-empty" colSpan={8}>No payments recorded yet.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             </>
           ) : (
             <div className="payments-empty"><WalletCards aria-hidden="true" size={24} /><h2>No bookings available</h2><p>No payment history to review. Create a booking before recording a payment.</p></div>

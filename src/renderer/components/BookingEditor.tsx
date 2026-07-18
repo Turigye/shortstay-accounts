@@ -419,7 +419,7 @@ export function BookingEditor({
           <div className="field-group">
             <label htmlFor="booking-occupancy">Space rented</label>
             <select id="booking-occupancy" onChange={(event) => update("occupancyMode", event.target.value as FormState["occupancyMode"])} value={form.occupancyMode}>
-              <option value="whole_unit">Whole two-bedroom unit</option>
+              <option value="whole_unit">Two bedrooms</option>
               <option value="one_room">One room only</option>
             </select>
           </div>
@@ -427,14 +427,14 @@ export function BookingEditor({
             <label htmlFor="booking-pricing">Pricing</label>
             <select id="booking-pricing" onChange={(event) => update("pricingMode", event.target.value as FormState["pricingMode"])} value={form.pricingMode}>
               <option value="nightly">Nightly rate</option>
-              <option value="fixed">Fixed stay or monthly amount</option>
+              <option value="fixed">Monthly rent</option>
             </select>
           </div>
         </div>
 
         <div className="booking-rate-row">
           <div className="field-group" data-invalid={Boolean(errorFor(form.pricingMode === "nightly" ? "nightlyRate" : "fixedAmount"))}>
-            <label htmlFor="booking-rate">{form.pricingMode === "nightly" ? "Nightly rate" : "Fixed amount"}</label>
+            <label htmlFor="booking-rate">{form.pricingMode === "nightly" ? "Nightly rate" : "Monthly rent"}</label>
             <div className="money-input-wrap">
               <span aria-hidden="true">UGX</span>
               <input id="booking-rate" inputMode="numeric" min={0} onChange={(event) => update(form.pricingMode === "nightly" ? "nightlyRate" : "fixedAmount", event.target.value)} step={1} type="number" value={form.pricingMode === "nightly" ? form.nightlyRate : form.fixedAmount} />

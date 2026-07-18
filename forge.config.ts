@@ -21,10 +21,16 @@ function ignorePackagedFile(file: string): boolean {
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    icon: "assets/app-icon",
     ignore: ignorePackagedFile,
   },
   rebuildConfig: {},
-  makers: [new MakerSquirrel({}), new MakerZIP({}, ["darwin"])],
+  makers: [
+    new MakerSquirrel({
+      setupIcon: "assets/app-icon.ico",
+    }),
+    new MakerZIP({}, ["darwin"]),
+  ],
   plugins: [
     new AutoUnpackNativesPlugin({}),
     new VitePlugin({

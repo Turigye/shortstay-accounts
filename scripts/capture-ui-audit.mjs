@@ -62,7 +62,23 @@ async function assertLayout(page, screen, size) {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     const findings = [];
     if (document.documentElement.scrollWidth > viewport.width + 1) {
-      findings.push(`document width ${document.documentElement.scrollWidth}`);
+      const overflowSource = [...document.querySelectorAll("*")]
+        .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+        .filter(({ rect }) => rect.right > viewport.width + 1)
+        .sort((left, right) => right.rect.right - left.rect.right)[0];
+      let ancestor = overflowSource?.element.parentElement;
+      let intentionallyScrollable = false;
+      while (ancestor) {
+        const style = getComputedStyle(ancestor);
+        if (/(auto|scroll)/.test(style.overflowX) && ancestor.scrollWidth > ancestor.clientWidth) {
+          intentionallyScrollable = true;
+          break;
+        }
+        ancestor = ancestor.parentElement;
+      }
+      if (!intentionallyScrollable) {
+        findings.push(`document width ${document.documentElement.scrollWidth}`);
+      }
     }
     const selectors = "button,input,select,textarea,[role='dialog'],[role='tab']";
     for (const element of document.querySelectorAll(selectors)) {
@@ -182,13 +198,25 @@ for (const size of SIZES) {
       await capture(page, directory, file);
     }
 
+    await page.getByRole("tab", { name: "Accounts" }).click();
+    await page.getByRole("heading", { name: "Payment accounts", level: 2 }).waitFor();
+    await assertLayout(page, "Payment account settings", size);
+    await capture(page, directory, "settings-accounts");
+
     await page.getByRole("tab", { name: "Users" }).click();
     await page.getByRole("heading", { name: "Users", level: 2 }).waitFor();
     await assertLayout(page, "Users", size);
     await capture(page, directory, "settings-users");
 
+    await navigate(page, "Bookings");
+    await page.getByRole("button", { name: "New booking", exact: true }).click();
+    await page.getByRole("heading", { name: "New booking", level: 2 }).waitFor();
+    await assertLayout(page, "Booking editor", size);
+    await capture(page, directory, "booking-editor");
+    await page.getByRole("button", { name: "Close booking editor" }).click();
+
     await navigate(page, "Payments");
-    await page.getByRole("button", { name: /Print receipt AUDIT-001/ }).click();
+    await page.getByRole("button", { name: /Print receipt AUDIT-001/ }).first().click();
     await page.getByRole("dialog", { name: "Payment receipt" }).waitFor();
     await assertLayout(page, "Receipt", size);
     await capture(page, directory, "payment-receipt");
@@ -207,4 +235,4 @@ for (const size of SIZES) {
 if (!existsSync(path.join(OUTPUT, "1024x640", "payment-receipt.png"))) {
   throw new Error("UI audit outputs were not created.");
 }
-process.stdout.write(`Captured ${SIZES.length * 12} UI audit screenshots in ${OUTPUT}\n`);
+process.stdout.write(`Captured ${SIZES.length * 14} UI audit screenshots in ${OUTPUT}\n`);

@@ -469,7 +469,7 @@ export function SettingsScreen({
           {activeTab === "accounts" ? (
             <>
               <div className="panel-heading"><h2>Payment accounts</h2><p>Add the real places used to receive or spend money</p></div>
-              <form className="rate-editor" onSubmit={addAccount}>
+              <form className="settings-entry-form account-settings-form" onSubmit={addAccount}>
                 <label className="field-group"><span>Account name</span><input name="name" placeholder="Visa card" required/></label>
                 <label className="field-group"><span>Type</span><select name="type"><option value="cash">Cash</option><option value="bank">Bank</option><option value="mobileMoney">Mobile money</option><option value="card">Card / Visa</option></select></label>
                 <button className="primary-button compact-button" type="submit"><Plus size={16}/>Add account</button>
