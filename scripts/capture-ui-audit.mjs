@@ -216,6 +216,20 @@ for (const size of SIZES) {
     await page.getByRole("button", { name: "Close booking editor" }).click();
 
     await navigate(page, "Payments");
+    await page.getByRole("button", { name: "Record payment", exact: true }).click();
+    await page.getByRole("heading", { name: "Record receipt", level: 2 }).waitFor();
+    await assertLayout(page, "Payment editor", size);
+    await capture(page, directory, "payment-editor");
+    await page.getByRole("button", { name: "Close payment editor" }).click();
+
+    await navigate(page, "Expenses");
+    await page.getByRole("button", { name: "Add recurring bill" }).click();
+    await page.getByRole("heading", { name: "New recurring bill", level: 2 }).waitFor();
+    await assertLayout(page, "Recurring bill editor", size);
+    await capture(page, directory, "recurring-bill-editor");
+    await page.getByRole("button", { name: "Close panel" }).click();
+
+    await navigate(page, "Payments");
     await page.getByRole("button", { name: /Print receipt AUDIT-001/ }).first().click();
     await page.getByRole("dialog", { name: "Payment receipt" }).waitFor();
     await assertLayout(page, "Receipt", size);

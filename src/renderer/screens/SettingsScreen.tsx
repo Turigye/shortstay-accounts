@@ -8,7 +8,7 @@ import {
   Plus,
   Percent,
   ShieldCheck,
-  ArchiveX,
+  Trash2,
   Download,
   FileSpreadsheet,
   Upload,
@@ -358,7 +358,7 @@ export function SettingsScreen({
                         title={unit.id ? "Archive unit" : "Remove unit"}
                         type="button"
                       >
-                        <ArchiveX aria-hidden="true" size={16} />
+                        <Trash2 aria-hidden="true" size={16} />
                       </button>
                     </div>
                   </div>

@@ -33,13 +33,16 @@ const receipt: ReceiptDocument = {
 describe("ReceiptDialog", () => {
   it("shows receipt essentials and prints through the provided action", async () => {
     const onPrint = vi.fn(async () => undefined);
+    const onSavePdf = vi.fn(async () => undefined);
     const user = userEvent.setup();
-    render(<ReceiptDialog receipt={receipt} onClose={vi.fn()} onPrint={onPrint} />);
+    render(<ReceiptDialog receipt={receipt} onClose={vi.fn()} onPrint={onPrint} onSavePdf={onSavePdf} />);
 
     expect(screen.getByText("RCT-20260718-ABC123")).toBeTruthy();
     expect(screen.getAllByText("UGX 150,000")).toHaveLength(2);
     expect(screen.getByText("Amina Kato")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Print receipt" }));
     expect(onPrint).toHaveBeenCalledWith("payment-1");
+    await user.click(screen.getByRole("button", { name: "Save PDF" }));
+    expect(onSavePdf).toHaveBeenCalledWith("payment-1");
   });
 });

@@ -1,4 +1,4 @@
-import { Printer, X } from "lucide-react";
+import { FileDown, Printer, X } from "lucide-react";
 import { useState } from "react";
 
 import type { ReceiptDocument } from "../../main/receipt-service";
@@ -7,6 +7,7 @@ interface ReceiptDialogProps {
   readonly receipt: ReceiptDocument;
   readonly onClose: () => void;
   readonly onPrint: (paymentId: string) => Promise<void> | void;
+  readonly onSavePdf: (paymentId: string) => Promise<void> | void;
 }
 
 function money(value: number): string {
@@ -17,8 +18,10 @@ export function ReceiptDialog({
   receipt,
   onClose,
   onPrint,
+  onSavePdf,
 }: ReceiptDialogProps) {
   const [printing, setPrinting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   async function print() {
     setPrinting(true);
@@ -26,6 +29,15 @@ export function ReceiptDialog({
       await onPrint(receipt.paymentId);
     } finally {
       setPrinting(false);
+    }
+  }
+
+  async function savePdf() {
+    setSaving(true);
+    try {
+      await onSavePdf(receipt.paymentId);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -49,6 +61,7 @@ export function ReceiptDialog({
         </dl>
         <footer>
           <button className="secondary-button" onClick={onClose} type="button">Done</button>
+          <button className="secondary-button" disabled={saving} onClick={() => void savePdf()} type="button"><FileDown size={16} />{saving ? "Saving PDF" : "Save PDF"}</button>
           <button className="primary-button" disabled={printing} onClick={() => void print()} type="button"><Printer size={16} />{printing ? "Opening print dialog" : "Print receipt"}</button>
         </footer>
       </section>
