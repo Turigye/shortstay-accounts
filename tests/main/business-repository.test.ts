@@ -493,5 +493,6 @@ describe("local business session", () => {
       business: { name: "Private Stays" },
       user: { role: "admin" },
     });
+    successfulSession.lock();
   });
 });

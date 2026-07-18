@@ -95,6 +95,7 @@ describe("profile-aware business session", () => {
       username: "desk",
       password: "initial editor password",
     })).toMatchObject({ user: { id: editor.id, role: "editor" } });
+    reopened.lock();
   });
 
   it("enforces Editor permissions inside the main-process session", () => {
@@ -125,5 +126,6 @@ describe("profile-aware business session", () => {
     })).toThrowError(
       expect.objectContaining<Partial<AuthorizationError>>({ code: "FORBIDDEN" }),
     );
+    session.lock();
   });
 });
