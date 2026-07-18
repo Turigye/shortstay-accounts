@@ -10,6 +10,24 @@ import { PRODUCT_NAME } from "../../src/shared/product";
 afterEach(cleanup);
 
 describe("AppShell product name", () => {
+  it("shows an Editor only operational navigation and actions", () => {
+    render(
+      <AppShell
+        activeScreen="today"
+        onScreenChange={vi.fn()}
+        user={{ id: "e1", name: "Front Desk", username: "desk", role: "editor" }}
+      >
+        <p>Content</p>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole("button", { name: "Bookings" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Payments" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Reports" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Expense" })).toBeNull();
+    expect(screen.getByText("Editor")).toBeTruthy();
+  });
+
   it("renders the shared runtime product name", () => {
     render(
       <AppShell activeScreen="today" onScreenChange={vi.fn()}>

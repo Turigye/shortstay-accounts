@@ -117,6 +117,12 @@ const defaultHandlers: IpcHandlers = {
   [IPC_CHANNELS.PAYMENT_REVERSE]: () => {
     throw new Error("Business session is unavailable");
   },
+  [IPC_CHANNELS.RECEIPT_GET]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.RECEIPT_PRINT]: () => {
+    throw new Error("Desktop printing is unavailable");
+  },
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: () => {
     throw new Error("Business session is unavailable");
   },
@@ -165,6 +171,8 @@ const registeredChannels = [
   IPC_CHANNELS.PAYMENT_REFUND,
   IPC_CHANNELS.PAYMENT_CORRECTION,
   IPC_CHANNELS.PAYMENT_REVERSE,
+  IPC_CHANNELS.RECEIPT_GET,
+  IPC_CHANNELS.RECEIPT_PRINT,
   IPC_CHANNELS.COMPENSATION_MONTHLY,
   IPC_CHANNELS.EXPENSES_LIST,IPC_CHANNELS.EXPENSE_CREATE,IPC_CHANNELS.SUPPLIERS_LIST,IPC_CHANNELS.SUPPLIER_CREATE,IPC_CHANNELS.SUPPLIER_PAYMENT,IPC_CHANNELS.RECURRING_EXPENSES_LIST,IPC_CHANNELS.RECURRING_EXPENSE_CREATE,
   IPC_CHANNELS.FINANCE_OVERVIEW,IPC_CHANNELS.BALANCE_SAVE,IPC_CHANNELS.INVENTORY_SAVE,IPC_CHANNELS.ASSET_CREATE,IPC_CHANNELS.ASSET_UPDATE,IPC_CHANNELS.LOAN_CREATE,IPC_CHANNELS.LOAN_UPDATE,IPC_CHANNELS.PERIOD_CLOSE,IPC_CHANNELS.PERIOD_REOPEN,
@@ -232,6 +240,7 @@ export function createBusinessIpcHandlers(
     [IPC_CHANNELS.PAYMENT_REFUND]: (payload) => session.recordRefund(payload),
     [IPC_CHANNELS.PAYMENT_CORRECTION]: (payload) => session.recordCorrection(payload),
     [IPC_CHANNELS.PAYMENT_REVERSE]: (payload) => session.reversePayment(payload),
+    [IPC_CHANNELS.RECEIPT_GET]: ({ paymentId }) => session.getReceipt(paymentId),
     [IPC_CHANNELS.COMPENSATION_MONTHLY]: ({ month }) =>
       session.getMonthlyCompensation(month),
     [IPC_CHANNELS.EXPENSES_LIST]:()=>session.listExpenses(), [IPC_CHANNELS.EXPENSE_CREATE]:(payload)=>session.createExpense(payload),

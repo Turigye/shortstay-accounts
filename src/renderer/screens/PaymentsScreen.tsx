@@ -16,6 +16,8 @@ import {
   type PaymentEditorValue,
 } from "../components/PaymentEditor";
 import { useAppStore } from "../store/app-store";
+import type { ReceiptDocument } from "../../main/receipt-service";
+import { ReceiptDialog } from "../components/ReceiptDialog";
 
 function firstError(failure: IpcFailure): string {
   return Object.values(failure.fieldErrors)[0]?.[0] ?? failure.message;
@@ -52,6 +54,7 @@ export function PaymentsScreen() {
   const [reversalBusy, setReversalBusy] = useState(false);
   const [reversalError, setReversalError] = useState<string | null>(null);
   const [confirmReversalOverpayment, setConfirmReversalOverpayment] = useState(false);
+  const [receipt, setReceipt] = useState<ReceiptDocument | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -109,6 +112,18 @@ export function PaymentsScreen() {
     );
   }
 
+  async function openReceipt(paymentId: string) {
+    setError(null);
+    const result = await window.stayBooks.invoke(IPC_CHANNELS.RECEIPT_GET, { paymentId });
+    if (!result.ok) return setError(firstError(result));
+    setReceipt(result.data);
+  }
+
+  async function printReceipt(paymentId: string) {
+    const result = await window.stayBooks.invoke(IPC_CHANNELS.RECEIPT_PRINT, { paymentId });
+    if (!result.ok) setError(firstError(result));
+  }
+
   async function recordPayment(value: PaymentEditorValue): Promise<void> {
     if (!selectedBooking) return;
     setError(null);
@@ -138,6 +153,7 @@ export function PaymentsScreen() {
     }
     applyMovement(result.data);
     setEditor(null);
+    if (result.data.recordType === "receipt") await openReceipt(result.data.id);
   }
 
   function editAccount(account: PaymentAccount) {
@@ -317,6 +333,7 @@ export function PaymentsScreen() {
                 movements={selectedMovements}
                 onCorrect={isEditor ? undefined : (movement) => openEditor({ mode: "correction", movement })}
                 onReverse={isEditor ? undefined : beginReversal}
+                onPrint={(movement) => void openReceipt(movement.id)}
               />
             </>
           ) : (
@@ -363,6 +380,13 @@ export function PaymentsScreen() {
           </aside>
         ) : null}
       </div>
+      {receipt ? (
+        <ReceiptDialog
+          onClose={() => setReceipt(null)}
+          onPrint={printReceipt}
+          receipt={receipt}
+        />
+      ) : null}
     </section>
   );
 }

@@ -50,6 +50,10 @@ import {
   type UserRecord,
   type UserRepository,
 } from "./db/repositories/user-repository";
+import {
+  getReceiptDocument,
+  type ReceiptDocument,
+} from "./receipt-service";
 
 type ExpenseRepository = ReturnType<typeof createExpenseRepository>;
 type FinanceRepository = ReturnType<typeof createFinanceRepository>;
@@ -133,6 +137,7 @@ export interface BusinessSession {
   recordRefund(input: RefundInput): PaymentMovement;
   recordCorrection(input: CorrectionInput): PaymentMovement;
   reversePayment(input: ReversalInput): PaymentMovement;
+  getReceipt(paymentId: string): ReceiptDocument;
   getMonthlyCompensation(month: string): MonthlyCompensationReport;
   listExpenses(): ExpenseRecord[];
   createExpense(input: Parameters<ExpenseRepository["createExpense"]>[0]): ExpenseRecord;
@@ -489,6 +494,14 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     reversePayment(input: ReversalInput): PaymentMovement {
       requireCapability("payment.reverse");
       return payments().reverseMovement(input);
+    },
+
+    getReceipt(paymentId: string): ReceiptDocument {
+      requireCapability("receipt.print");
+      if (!database) throw new BusinessSessionError("LOCKED", "The business file is locked.");
+      const business = repository().getSettings();
+      if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
+      return getReceiptDocument(database, business.businessId, paymentId);
     },
 
     getMonthlyCompensation(month: string): MonthlyCompensationReport {

@@ -12,6 +12,7 @@ import type { AssetRecord, FinancialPosition, LoanRecord, PeriodClose } from "..
 import type { FinancialReport } from "../domain/accounting";
 import type { TodayOverview } from "../main/db/repositories/dashboard-repository";
 import type { AuthenticatedUser, UserProfile } from "../domain/users";
+import type { ReceiptDocument } from "../main/receipt-service";
 
 export const IPC_CHANNELS = {
   APP_READY: "app:ready",
@@ -47,6 +48,8 @@ export const IPC_CHANNELS = {
   PAYMENT_REFUND: "payments:refund",
   PAYMENT_CORRECTION: "payments:correction",
   PAYMENT_REVERSE: "payments:reverse",
+  RECEIPT_GET: "receipts:get",
+  RECEIPT_PRINT: "receipts:print",
   COMPENSATION_MONTHLY: "compensation:monthly",
   EXPENSES_LIST: "expenses:list", EXPENSE_CREATE: "expenses:create",
   SUPPLIERS_LIST: "suppliers:list", SUPPLIER_CREATE: "suppliers:create", SUPPLIER_PAYMENT: "suppliers:payment",
@@ -517,6 +520,18 @@ const paymentReverseRequestSchema = z
       .strict(),
   })
   .strict();
+const receiptGetRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.RECEIPT_GET),
+    payload: z.object({ paymentId: idSchema }).strict(),
+  })
+  .strict();
+const receiptPrintRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.RECEIPT_PRINT),
+    payload: z.object({ paymentId: idSchema }).strict(),
+  })
+  .strict();
 const compensationMonthlyRequestSchema = z
   .object({
     channel: z.literal(IPC_CHANNELS.COMPENSATION_MONTHLY),
@@ -591,6 +606,8 @@ export const ipcRequestSchema = z.discriminatedUnion("channel", [
   paymentRefundRequestSchema,
   paymentCorrectionRequestSchema,
   paymentReverseRequestSchema,
+  receiptGetRequestSchema,
+  receiptPrintRequestSchema,
   compensationMonthlyRequestSchema,
   ...expenseRequests,
   ...financeRequests,
@@ -760,6 +777,29 @@ const paymentMovementSchema = z
     createdAt: z.string(),
   })
   .strict();
+const receiptDocumentSchema = z.object({
+  paymentId: z.string(),
+  reference: z.string(),
+  businessName: z.string(),
+  paidAt: dateTimeSchema,
+  guestName: z.string(),
+  guestPhone: z.string(),
+  unitName: z.string(),
+  occupancyMode: z.enum(["whole_unit", "one_room"]),
+  checkIn: dateSchema,
+  checkOut: dateSchema,
+  amount: positiveWholeUgxSchema,
+  amountWords: z.string(),
+  method: z.enum(["Cash", "Mobile money", "Bank transfer", "Card"]),
+  accountName: z.string(),
+  externalReference: z.string().nullable(),
+  bookingTotal: wholeUgxSchema.nonnegative(),
+  receivedAfter: wholeUgxSchema,
+  remainingBalance: wholeUgxSchema.nonnegative(),
+  receivedBy: z.string(),
+  receivedByUserId: z.string().nullable(),
+  reversed: z.boolean(),
+}).strict();
 const staffStatementLineSchema = z.object({
   role: roleSchema,
   base: wholeUgxSchema.nonnegative(),
@@ -848,6 +888,8 @@ const responseSchemas = {
   [IPC_CHANNELS.PAYMENT_REFUND]: responseSchema(paymentMovementSchema),
   [IPC_CHANNELS.PAYMENT_CORRECTION]: responseSchema(paymentMovementSchema),
   [IPC_CHANNELS.PAYMENT_REVERSE]: responseSchema(paymentMovementSchema),
+  [IPC_CHANNELS.RECEIPT_GET]: responseSchema(receiptDocumentSchema),
+  [IPC_CHANNELS.RECEIPT_PRINT]: responseSchema(z.object({ cancelled: z.boolean() }).strict()),
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: responseSchema(monthlyCompensationReportSchema),
   [IPC_CHANNELS.EXPENSES_LIST]: responseSchema(z.array(expenseSchema)), [IPC_CHANNELS.EXPENSE_CREATE]: responseSchema(expenseSchema),
   [IPC_CHANNELS.SUPPLIERS_LIST]: responseSchema(z.array(supplierSchema)), [IPC_CHANNELS.SUPPLIER_CREATE]: responseSchema(supplierSchema), [IPC_CHANNELS.SUPPLIER_PAYMENT]: responseSchema(expenseSchema),
@@ -927,6 +969,8 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.PAYMENT_REFUND]: PaymentMovement;
   [IPC_CHANNELS.PAYMENT_CORRECTION]: PaymentMovement;
   [IPC_CHANNELS.PAYMENT_REVERSE]: PaymentMovement;
+  [IPC_CHANNELS.RECEIPT_GET]: ReceiptDocument;
+  [IPC_CHANNELS.RECEIPT_PRINT]: { readonly cancelled: boolean };
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: MonthlyCompensationReport;
   [IPC_CHANNELS.EXPENSES_LIST]: ExpenseRecord[]; [IPC_CHANNELS.EXPENSE_CREATE]: ExpenseRecord;
   [IPC_CHANNELS.SUPPLIERS_LIST]: Supplier[]; [IPC_CHANNELS.SUPPLIER_CREATE]: Supplier; [IPC_CHANNELS.SUPPLIER_PAYMENT]: ExpenseRecord;
