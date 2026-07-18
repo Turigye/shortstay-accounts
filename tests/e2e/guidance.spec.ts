@@ -16,7 +16,7 @@ const CHAPTERS = [
   ["staff", "Staff and Referrals", 4],
   ["month-end", "Financial Position and Month End", 4],
   ["reports", "Reports and Tax", 4],
-  ["administration", "Administration and Safety", 5],
+  ["administration", "Administration and Safety", 6],
 ] as const;
 
 interface Viewport {

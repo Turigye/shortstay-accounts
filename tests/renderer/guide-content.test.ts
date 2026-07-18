@@ -22,7 +22,7 @@ const tourTargetManifest = {
   staff: ["staff-base", "staff-rates", "referral-earnings", "calculation-trace"],
   "financial-position": ["position-summary", "position-balances", "month-end", "reopen-period"],
   reports: ["report-period", "report-tabs"],
-  settings: ["tax-guidance", "excel-export", "unit-settings", "effective-rates", "backup", "restore", "security"],
+  settings: ["tax-guidance", "excel-export", "unit-settings", "effective-rates", "backup", "users", "restore", "security"],
 } as const;
 
 const targetSourceFiles: Record<string, string> = {
@@ -54,6 +54,7 @@ const targetSourceFiles: Record<string, string> = {
   "excel-export": "src/renderer/screens/SettingsScreen.tsx",
   "unit-settings": "src/renderer/screens/SettingsScreen.tsx",
   "effective-rates": "src/renderer/screens/SettingsScreen.tsx",
+  users: "src/renderer/screens/SettingsScreen.tsx",
   security: "src/renderer/screens/SettingsScreen.tsx",
 };
 
@@ -62,6 +63,7 @@ const dynamicTargetMarkers: Partial<Record<string, readonly string[]>> = {
   "effective-rates": ["tabTourTargets"],
   "tax-guidance": ["tabTourTargets"],
   backup: ["tabTourTargets"],
+  users: ["tabTourTargets"],
   security: ["tabTourTargets"],
 };
 

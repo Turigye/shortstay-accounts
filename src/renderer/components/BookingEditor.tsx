@@ -441,7 +441,7 @@ export function BookingEditor({
             </div>
             {errorFor(form.pricingMode === "nightly" ? "nightlyRate" : "fixedAmount") ? <small className="field-error">{errorFor(form.pricingMode === "nightly" ? "nightlyRate" : "fixedAmount")}</small> : null}
           </div>
-          <output aria-label="Booking total" className="booking-total" htmlFor="booking-check-in booking-check-out booking-nightly-rate">
+          <output aria-label="Booking total" className="booking-total" htmlFor="booking-check-in booking-check-out booking-rate">
             <span>{calculation.nights === 1 ? "1 night" : `${calculation.nights} nights`}</span>
             <strong>{formatUgx(calculation.total)}</strong>
           </output>

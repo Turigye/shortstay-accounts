@@ -30,7 +30,7 @@ Short-Stay Accounts is for recording a short-stay business as it happens. Bookin
 
 ## Quick Start
 
-1. Open the application and enter the local password to unlock the business file.
+1. Open the application and sign in with your profile username and password. If secure operating-system storage is unavailable, the Admin may first be asked for the local business-file password.
 2. On the first setup, enter the business name, the two unit names, and a local password of at least 10 characters. Confirm the password before creating the business.
 3. Start on **Today**. Read the arrivals, departures, unit status, outstanding amounts, and the attention list before adding anything.
 4. Enter a stay in **Bookings**, record actual money in **Payments**, and record business costs in **Expenses**.
@@ -47,7 +47,7 @@ Short-Stay Accounts stores the business data on the local computer. The business
 
 The business owner is responsible for the password. Choose one that is hard to guess, store it securely outside the computer, and do not send it in messages or put it in a shared note. If the password is lost, access to the encrypted local records and encrypted backups may not be recoverable.
 
-Use **Lock** in the top command bar, or **Settings > Security > Lock now**, before walking away. Locking returns the application to its password screen; it does not delete work. A backup is also local: choose a separate, secure location such as an approved encrypted drive. A restore replaces the current local business file only after an explicit confirmation.
+Use **Lock** in the top command bar, or **Settings > Security > Lock now**, before walking away. Locking returns the application to profile sign-in; it does not delete work. Each operator should use their own profile. A backup is also local: choose a separate, secure location such as an approved encrypted drive. A restore replaces the current local business file only after an explicit confirmation.
 
 ## Screen Map
 
@@ -57,12 +57,12 @@ The left navigation opens the eight main work areas. The top command bar is avai
 | --- | --- | --- |
 | Today | Daily priorities | Read arrivals, departures, warnings, unit status, occupancy, collected money, outstanding balances, and net position. Start a payment, expense, or booking. |
 | Bookings | Manual stays | Create, edit, filter, schedule, update status, cancel, and archive stays. |
-| Payments | Guest money | Record receipts, refunds, corrections, reversals, accounts, and booking balances. |
+| Payments | Guest money | Record and print receipts; review refunds, corrections, reversals, accounts, and booking balances according to profile permission. |
 | Expenses | Business costs | Record cash costs, supplier credit, suppliers, supplier payments, and recurring bill templates. |
 | Staff | Compensation and referrals | Review collected-revenue base, earned, paid, due, configured rates, and calculation traces. |
 | Financial Position | What the business owns and owes | Record balances, inventory, fixed assets, loans, and perform month-end review. |
 | Reports | Statements | Select a month; view, print, refresh, or export the accounting reports. |
-| Settings | Business configuration and safety | Manage units, effective-dated rates, tax basis, categories, accounts, backup, export, and lock. |
+| Settings | Business configuration and safety | Manage users, units, effective-dated rates, tax basis, categories, accounts, backup, export, and lock. Admin only. |
 
 ## First Day
 
@@ -149,6 +149,8 @@ Payments records guest-money movements against a booking. It does not create the
 2. Select **Record receipt**.
 3. Enter a positive whole-UGX amount, the actual payment date and time, payment method, account, optional reference, and optional note.
 4. Save and check the balance panel.
+
+The payment receipt opens after an incoming payment is saved. Select **Print receipt** to use a physical printer or **Save as PDF** in the system print dialog. To print it again, open **Payments**, select the booking, and use the printer button beside the original receipt. Reprinting does not create another payment.
 
 For Eden Grove's UGX 340,000 booking, a UGX 150,000 receipt produces: received UGX 150,000, refunded UGX 0, net received UGX 150,000, and due UGX 190,000. Its payment state is **Partially paid**. Record the remaining UGX 190,000 only when received; after that, the state becomes **Fully paid**.
 
@@ -316,6 +318,14 @@ When changing a past date or a closed-period rate, enter a clear reason. This pr
 
 The referral setting controls the default commission for referred bookings. The Rental tax setting controls the monthly gross rental basis per active unit used by the estimate; it is not a tax payment amount.
 
+### Admin and Editor profiles
+
+The first profile is the **Admin**. Admin has full access. Open **Settings > Users** to add an **Editor** with a name, username, and temporary password. Use the pencil to change profile details, the key to reset an Editor password, and the deactivate action to prevent future sign-in without removing their recorded attribution.
+
+An Editor can use **Today**, **Bookings**, and **Payments**. They can create customers and bookings, update active stays, progress check-in and completion, record incoming payments, and print receipts. They cannot cancel, remove, or archive bookings; record refunds, corrections, reversals, or overpayments; change payment accounts; or access expenses, reports, financial position, staff, settings, backups, or user management.
+
+Select **Lock** when changing operators, then let the next person sign in with their own profile. Never share the Admin password with an Editor.
+
 ### Backup, restore, export, and lock
 
 In **Backup**, type the local password into the password field. Select **Create backup**, choose a secure location, and wait for the success message. The backup is encrypted. Keep it separate from the computer and verify it can be located before an emergency.
@@ -427,6 +437,7 @@ The password is the business owner's responsibility. Do not repeatedly guess or 
 | --- | --- |
 | Active unit | A unit available for normal booking selection. |
 | Adjustment | A signed amount added to or subtracted from the nights-times-rate booking total. |
+| Admin | A full-access local profile that manages accounting, settings, backups, and Editor profiles. |
 | Archive | Remove a record from ordinary active lists without erasing its retained history. |
 | Asset | A resource the business controls, including cash, inventory, and fixed assets. |
 | Balanced | Total assets equal total liabilities plus equity. |
@@ -443,6 +454,7 @@ The password is the business owner's responsibility. Do not repeatedly guess or 
 | Due | The remaining amount owed after the relevant receipts, refunds, and payments. |
 | Effective-dated rate | A rate that applies from a chosen date, retaining the historical basis before that date. |
 | Encrypted backup | A password-protected local copy of the complete business file. |
+| Editor | A restricted local profile for active bookings, incoming payments, and receipt printing. |
 | Equity | The owner's residual interest after liabilities are deducted from assets. |
 | Fully paid | Net recorded guest money equals the booking total without a refund. |
 | Fully refunded | Refunds reduce net guest money to zero or below. |

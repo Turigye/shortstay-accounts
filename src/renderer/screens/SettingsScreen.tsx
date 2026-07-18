@@ -79,6 +79,7 @@ const tabTourTargets: Partial<Record<SettingsTab, string>> = {
   compensation: "effective-rates",
   tax: "tax-guidance",
   backup: "backup",
+  users: "users",
   security: "security",
 };
 

@@ -55,6 +55,12 @@ describe("profile-aware business session", () => {
       business: { name: "Eden Grove" },
       user: { username: "admin", role: "admin" },
     });
+    expect(created.user).toStrictEqual({
+      id: expect.any(String),
+      name: "Owner",
+      username: "admin",
+      role: "admin",
+    });
     expect(vault.value).toBe("correct local password");
 
     session.logout();

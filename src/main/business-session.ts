@@ -59,6 +59,15 @@ type ExpenseRepository = ReturnType<typeof createExpenseRepository>;
 type FinanceRepository = ReturnType<typeof createFinanceRepository>;
 type DashboardRepository = ReturnType<typeof createDashboardRepository>;
 
+function authenticatedUser(user: UserRecord): AuthenticatedUser {
+  return {
+    id: user.id,
+    name: user.name,
+    username: user.username,
+    role: user.role,
+  };
+}
+
 export type BusinessSessionStatus =
   | { state: "setup" }
   | { state: "databaseLocked" }
@@ -293,7 +302,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
       try {
         database = openDatabase(options.databasePath, input.password);
         repository().create(input);
-        activeUser = users().bootstrapAdmin(input.password);
+        activeUser = authenticatedUser(users().bootstrapAdmin(input.password));
         saveDatabaseSecret(input.password);
         return readyStatus();
       } catch (error) {
@@ -319,7 +328,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
         }
         database = opened;
         opened = undefined;
-        activeUser = users().bootstrapAdmin(password);
+        activeUser = authenticatedUser(users().bootstrapAdmin(password));
         saveDatabaseSecret(password);
         return readyStatus();
       } catch {
@@ -333,7 +342,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     },
 
     login(input): ReadyBusinessSession {
-      activeUser = users().authenticate(input.username, input.password);
+      activeUser = authenticatedUser(users().authenticate(input.username, input.password));
       return readyStatus();
     },
 
