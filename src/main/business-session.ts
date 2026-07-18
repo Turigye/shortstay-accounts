@@ -40,7 +40,7 @@ import {
   type MonthlyCompensationReport,
 } from "./db/repositories/compensation-repository";
 import { createExpenseRepository, type ExpenseRecord, type Supplier, type RecurringExpenseTemplate } from "./db/repositories/expense-repository";
-import { createFinanceRepository, type AssetRecord, type FinancialPosition, type LoanRecord, type PeriodClose } from "./db/repositories/finance-repository";
+import { createFinanceRepository, type AssetRecord, type FinancialPosition, type InvestmentRecovery, type LoanRecord, type PeriodClose } from "./db/repositories/finance-repository";
 import { createDashboardRepository, type TodayOverview } from "./db/repositories/dashboard-repository";
 import { backupEncryptedDatabase,restoreEncryptedDatabase,validateEncryptedBackup } from "./backup";
 import { exportBusinessWorkbook } from "./export";
@@ -156,7 +156,7 @@ export interface BusinessSession {
   listRecurringExpenses(month: string): RecurringExpenseTemplate[];
   createRecurringExpense(input: Parameters<ExpenseRepository["createRecurringTemplate"]>[0]): RecurringExpenseTemplate;
   advanceRecurringExpense(id: string): RecurringExpenseTemplate;
-  getFinanceOverview(month:string):{position:FinancialPosition;assets:AssetRecord[];loans:LoanRecord[];period:PeriodClose};
+  getFinanceOverview(month:string):{position:FinancialPosition;assets:AssetRecord[];loans:LoanRecord[];period:PeriodClose;investmentRecovery:InvestmentRecovery};
   recordBalance(input:Parameters<FinanceRepository["recordBalance"]>[0]):FinancialPosition;
   recordInventory(input:Parameters<FinanceRepository["recordInventory"]>[0]):FinancialPosition;
   createAsset(input:Parameters<FinanceRepository["createAsset"]>[0]):AssetRecord;
@@ -527,7 +527,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     listRecurringExpenses(month) { requireCapability("admin.all"); return expenses().listRecurringForReview(month); },
     createRecurringExpense(input) { requireCapability("admin.all"); return expenses().createRecurringTemplate(input); },
     advanceRecurringExpense(id) { requireCapability("admin.all"); return expenses().advanceRecurringTemplate(id); },
-    getFinanceOverview(month) { requireCapability("admin.all"); return {position:finance().getPosition(month),assets:finance().listAssets(),loans:finance().listLoans(),period:finance().getPeriodStatus(month)}; },
+    getFinanceOverview(month) { requireCapability("admin.all"); return {position:finance().getPosition(month),assets:finance().listAssets(),loans:finance().listLoans(),period:finance().getPeriodStatus(month),investmentRecovery:finance().getInvestmentRecovery(month)}; },
     recordBalance(input) { requireCapability("admin.all"); return finance().recordBalance(input); },
     recordInventory(input) { requireCapability("admin.all"); return finance().recordInventory(input); },
     createAsset(input) { requireCapability("admin.all"); return finance().createAsset(input); },

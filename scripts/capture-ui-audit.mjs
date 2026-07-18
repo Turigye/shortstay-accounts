@@ -172,6 +172,30 @@ async function seed(page) {
     username: "desk",
     password: "editor-password",
   });
+  await invoke(page, "finance:asset-create", {
+    category: "land",
+    description: "Property land",
+    purchaseDate: "2025-04-01",
+    purchaseAmount: 120000000,
+    unitId: null,
+    supplierId: null,
+    paymentMethod: "Owner contribution",
+    usefulLifeMonths: null,
+    fundingSource: "owner",
+    ownerFundedAmount: 120000000,
+  });
+  await invoke(page, "finance:asset-create", {
+    category: "buildings",
+    description: "Property renovations",
+    purchaseDate: "2025-05-01",
+    purchaseAmount: 45000000,
+    unitId: null,
+    supplierId: null,
+    paymentMethod: "Mixed funding",
+    usefulLifeMonths: 120,
+    fundingSource: "mixed",
+    ownerFundedAmount: 30000000,
+  });
   return { payment };
 }
 
@@ -208,6 +232,13 @@ for (const size of SIZES) {
       await capture(page, directory, file);
     }
 
+    await navigate(page, "Financial Position");
+    await page.getByRole("button", { name: "Investment Recovery" }).click();
+    await page.getByRole("heading", { name: /recovered$/ }).waitFor();
+    await assertLayout(page, "Investment Recovery", size);
+    await capture(page, directory, "investment-recovery");
+
+    await navigate(page, "Settings");
     await page.getByRole("tab", { name: "Accounts" }).click();
     await page.getByRole("heading", { name: "Payment accounts", level: 2 }).waitFor();
     await assertLayout(page, "Payment account settings", size);

@@ -95,6 +95,32 @@ describe("financial position and month close", () => {
     });
   });
 
+  it("tracks owner-funded investment recovery without counting loan-funded assets", () => {
+    const { database, business, finance } = fixture();
+    finance.createAsset({ category: "land", description: "Property land", purchaseDate: "2026-07-01", purchaseAmount: 10_000_000, fundingSource: "owner", ownerFundedAmount: 10_000_000 });
+    finance.createAsset({ category: "buildings", description: "Renovations", purchaseDate: "2026-07-02", purchaseAmount: 4_000_000, fundingSource: "mixed", ownerFundedAmount: 2_000_000 });
+    finance.createAsset({ category: "furniture", description: "Guest furniture", purchaseDate: "2026-07-03", purchaseAmount: 3_000_000, fundingSource: "loan", ownerFundedAmount: 0 });
+    finance.createAsset({ category: "equipment", description: "Opening equipment", purchaseDate: "2026-07-04", purchaseAmount: 1_000_000 });
+    const customer = database.prepare<[string], { id:string }>("INSERT INTO customers (business_id,name) VALUES (?,'Grace') RETURNING id").get(business.businessId)!;
+    const booking = database.prepare<any, { id:string }>(`INSERT INTO bookings (business_id,unit_id,customer_id,check_in,check_out,nightly_rate,total_amount,status) VALUES (@businessId,@unitId,@customerId,'2026-07-10','2026-07-12',1000000,2000000,'completed') RETURNING id`).get({businessId:business.businessId,unitId:business.unitIds[0],customerId:customer.id})!;
+    database.prepare("INSERT INTO booking_months (booking_id,month,occupied_nights,earned_revenue,payable_base) VALUES (?,'2026-07',2,2000000,2000000)").run(booking.id);
+    database.prepare("INSERT INTO expenses (business_id,category_id,scope,amount,expense_date,purchase_type,payment_status) VALUES (?,'maintenance','shared',400000,'2026-07-13','cash','paid')").run(business.businessId);
+
+    expect(finance.getInvestmentRecovery("2026-07")).toMatchObject({
+      ownerInvestment: 12_000_000,
+      totalAssetInvestment: 18_000_000,
+      loanFundedInvestment: 3_000_000,
+      unclassifiedInvestment: 1_000_000,
+      cumulativeRevenue: 2_000_000,
+      cumulativeNetGenerated: 1_484_200,
+      recoveredAmount: 1_484_200,
+      remainingInvestment: 10_515_800,
+      recoveryPercent: 12.4,
+      estimatedMonthsRemaining: 8,
+      estimatedPaybackMonth: "2027-03",
+    });
+  });
+
   it("blocks an unbalanced close, locks a closed month, and audits reopening", () => {
     const { database, finance } = fixture();
     finance.recordBalance({ month: "2026-07", category: "cash_on_hand", amount: 1_000_000 });

@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3-multiple-ciphers";
 
-export const LATEST_SCHEMA_VERSION = 9;
+export const LATEST_SCHEMA_VERSION = 10;
 
 interface Migration {
   readonly version: number;
@@ -731,6 +731,13 @@ const CREATE_VERSION_NINE_SCHEMA = `
   CREATE INDEX payments_created_by_user_id_idx ON payments(created_by_user_id);
 `;
 
+const CREATE_VERSION_TEN_SCHEMA = `
+  ALTER TABLE assets ADD COLUMN funding_source TEXT NOT NULL DEFAULT 'unclassified'
+    CHECK (funding_source IN ('unclassified', 'owner', 'loan', 'business', 'mixed'));
+  ALTER TABLE assets ADD COLUMN owner_funded_amount INTEGER NOT NULL DEFAULT 0
+    CHECK (owner_funded_amount >= 0 AND owner_funded_amount <= purchase_amount);
+`;
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -805,6 +812,14 @@ const migrations: readonly Migration[] = [
     version: 9,
     up(database) {
       database.exec(CREATE_VERSION_NINE_SCHEMA);
+      database.prepare("update app_meta set value = ? where key = 'schema_version'")
+        .run(String(LATEST_SCHEMA_VERSION));
+    },
+  },
+  {
+    version: 10,
+    up(database) {
+      database.exec(CREATE_VERSION_TEN_SCHEMA);
       database.prepare("update app_meta set value = ? where key = 'schema_version'")
         .run(String(LATEST_SCHEMA_VERSION));
     },

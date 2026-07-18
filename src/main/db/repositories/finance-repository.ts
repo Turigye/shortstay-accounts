@@ -15,6 +15,7 @@ export type BalanceCategory =
   | "staff_payable" | "referral_payable" | "tax_payable" | "pension_payable"
   | "owner_capital" | "owner_drawings";
 export type AssetCategory = "furniture" | "machinery" | "equipment" | "vehicles" | "land" | "buildings";
+export type AssetFundingSource = "unclassified" | "owner" | "loan" | "business" | "mixed";
 export type LoanKind = "bank" | "non_bank" | "interest_free";
 export type RepaymentFrequency = "monthly" | "quarterly" | "annually" | "custom";
 export type PeriodStatus = "open" | "closed" | "reopened";
@@ -39,6 +40,18 @@ export interface AssetRecord {
   id: string; category: AssetCategory; description: string; purchaseDate: string;
   purchaseAmount: Ugx; unitId: string | null; supplierId: string | null;
   paymentMethod: string | null; usefulLifeMonths: number | null; status: "active" | "disposed";
+  fundingSource: AssetFundingSource; ownerFundedAmount: Ugx;
+}
+export interface InvestmentRecoveryPoint {
+  month: string; revenue: Ugx; netGenerated: number; cumulativeNetGenerated: number;
+}
+export interface InvestmentRecovery {
+  asOfMonth: string; ownerInvestment: Ugx; totalAssetInvestment: Ugx;
+  loanFundedInvestment: Ugx; businessFundedInvestment: Ugx; unclassifiedInvestment: Ugx;
+  cumulativeRevenue: Ugx; cumulativeNetGenerated: number; recoveredAmount: Ugx;
+  remainingInvestment: Ugx; recoveryPercent: number; averageMonthlyNet: number;
+  estimatedMonthsRemaining: number | null; estimatedPaybackMonth: string | null;
+  points: InvestmentRecoveryPoint[];
 }
 export interface LoanRecord {
   id: string; lender: string; kind: LoanKind; classification: "current" | "non_current";
@@ -51,6 +64,7 @@ export interface AssetInput {
   category: AssetCategory; description: string; purchaseDate: string; purchaseAmount: number;
   unitId?: string | null; supplierId?: string | null; paymentMethod?: string | null;
   usefulLifeMonths?: number | null;
+  fundingSource?: AssetFundingSource; ownerFundedAmount?: number;
 }
 export interface LoanInput {
   lender: string; kind: LoanKind; classification: "current" | "non_current";
@@ -64,6 +78,7 @@ export interface PeriodClose { month: string; status: PeriodStatus; reason: stri
 const monthPattern = /^\d{4}-(?:0[1-9]|1[0-2])$/;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const assetCategories = new Set<AssetCategory>(["furniture", "machinery", "equipment", "vehicles", "land", "buildings"]);
+const assetFundingSources = new Set<AssetFundingSource>(["unclassified", "owner", "loan", "business", "mixed"]);
 const loanKinds = new Set<LoanKind>(["bank", "non_bank", "interest_free"]);
 const repaymentFrequencies = new Set<RepaymentFrequency>(["monthly", "quarterly", "annually", "custom"]);
 const assetBalanceCategories = new Set<BalanceCategory>(["cash_on_hand", "current_bank", "mobile_money", "long_term_deposit", "customer_receivable", "other_receivable"]);
@@ -113,6 +128,7 @@ export function createFinanceRepository(database: Database.Database, businessId:
       id: row.id, category: row.category, description: row.description, purchaseDate: row.purchase_date,
       purchaseAmount: ugx(row.purchase_amount), unitId: row.unit_id, supplierId: row.supplier_id,
       paymentMethod: row.payment_method, usefulLifeMonths: row.useful_life_months, status: row.status,
+      fundingSource: row.funding_source, ownerFundedAmount: ugx(row.owner_funded_amount),
     }));
   }
   function loans(): LoanRecord[] {
@@ -167,6 +183,48 @@ export function createFinanceRepository(database: Database.Database, businessId:
     const cash=balance("cash_on_hand","current_bank","mobile_money"),cashPayments=cashMovements.refunds+cashExpense+supplierPaid;
     return buildFinancialReport({cashSales,creditSales,cashPurchases,creditPurchases,operatingExpenses,financialExpenses,taxExpense:calculateMonthlyRentalTaxProvision(activeUnits,ugx(taxRate)),cash,longTermDeposits:balance("long_term_deposit"),receivables:balance("customer_receivable","other_receivable"),inventory,fixedAssets,currentLiabilities:balance("supplier_payable","staff_payable","referral_payable","tax_payable","pension_payable")+currentLoans,nonCurrentLiabilities:nonCurrentLoans,ownerEquity:balance("owner_capital"),drawings:balance("owner_drawings"),openingCash:cash-(cashMovements.receipts-cashPayments),cashReceipts:cashMovements.receipts,cashPayments,fixedCosts:Object.values(operatingExpenses).reduce((t,v)=>t+v,0)+financialExpenses,variableCosts:cashPurchases+creditPurchases});
   }
+  function addMonths(month:string, offset:number):string {
+    const [year, monthIndex] = month.split("-").map(Number);
+    return new Date(Date.UTC(year, monthIndex - 1 + offset, 1)).toISOString().slice(0, 7);
+  }
+  function investmentRecovery(month:string):InvestmentRecovery {
+    requireMonth(month);
+    const includedAssets=assets().filter(({purchaseDate})=>purchaseDate.slice(0,7)<=month);
+    const ownerInvestment=includedAssets.reduce((total,item)=>total+item.ownerFundedAmount,0);
+    const totalAssetInvestment=includedAssets.reduce((total,item)=>total+item.purchaseAmount,0);
+    const loanFundedInvestment=includedAssets.filter(({fundingSource})=>fundingSource==="loan").reduce((total,item)=>total+item.purchaseAmount,0);
+    const businessFundedInvestment=includedAssets.filter(({fundingSource})=>fundingSource==="business").reduce((total,item)=>total+item.purchaseAmount,0);
+    const unclassifiedInvestment=includedAssets.filter(({fundingSource})=>fundingSource==="unclassified").reduce((total,item)=>total+item.purchaseAmount,0);
+    const starts=database.prepare<[string,string,string],{month:string}>(`
+      SELECT MIN(month) month FROM (
+        SELECT bm.month FROM booking_months bm JOIN bookings b ON b.id=bm.booking_id WHERE b.business_id=? AND b.status='completed' AND b.archived_at IS NULL
+        UNION ALL SELECT substr(expense_date,1,7) FROM expenses WHERE business_id=? AND archived_at IS NULL
+      ) WHERE month<=?
+    `).get(businessId,businessId,month)?.month;
+    const points:InvestmentRecoveryPoint[]=[];
+    let cumulativeRevenue=0,cumulativeNetGenerated=0;
+    if(starts)for(let cursor=starts;cursor<=month;cursor=addMonths(cursor,1)){
+      const report=monthlyReport(cursor);
+      cumulativeRevenue+=report.incomeStatement.revenue;
+      cumulativeNetGenerated+=report.incomeStatement.netIncome;
+      points.push({month:cursor,revenue:ugx(report.incomeStatement.revenue),netGenerated:report.incomeStatement.netIncome,cumulativeNetGenerated});
+    }
+    const recovered=Math.min(ownerInvestment,Math.max(0,cumulativeNetGenerated));
+    const remaining=Math.max(0,ownerInvestment-recovered);
+    const recent=points.slice(-6);
+    const averageMonthlyNet=recent.length?Math.round(recent.reduce((total,point)=>total+point.netGenerated,0)/recent.length):0;
+    const estimatedMonthsRemaining=remaining>0&&averageMonthlyNet>0?Math.ceil(remaining/averageMonthlyNet):null;
+    return {
+      asOfMonth:month,ownerInvestment:ugx(ownerInvestment),totalAssetInvestment:ugx(totalAssetInvestment),
+      loanFundedInvestment:ugx(loanFundedInvestment),businessFundedInvestment:ugx(businessFundedInvestment),
+      unclassifiedInvestment:ugx(unclassifiedInvestment),cumulativeRevenue:ugx(cumulativeRevenue),
+      cumulativeNetGenerated,recoveredAmount:ugx(recovered),remainingInvestment:ugx(remaining),
+      recoveryPercent:ownerInvestment?Math.min(100,Math.round(recovered/ownerInvestment*1000)/10):0,
+      averageMonthlyNet,estimatedMonthsRemaining,
+      estimatedPaybackMonth:estimatedMonthsRemaining==null?null:addMonths(month,estimatedMonthsRemaining),
+      points,
+    };
+  }
 
   return Object.freeze({
     recordBalance(input: { month: string; category: BalanceCategory; amount: number; accountId?: string | null; unitId?: string | null; notes?: string | null }) {
@@ -177,14 +235,15 @@ export function createFinanceRepository(database: Database.Database, businessId:
       return position(input.month);
     },
     recordInventory(input:{month:string;unitId?:string|null;value:number;notes?:string|null}) { requireMonth(input.month); assertOpen(input.month); requireOwned("units",input.unitId); const value=wholeUgx(input.value); const row=database.prepare<[string,string,string|null],{id:string}>("SELECT id FROM inventory_snapshots WHERE business_id=? AND month=? AND unit_id IS ?").get(businessId,input.month,input.unitId??null); if(row)database.prepare("UPDATE inventory_snapshots SET value=?,notes=? WHERE id=?").run(value,input.notes?.trim()||null,row.id);else database.prepare("INSERT INTO inventory_snapshots (business_id,month,unit_id,value,notes) VALUES (?,?,?,?,?)").run(businessId,input.month,input.unitId??null,value,input.notes?.trim()||null); return position(input.month); },
-    createAsset(input:AssetInput):AssetRecord { if(!assetCategories.has(input.category))throw new Error("Choose a valid asset category.");if(!input.description.trim())throw new Error("Asset description is required.");if(!calendarDate(input.purchaseDate))throw new Error("Choose a valid purchase date.");assertOpen(input.purchaseDate.slice(0,7));requireOwned("units",input.unitId);requireOwned("suppliers",input.supplierId);const amount=wholeUgx(input.purchaseAmount);if(input.usefulLifeMonths!=null&&(!Number.isSafeInteger(input.usefulLifeMonths)||input.usefulLifeMonths<1))throw new Error("Useful life must be whole months.");const row=database.prepare<any,{id:string}>("INSERT INTO assets (business_id,unit_id,supplier_id,category,description,purchase_date,purchase_amount,payment_method,useful_life_months) VALUES (@businessId,@unitId,@supplierId,@category,@description,@purchaseDate,@amount,@paymentMethod,@usefulLifeMonths) RETURNING id").get({businessId,unitId:input.unitId??null,supplierId:input.supplierId??null,category:input.category,description:input.description.trim(),purchaseDate:input.purchaseDate,amount,paymentMethod:input.paymentMethod?.trim()||null,usefulLifeMonths:input.usefulLifeMonths??null})!;return assets().find(({id})=>id===row.id)!; },
-    updateAsset(id:string,input:AssetInput):AssetRecord { const before=assets().find((asset)=>asset.id===id);if(!before)throw new Error("Asset not found.");if(!assetCategories.has(input.category)||!input.description.trim()||!calendarDate(input.purchaseDate))throw new Error("Check the asset details.");assertOpen(before.purchaseDate.slice(0,7));assertOpen(input.purchaseDate.slice(0,7));requireOwned("units",input.unitId);requireOwned("suppliers",input.supplierId);const amount=wholeUgx(input.purchaseAmount);if(input.usefulLifeMonths!=null&&(!Number.isSafeInteger(input.usefulLifeMonths)||input.usefulLifeMonths<1))throw new Error("Useful life must be whole months.");database.prepare("UPDATE assets SET unit_id=@unitId,supplier_id=@supplierId,category=@category,description=@description,purchase_date=@purchaseDate,purchase_amount=@amount,payment_method=@paymentMethod,useful_life_months=@usefulLifeMonths WHERE id=@id AND business_id=@businessId AND archived_at IS NULL").run({id,businessId,unitId:input.unitId??null,supplierId:input.supplierId??null,category:input.category,description:input.description.trim(),purchaseDate:input.purchaseDate,amount,paymentMethod:input.paymentMethod?.trim()||null,usefulLifeMonths:input.usefulLifeMonths??null});const after=assets().find((asset)=>asset.id===id)!;audit.append({entityType:"asset",entityId:id,action:"update",before,after});return after; },
+    createAsset(input:AssetInput):AssetRecord { if(!assetCategories.has(input.category))throw new Error("Choose a valid asset category.");if(!input.description.trim())throw new Error("Asset description is required.");if(!calendarDate(input.purchaseDate))throw new Error("Choose a valid purchase date.");assertOpen(input.purchaseDate.slice(0,7));requireOwned("units",input.unitId);requireOwned("suppliers",input.supplierId);const amount=wholeUgx(input.purchaseAmount),fundingSource=input.fundingSource??"unclassified",ownerFundedAmount=wholeUgx(input.ownerFundedAmount??(fundingSource==="owner"?amount:0));if(!assetFundingSources.has(fundingSource)||ownerFundedAmount>amount)throw new Error("Check the asset funding details.");if(input.usefulLifeMonths!=null&&(!Number.isSafeInteger(input.usefulLifeMonths)||input.usefulLifeMonths<1))throw new Error("Useful life must be whole months.");const row=database.prepare<any,{id:string}>("INSERT INTO assets (business_id,unit_id,supplier_id,category,description,purchase_date,purchase_amount,payment_method,useful_life_months,funding_source,owner_funded_amount) VALUES (@businessId,@unitId,@supplierId,@category,@description,@purchaseDate,@amount,@paymentMethod,@usefulLifeMonths,@fundingSource,@ownerFundedAmount) RETURNING id").get({businessId,unitId:input.unitId??null,supplierId:input.supplierId??null,category:input.category,description:input.description.trim(),purchaseDate:input.purchaseDate,amount,paymentMethod:input.paymentMethod?.trim()||null,usefulLifeMonths:input.usefulLifeMonths??null,fundingSource,ownerFundedAmount})!;return assets().find(({id})=>id===row.id)!; },
+    updateAsset(id:string,input:AssetInput):AssetRecord { const before=assets().find((asset)=>asset.id===id);if(!before)throw new Error("Asset not found.");if(!assetCategories.has(input.category)||!input.description.trim()||!calendarDate(input.purchaseDate))throw new Error("Check the asset details.");assertOpen(before.purchaseDate.slice(0,7));assertOpen(input.purchaseDate.slice(0,7));requireOwned("units",input.unitId);requireOwned("suppliers",input.supplierId);const amount=wholeUgx(input.purchaseAmount),fundingSource=input.fundingSource??before.fundingSource,ownerFundedAmount=wholeUgx(input.ownerFundedAmount??before.ownerFundedAmount);if(!assetFundingSources.has(fundingSource)||ownerFundedAmount>amount)throw new Error("Check the asset funding details.");if(input.usefulLifeMonths!=null&&(!Number.isSafeInteger(input.usefulLifeMonths)||input.usefulLifeMonths<1))throw new Error("Useful life must be whole months.");database.prepare("UPDATE assets SET unit_id=@unitId,supplier_id=@supplierId,category=@category,description=@description,purchase_date=@purchaseDate,purchase_amount=@amount,payment_method=@paymentMethod,useful_life_months=@usefulLifeMonths,funding_source=@fundingSource,owner_funded_amount=@ownerFundedAmount WHERE id=@id AND business_id=@businessId AND archived_at IS NULL").run({id,businessId,unitId:input.unitId??null,supplierId:input.supplierId??null,category:input.category,description:input.description.trim(),purchaseDate:input.purchaseDate,amount,paymentMethod:input.paymentMethod?.trim()||null,usefulLifeMonths:input.usefulLifeMonths??null,fundingSource,ownerFundedAmount});const after=assets().find((asset)=>asset.id===id)!;audit.append({entityType:"asset",entityId:id,action:"update",before,after});return after; },
     archiveAsset(id:string):void { const before=assets().find((asset)=>asset.id===id);if(!before)throw new Error("Asset not found.");assertOpen(before.purchaseDate.slice(0,7));database.prepare("UPDATE assets SET archived_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND business_id=? AND archived_at IS NULL").run(id,businessId);audit.append({entityType:"asset",entityId:id,action:"update",before,after:{archived:true}}); },
     listAssets: assets,
     createLoan(input:LoanInput):LoanRecord { if(!input.lender.trim())throw new Error("Lender is required.");if(!loanKinds.has(input.kind))throw new Error("Choose a valid loan type.");if(!calendarDate(input.startDate)||input.dueDate&&!calendarDate(input.dueDate))throw new Error("Choose valid loan dates.");assertOpen(input.startDate.slice(0,7));const principal=wholeUgx(input.principal),outstanding=wholeUgx(input.outstandingBalance),rate=input.interestRateBasisPoints??0,frequency=input.repaymentFrequency??"monthly",installment=input.installmentAmount==null?null:wholeUgx(input.installmentAmount),term=input.termMonths??null;if(!Number.isSafeInteger(rate)||rate<0||!repaymentFrequencies.has(frequency))throw new Error("Use a valid repayment plan.");if(term!=null&&(!Number.isSafeInteger(term)||term<1))throw new Error("Term must be whole months.");const row=database.prepare<any,{id:string}>("INSERT INTO loans (business_id,lender,kind,classification,principal,outstanding_balance,interest_rate_basis_points,start_date,due_date,notes,repayment_frequency,installment_amount,term_months) VALUES (@businessId,@lender,@kind,@classification,@principal,@outstanding,@rate,@startDate,@dueDate,@notes,@frequency,@installment,@term) RETURNING id").get({businessId,lender:input.lender.trim(),kind:input.kind,classification:input.classification,principal,outstanding,rate,startDate:input.startDate,dueDate:input.dueDate??null,notes:input.notes?.trim()||null,frequency,installment,term})!;return loans().find(({id})=>id===row.id)!; },
     updateLoan(id:string,input:LoanInput):LoanRecord { const before=loans().find((loan)=>loan.id===id);if(!before)throw new Error("Loan not found.");if(!input.lender.trim()||!loanKinds.has(input.kind)||!calendarDate(input.startDate)||input.dueDate&&!calendarDate(input.dueDate))throw new Error("Check the loan details.");assertOpen(before.startDate.slice(0,7));assertOpen(input.startDate.slice(0,7));const principal=wholeUgx(input.principal),outstanding=wholeUgx(input.outstandingBalance),rate=input.interestRateBasisPoints??0,frequency=input.repaymentFrequency??"monthly",installment=input.installmentAmount==null?null:wholeUgx(input.installmentAmount),term=input.termMonths??null;if(!Number.isSafeInteger(rate)||rate<0||!repaymentFrequencies.has(frequency)||term!=null&&(!Number.isSafeInteger(term)||term<1))throw new Error("Use a valid repayment plan.");database.prepare("UPDATE loans SET lender=@lender,kind=@kind,classification=@classification,principal=@principal,outstanding_balance=@outstanding,interest_rate_basis_points=@rate,start_date=@startDate,due_date=@dueDate,notes=@notes,repayment_frequency=@frequency,installment_amount=@installment,term_months=@term WHERE id=@id AND business_id=@businessId AND archived_at IS NULL").run({id,businessId,lender:input.lender.trim(),kind:input.kind,classification:input.classification,principal,outstanding,rate,startDate:input.startDate,dueDate:input.dueDate??null,notes:input.notes?.trim()||null,frequency,installment,term});const after=loans().find((loan)=>loan.id===id)!;audit.append({entityType:"loan",entityId:id,action:"update",before,after});return after; },
     listLoans: loans,
     getPosition: position,
+    getInvestmentRecovery:investmentRecovery,
     getMonthlyReport:monthlyReport,
     getPeriodStatus: status,
     closeMonth(month:string):PeriodClose { assertOpen(month);const report=position(month);if(!report.balanced)throw new Error(`The month is not balanced by UGX ${Math.abs(report.difference)}.`);database.prepare("INSERT INTO period_closes (business_id,month,status,closed_at) VALUES (?,?,'closed',strftime('%Y-%m-%dT%H:%M:%fZ','now')) ON CONFLICT(business_id,month) DO UPDATE SET status='closed',reason=NULL,closed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),reopened_at=NULL").run(businessId,month);audit.append({entityType:"period_close",entityId:`${businessId}:${month}`,action:"close",after:{status:"closed"}});return status(month); },
