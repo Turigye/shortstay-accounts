@@ -342,7 +342,7 @@ async function capturePartialPaymentDemo(page, bookingId) {
   await recordFrame(page, "demo-partial-payment", 3, [".receipt-reference", ".receipt-amount"]);
   await receipt.getByRole("button", { name: "Done" }).click();
   await receipt.waitFor({ state: "detached" });
-  await page.getByText("EG-PARTIAL-01").waitFor();
+  await page.getByText("EG-PARTIAL-01").first().waitFor();
   await recordFrame(page, "demo-partial-payment", 4, ["[aria-label='Booking balance']"]);
   await screenshot(page, "03-payments.webp", ["[data-tour='payment-history']", "[data-tour='payment-action']"]);
   encodeDemo("demo-partial-payment");
@@ -359,7 +359,7 @@ async function captureCorrectionDemo(page) {
   await recordFrame(page, "demo-correction", 2, ["#payment-reason", "#payment-reference"]);
   await page.getByRole("button", { name: "Record correction" }).last().click();
   await page.getByRole("complementary", { name: "Record correction" }).waitFor({ state: "detached" });
-  await page.getByText("EG-CORRECTION-01").waitFor();
+  await page.getByText("EG-CORRECTION-01").first().waitFor();
   await recordFrame(page, "demo-correction", 3, ["[aria-label='Booking balance']"]);
   encodeDemo("demo-correction");
 }

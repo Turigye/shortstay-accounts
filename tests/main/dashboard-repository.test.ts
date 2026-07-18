@@ -59,6 +59,12 @@ describe("today overview", () => {
       customerName: "David K.",
       balance: 300_000,
     });
+    expect(overview.performance).toHaveLength(6);
+    expect(overview.performance.at(-1)).toMatchObject({
+      month: "2026-07",
+      collected: 700_000,
+      expenses: 80_000,
+    });
     expect(overview.warnings[0]).toMatchObject({ target: "payments" });
   });
 });
