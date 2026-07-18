@@ -264,7 +264,6 @@ export function SettingsScreen({
           <h1>Settings</h1>
           <p>{business.name}</p>
         </div>
-        <span className="settings-currency">UGX</span>
       </header>
 
       {error ? <div className="form-alert" role="alert">{error}</div> : null}
