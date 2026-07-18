@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3-multiple-ciphers";
 
-export const LATEST_SCHEMA_VERSION = 8;
+export const LATEST_SCHEMA_VERSION = 9;
 
 interface Migration {
   readonly version: number;
@@ -698,6 +698,39 @@ const CREATE_VERSION_EIGHT_SCHEMA = `
   BEGIN SELECT RAISE(ABORT, 'accounting month is closed'); END;
 `;
 
+const CREATE_VERSION_NINE_SCHEMA = `
+  CREATE TABLE users (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    username TEXT NOT NULL COLLATE NOCASE,
+    role TEXT NOT NULL CHECK (role IN ('admin', 'editor')),
+    password_salt TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE (business_id, username)
+  );
+  CREATE INDEX users_business_id_idx ON users(business_id);
+  CREATE TRIGGER users_touch_updated_at
+  AFTER UPDATE ON users
+  WHEN NEW.updated_at = OLD.updated_at
+  BEGIN
+    UPDATE users
+    SET updated_at = CASE
+      WHEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now') > OLD.updated_at
+        THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      ELSE strftime('%Y-%m-%dT%H:%M:%fZ', OLD.updated_at, '+0.001 seconds')
+    END
+    WHERE id = NEW.id;
+  END;
+  ALTER TABLE audit_events ADD COLUMN actor_user_id TEXT REFERENCES users(id);
+  ALTER TABLE payments ADD COLUMN created_by_user_id TEXT REFERENCES users(id);
+  CREATE INDEX audit_events_actor_user_id_idx ON audit_events(actor_user_id);
+  CREATE INDEX payments_created_by_user_id_idx ON payments(created_by_user_id);
+`;
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -764,6 +797,14 @@ const migrations: readonly Migration[] = [
     version: 8,
     up(database) {
       database.exec(CREATE_VERSION_EIGHT_SCHEMA);
+      database.prepare("update app_meta set value = ? where key = 'schema_version'")
+        .run(String(LATEST_SCHEMA_VERSION));
+    },
+  },
+  {
+    version: 9,
+    up(database) {
+      database.exec(CREATE_VERSION_NINE_SCHEMA);
       database.prepare("update app_meta set value = ? where key = 'schema_version'")
         .run(String(LATEST_SCHEMA_VERSION));
     },

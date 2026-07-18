@@ -11,6 +11,8 @@ import type { ExpenseRecord, RecurringExpenseTemplate, Supplier } from "../main/
 import type { AssetRecord, FinancialPosition, LoanRecord, PeriodClose } from "../main/db/repositories/finance-repository";
 import type { FinancialReport } from "../domain/accounting";
 import type { TodayOverview } from "../main/db/repositories/dashboard-repository";
+import type { AuthenticatedUser, UserProfile } from "../domain/users";
+import type { ReceiptDocument } from "../main/receipt-service";
 
 export const IPC_CHANNELS = {
   APP_READY: "app:ready",
@@ -18,6 +20,13 @@ export const IPC_CHANNELS = {
   BUSINESS_CREATE: "business:create",
   BUSINESS_UNLOCK: "business:unlock",
   BUSINESS_LOCK: "business:lock",
+  PROFILE_LOGIN: "profile:login",
+  PROFILE_LOGOUT: "profile:logout",
+  USERS_LIST: "users:list",
+  USER_CREATE_EDITOR: "users:create-editor",
+  USER_UPDATE: "users:update",
+  USER_RESET_PASSWORD: "users:reset-password",
+  USER_SET_ACTIVE: "users:set-active",
   BUSINESS_MANAGE_UNITS: "business:manage-units",
   BUSINESS_SET_RATE: "business:set-rate",
   CUSTOMERS_LIST: "customers:list",
@@ -39,6 +48,8 @@ export const IPC_CHANNELS = {
   PAYMENT_REFUND: "payments:refund",
   PAYMENT_CORRECTION: "payments:correction",
   PAYMENT_REVERSE: "payments:reverse",
+  RECEIPT_GET: "receipts:get",
+  RECEIPT_PRINT: "receipts:print",
   COMPENSATION_MONTHLY: "compensation:monthly",
   EXPENSES_LIST: "expenses:list", EXPENSE_CREATE: "expenses:create",
   SUPPLIERS_LIST: "suppliers:list", SUPPLIER_CREATE: "suppliers:create", SUPPLIER_PAYMENT: "suppliers:payment",
@@ -109,6 +120,56 @@ const businessUnlockRequestSchema = z
   .strict();
 const businessLockRequestSchema = z
   .object({ channel: z.literal(IPC_CHANNELS.BUSINESS_LOCK), payload: z.object({}).strict() })
+  .strict();
+const profileLoginRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.PROFILE_LOGIN),
+    payload: z.object({
+      username: z.string().trim().min(1).max(80),
+      password: passwordSchema,
+    }).strict(),
+  })
+  .strict();
+const profileLogoutRequestSchema = z
+  .object({ channel: z.literal(IPC_CHANNELS.PROFILE_LOGOUT), payload: z.object({}).strict() })
+  .strict();
+const usersListRequestSchema = z
+  .object({ channel: z.literal(IPC_CHANNELS.USERS_LIST), payload: z.object({}).strict() })
+  .strict();
+const createEditorRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.USER_CREATE_EDITOR),
+    payload: z.object({
+      name: z.string().trim().min(1).max(120),
+      username: z.string().trim().min(1).max(80),
+      password: passwordSchema.min(10),
+    }).strict(),
+  })
+  .strict();
+const updateUserRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.USER_UPDATE),
+    payload: z.object({
+      id: z.string().min(1),
+      name: z.string().trim().min(1).max(120),
+      username: z.string().trim().min(1).max(80),
+    }).strict(),
+  })
+  .strict();
+const resetUserPasswordRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.USER_RESET_PASSWORD),
+    payload: z.object({
+      id: z.string().min(1),
+      password: passwordSchema.min(10),
+    }).strict(),
+  })
+  .strict();
+const setUserActiveRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.USER_SET_ACTIVE),
+    payload: z.object({ id: z.string().min(1), active: z.boolean() }).strict(),
+  })
   .strict();
 const manageUnitsRequestSchema = z
   .object({
@@ -459,6 +520,18 @@ const paymentReverseRequestSchema = z
       .strict(),
   })
   .strict();
+const receiptGetRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.RECEIPT_GET),
+    payload: z.object({ paymentId: idSchema }).strict(),
+  })
+  .strict();
+const receiptPrintRequestSchema = z
+  .object({
+    channel: z.literal(IPC_CHANNELS.RECEIPT_PRINT),
+    payload: z.object({ paymentId: idSchema }).strict(),
+  })
+  .strict();
 const compensationMonthlyRequestSchema = z
   .object({
     channel: z.literal(IPC_CHANNELS.COMPENSATION_MONTHLY),
@@ -505,6 +578,13 @@ export const ipcRequestSchema = z.discriminatedUnion("channel", [
   businessCreateRequestSchema,
   businessUnlockRequestSchema,
   businessLockRequestSchema,
+  profileLoginRequestSchema,
+  profileLogoutRequestSchema,
+  usersListRequestSchema,
+  createEditorRequestSchema,
+  updateUserRequestSchema,
+  resetUserPasswordRequestSchema,
+  setUserActiveRequestSchema,
   manageUnitsRequestSchema,
   setRateRequestSchema,
   customersListRequestSchema,
@@ -526,6 +606,8 @@ export const ipcRequestSchema = z.discriminatedUnion("channel", [
   paymentRefundRequestSchema,
   paymentCorrectionRequestSchema,
   paymentReverseRequestSchema,
+  receiptGetRequestSchema,
+  receiptPrintRequestSchema,
   compensationMonthlyRequestSchema,
   ...expenseRequests,
   ...financeRequests,
@@ -537,6 +619,9 @@ export const IPC_FAILURE_CODES = [
   "INVALID_RESPONSE",
   "WRONG_PASSWORD",
   "LOCKED",
+  "AUTHENTICATION_REQUIRED",
+  "AUTHENTICATION_FAILED",
+  "FORBIDDEN",
   "NOT_FOUND",
   "ALREADY_EXISTS",
   "CONFLICT",
@@ -587,11 +672,30 @@ const businessSettingsSchema = z
       .strict(),
   })
   .strict();
+const authenticatedUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  username: z.string(),
+  role: z.enum(["admin", "editor"]),
+}).strict();
+const userProfileSchema = authenticatedUserSchema.extend({
+  active: z.boolean(),
+}).strict();
 const businessStatusSchema = z.discriminatedUnion("state", [
   z.object({ state: z.literal("setup") }).strict(),
-  z.object({ state: z.literal("locked") }).strict(),
-  z.object({ state: z.literal("ready"), business: businessSettingsSchema }).strict(),
+  z.object({ state: z.literal("databaseLocked") }).strict(),
+  z.object({ state: z.literal("profileLocked"), business: businessSettingsSchema }).strict(),
+  z.object({
+    state: z.literal("ready"),
+    business: businessSettingsSchema,
+    user: authenticatedUserSchema,
+  }).strict(),
 ]);
+const readyBusinessSessionSchema = z.object({
+  state: z.literal("ready"),
+  business: businessSettingsSchema,
+  user: authenticatedUserSchema,
+}).strict();
 const customerSchema = z
   .object({
     id: z.string(),
@@ -673,6 +777,29 @@ const paymentMovementSchema = z
     createdAt: z.string(),
   })
   .strict();
+const receiptDocumentSchema = z.object({
+  paymentId: z.string(),
+  reference: z.string(),
+  businessName: z.string(),
+  paidAt: dateTimeSchema,
+  guestName: z.string(),
+  guestPhone: z.string(),
+  unitName: z.string(),
+  occupancyMode: z.enum(["whole_unit", "one_room"]),
+  checkIn: dateSchema,
+  checkOut: dateSchema,
+  amount: positiveWholeUgxSchema,
+  amountWords: z.string(),
+  method: z.enum(["Cash", "Mobile money", "Bank transfer", "Card"]),
+  accountName: z.string(),
+  externalReference: z.string().nullable(),
+  bookingTotal: wholeUgxSchema.nonnegative(),
+  receivedAfter: wholeUgxSchema,
+  remainingBalance: wholeUgxSchema.nonnegative(),
+  receivedBy: z.string(),
+  receivedByUserId: z.string().nullable(),
+  reversed: z.boolean(),
+}).strict();
 const staffStatementLineSchema = z.object({
   role: roleSchema,
   base: wholeUgxSchema.nonnegative(),
@@ -730,9 +857,16 @@ function responseSchema<T extends z.ZodType>(data: T) {
 const responseSchemas = {
   [IPC_CHANNELS.APP_READY]: responseSchema(z.object({ ready: z.literal(true) }).strict()),
   [IPC_CHANNELS.BUSINESS_STATUS]: responseSchema(businessStatusSchema),
-  [IPC_CHANNELS.BUSINESS_CREATE]: responseSchema(businessSettingsSchema),
-  [IPC_CHANNELS.BUSINESS_UNLOCK]: responseSchema(businessSettingsSchema),
-  [IPC_CHANNELS.BUSINESS_LOCK]: responseSchema(z.object({ state: z.literal("locked") }).strict()),
+  [IPC_CHANNELS.BUSINESS_CREATE]: responseSchema(readyBusinessSessionSchema),
+  [IPC_CHANNELS.BUSINESS_UNLOCK]: responseSchema(readyBusinessSessionSchema),
+  [IPC_CHANNELS.BUSINESS_LOCK]: responseSchema(z.object({ state: z.literal("databaseLocked") }).strict()),
+  [IPC_CHANNELS.PROFILE_LOGIN]: responseSchema(readyBusinessSessionSchema),
+  [IPC_CHANNELS.PROFILE_LOGOUT]: responseSchema(z.object({ state: z.literal("profileLocked") }).strict()),
+  [IPC_CHANNELS.USERS_LIST]: responseSchema(z.array(userProfileSchema)),
+  [IPC_CHANNELS.USER_CREATE_EDITOR]: responseSchema(userProfileSchema),
+  [IPC_CHANNELS.USER_UPDATE]: responseSchema(userProfileSchema),
+  [IPC_CHANNELS.USER_RESET_PASSWORD]: responseSchema(z.object({ reset: z.literal(true) }).strict()),
+  [IPC_CHANNELS.USER_SET_ACTIVE]: responseSchema(userProfileSchema),
   [IPC_CHANNELS.BUSINESS_MANAGE_UNITS]: responseSchema(businessSettingsSchema),
   [IPC_CHANNELS.BUSINESS_SET_RATE]: responseSchema(businessSettingsSchema),
   [IPC_CHANNELS.CUSTOMERS_LIST]: responseSchema(z.array(customerSchema)),
@@ -754,6 +888,8 @@ const responseSchemas = {
   [IPC_CHANNELS.PAYMENT_REFUND]: responseSchema(paymentMovementSchema),
   [IPC_CHANNELS.PAYMENT_CORRECTION]: responseSchema(paymentMovementSchema),
   [IPC_CHANNELS.PAYMENT_REVERSE]: responseSchema(paymentMovementSchema),
+  [IPC_CHANNELS.RECEIPT_GET]: responseSchema(receiptDocumentSchema),
+  [IPC_CHANNELS.RECEIPT_PRINT]: responseSchema(z.object({ cancelled: z.boolean() }).strict()),
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: responseSchema(monthlyCompensationReportSchema),
   [IPC_CHANNELS.EXPENSES_LIST]: responseSchema(z.array(expenseSchema)), [IPC_CHANNELS.EXPENSE_CREATE]: responseSchema(expenseSchema),
   [IPC_CHANNELS.SUPPLIERS_LIST]: responseSchema(z.array(supplierSchema)), [IPC_CHANNELS.SUPPLIER_CREATE]: responseSchema(supplierSchema), [IPC_CHANNELS.SUPPLIER_PAYMENT]: responseSchema(expenseSchema),
@@ -783,11 +919,35 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.APP_READY]: { readonly ready: true };
   [IPC_CHANNELS.BUSINESS_STATUS]:
     | { readonly state: "setup" }
-    | { readonly state: "locked" }
-    | { readonly state: "ready"; readonly business: BusinessSettings };
-  [IPC_CHANNELS.BUSINESS_CREATE]: BusinessSettings;
-  [IPC_CHANNELS.BUSINESS_UNLOCK]: BusinessSettings;
-  [IPC_CHANNELS.BUSINESS_LOCK]: { readonly state: "locked" };
+    | { readonly state: "databaseLocked" }
+    | { readonly state: "profileLocked"; readonly business: BusinessSettings }
+    | {
+        readonly state: "ready";
+        readonly business: BusinessSettings;
+        readonly user: AuthenticatedUser;
+      };
+  [IPC_CHANNELS.BUSINESS_CREATE]: {
+    state: "ready";
+    business: BusinessSettings;
+    user: AuthenticatedUser;
+  };
+  [IPC_CHANNELS.BUSINESS_UNLOCK]: {
+    state: "ready";
+    business: BusinessSettings;
+    user: AuthenticatedUser;
+  };
+  [IPC_CHANNELS.BUSINESS_LOCK]: { readonly state: "databaseLocked" };
+  [IPC_CHANNELS.PROFILE_LOGIN]: {
+    state: "ready";
+    business: BusinessSettings;
+    user: AuthenticatedUser;
+  };
+  [IPC_CHANNELS.PROFILE_LOGOUT]: { readonly state: "profileLocked" };
+  [IPC_CHANNELS.USERS_LIST]: UserProfile[];
+  [IPC_CHANNELS.USER_CREATE_EDITOR]: UserProfile;
+  [IPC_CHANNELS.USER_UPDATE]: UserProfile;
+  [IPC_CHANNELS.USER_RESET_PASSWORD]: { readonly reset: true };
+  [IPC_CHANNELS.USER_SET_ACTIVE]: UserProfile;
   [IPC_CHANNELS.BUSINESS_MANAGE_UNITS]: BusinessSettings;
   [IPC_CHANNELS.BUSINESS_SET_RATE]: BusinessSettings;
   [IPC_CHANNELS.CUSTOMERS_LIST]: Customer[];
@@ -809,6 +969,8 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.PAYMENT_REFUND]: PaymentMovement;
   [IPC_CHANNELS.PAYMENT_CORRECTION]: PaymentMovement;
   [IPC_CHANNELS.PAYMENT_REVERSE]: PaymentMovement;
+  [IPC_CHANNELS.RECEIPT_GET]: ReceiptDocument;
+  [IPC_CHANNELS.RECEIPT_PRINT]: { readonly cancelled: boolean };
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: MonthlyCompensationReport;
   [IPC_CHANNELS.EXPENSES_LIST]: ExpenseRecord[]; [IPC_CHANNELS.EXPENSE_CREATE]: ExpenseRecord;
   [IPC_CHANNELS.SUPPLIERS_LIST]: Supplier[]; [IPC_CHANNELS.SUPPLIER_CREATE]: Supplier; [IPC_CHANNELS.SUPPLIER_PAYMENT]: ExpenseRecord;

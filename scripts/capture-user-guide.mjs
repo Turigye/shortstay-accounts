@@ -306,7 +306,7 @@ async function captureBookingDemo(page, fixture) {
   await page.locator("#booking-customer").selectOption(fixture.returningGuest.id);
   await page.locator("#booking-check-in").fill(localDate(9));
   await page.locator("#booking-check-out").fill(localDate(11));
-  await page.locator("#booking-nightly-rate").fill("110000");
+  await page.locator("#booking-rate").fill("110000");
   await recordFrame(page, "demo-booking", 2, ["#booking-unit", "#booking-customer", "[aria-label='Booking total']"]);
   await page.getByRole("button", { name: "Save booking" }).click();
   await page.getByRole("complementary", { name: "New booking" }).waitFor({ state: "detached" });
@@ -337,8 +337,13 @@ async function capturePartialPaymentDemo(page, bookingId) {
   await recordFrame(page, "demo-partial-payment", 2, ["#payment-amount", "#payment-account"]);
   await page.getByRole("button", { name: "Record receipt" }).last().click();
   await page.getByRole("complementary", { name: "Record receipt" }).waitFor({ state: "detached" });
+  const receipt = page.getByRole("dialog", { name: "Payment receipt" });
+  await receipt.waitFor();
+  await recordFrame(page, "demo-partial-payment", 3, [".receipt-reference", ".receipt-amount"]);
+  await receipt.getByRole("button", { name: "Done" }).click();
+  await receipt.waitFor({ state: "detached" });
   await page.getByText("EG-PARTIAL-01").waitFor();
-  await recordFrame(page, "demo-partial-payment", 3, ["[aria-label='Booking balance']"]);
+  await recordFrame(page, "demo-partial-payment", 4, ["[aria-label='Booking balance']"]);
   await screenshot(page, "03-payments.webp", ["[data-tour='payment-history']", "[data-tour='payment-action']"]);
   encodeDemo("demo-partial-payment");
 }

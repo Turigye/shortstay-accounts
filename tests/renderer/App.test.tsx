@@ -28,6 +28,12 @@ const business = {
   closedMonths: [],
   rateHistory: { staff: [], referral: [], taxProvision: [] },
 };
+const admin = {
+  id: "admin-1",
+  name: "Owner",
+  username: "admin",
+  role: "admin",
+};
 
 beforeEach(() => {
   localStorage.setItem(GUIDANCE_STORAGE_KEY, JSON.stringify({
@@ -38,7 +44,7 @@ beforeEach(() => {
   }));
   Object.defineProperty(window, "stayBooks", {
     configurable: true,
-    value: { invoke: vi.fn().mockResolvedValue({ ok: true, data: { state: "ready", business } }) },
+    value: { invoke: vi.fn().mockResolvedValue({ ok: true, data: { state: "ready", business, user: admin } }) },
   });
 });
 

@@ -261,6 +261,7 @@ function movementFromRow(row: MovementRow): PaymentMovement {
 export function createPaymentRepository(
   database: Database.Database,
   businessId: string,
+  actorUserId: string | null = null,
 ): PaymentRepository {
   const scopedBusinessId = requiredText(businessId, "businessId", "Business");
   const activeBusiness = database
@@ -273,7 +274,7 @@ export function createPaymentRepository(
       businessId: ["Use an active local business."],
     });
   }
-  const audit = createAuditRepository(database);
+  const audit = createAuditRepository(database, actorUserId);
   const accountSelect = `
     SELECT id, business_id, name, type, currency, archived_at, created_at, updated_at
     FROM accounts
@@ -435,15 +436,18 @@ export function createPaymentRepository(
         correctionOfId: string | null;
         additionalSettlement: number;
         reason: string | null;
+        actorUserId: string | null;
       }, { id: string }>(`
         INSERT INTO payments (
           business_id, booking_id, account_id, record_type, direction, amount,
           paid_at, method, reference, note,
-          reversal_of_id, correction_of_id, additional_settlement, reason
+          reversal_of_id, correction_of_id, additional_settlement, reason,
+          created_by_user_id
         ) VALUES (
           @businessId, @bookingId, @accountId, @recordType, @direction, @amount,
           @paidAt, @method, @reference, @note,
-          @reversalOfId, @correctionOfId, @additionalSettlement, @reason
+          @reversalOfId, @correctionOfId, @additionalSettlement, @reason,
+          @actorUserId
         ) RETURNING id
       `)
       .get({
@@ -461,6 +465,7 @@ export function createPaymentRepository(
         correctionOfId: input.correctionOfId ?? null,
         additionalSettlement: additionalSettlement ? 1 : 0,
         reason,
+        actorUserId,
       });
     if (!inserted) throw new Error("Payment movement could not be created");
     refreshBookingCompensation(database, scopedBusinessId, booking.id);

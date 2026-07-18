@@ -25,6 +25,7 @@ function serializeSnapshot(value: unknown): string | null {
 
 export function createAuditRepository(
   database: Database.Database,
+  actorUserId: string | null = null,
 ): AuditRepository {
   const insert = database.prepare<{
     entityType: string;
@@ -33,6 +34,7 @@ export function createAuditRepository(
     reason: string | null;
     beforeJson: string | null;
     afterJson: string | null;
+    actorUserId: string | null;
   }>(`
     INSERT INTO audit_events (
       entity_type,
@@ -40,14 +42,16 @@ export function createAuditRepository(
       action,
       reason,
       before_json,
-      after_json
+      after_json,
+      actor_user_id
     ) VALUES (
       @entityType,
       @entityId,
       @action,
       @reason,
       @beforeJson,
-      @afterJson
+      @afterJson,
+      @actorUserId
     )
   `);
 
@@ -66,6 +70,7 @@ export function createAuditRepository(
         reason: input.reason?.trim() || null,
         beforeJson: serializeSnapshot(input.before),
         afterJson: serializeSnapshot(input.after),
+        actorUserId,
       });
     },
   });

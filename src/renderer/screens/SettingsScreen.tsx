@@ -12,6 +12,7 @@ import {
   Download,
   FileSpreadsheet,
   Upload,
+  UserRound,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -28,6 +29,7 @@ import type { BusinessSettings, RoleKey } from "../../domain/types";
 import type { PaymentAccount } from "../../main/db/repositories/payment-repository";
 import type { SetRatePayload } from "../../shared/ipc";
 import { IPC_CHANNELS } from "../../shared/ipc";
+import { UserManager } from "../components/UserManager";
 
 type SettingsTab =
   | "units"
@@ -37,6 +39,7 @@ type SettingsTab =
   | "categories"
   | "accounts"
   | "backup"
+  | "users"
   | "security";
 
 interface SettingsScreenProps {
@@ -68,6 +71,7 @@ const TABS = [
   { id: "categories", label: "Categories", icon: ListTree },
   { id: "accounts", label: "Accounts", icon: Archive },
   { id: "backup", label: "Backup", icon: ShieldCheck },
+  { id: "users", label: "Users", icon: UserRound },
   { id: "security", label: "Security", icon: KeyRound },
 ] as const;
 
@@ -75,6 +79,7 @@ const tabTourTargets: Partial<Record<SettingsTab, string>> = {
   compensation: "effective-rates",
   tax: "tax-guidance",
   backup: "backup",
+  users: "users",
   security: "security",
 };
 
@@ -496,6 +501,7 @@ export function SettingsScreen({
               </div>
             </>
           ) : null}
+          {activeTab === "users" ? <UserManager /> : null}
         </section>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { RotateCcw, Wrench } from "lucide-react";
+import { Printer, RotateCcw, Wrench } from "lucide-react";
 
 import type { Booking } from "../../domain/bookings";
 import type { PaymentMovement } from "../../main/db/repositories/payment-repository";
@@ -8,6 +8,7 @@ interface BookingBalanceProps {
   readonly movements: readonly PaymentMovement[];
   readonly onCorrect?: (movement: PaymentMovement) => void;
   readonly onReverse?: (movement: PaymentMovement) => void;
+  readonly onPrint?: (movement: PaymentMovement) => void;
 }
 
 const methodLabels = {
@@ -40,6 +41,7 @@ export function BookingBalance({
   movements,
   onCorrect,
   onReverse,
+  onPrint,
 }: BookingBalanceProps) {
   const ordered = [...movements].sort(
     (left, right) =>
@@ -90,8 +92,19 @@ export function BookingBalance({
               <strong className="movement-amount" data-direction={movement.direction}>
                 {movement.direction === "receipt" ? "+" : "-"}{formatUgx(movement.amount)}
               </strong>
-              {onCorrect || onReverse ? (
+              {onCorrect || onReverse || onPrint ? (
                 <div className="movement-actions">
+                  {onPrint && movement.recordType === "receipt" ? (
+                    <button
+                      aria-label={`Print receipt ${movement.reference ?? movement.id}`}
+                      className="icon-button"
+                      onClick={() => onPrint(movement)}
+                      title="Print receipt"
+                      type="button"
+                    >
+                      <Printer aria-hidden="true" size={15} />
+                    </button>
+                  ) : null}
                   {onCorrect && movement.recordType !== "reversal" ? (
                     <button
                       aria-label={`Correct ${recordLabels[movement.recordType].toLocaleLowerCase()} ${movement.reference ?? movement.id}`}

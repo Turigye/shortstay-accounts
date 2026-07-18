@@ -3,6 +3,8 @@ import {
 } from "../db/repositories/business-repository";
 import { BookingRepositoryError } from "../db/repositories/booking-repository";
 import { PaymentRepositoryError } from "../db/repositories/payment-repository";
+import { UserRepositoryError } from "../db/repositories/user-repository";
+import { AuthorizationError } from "../authorization";
 import {
   IPC_CHANNELS,
   internalFailure,
@@ -44,7 +46,22 @@ const defaultHandlers: IpcHandlers = {
   [IPC_CHANNELS.BUSINESS_UNLOCK]: () => {
     throw new Error("Business session is unavailable");
   },
-  [IPC_CHANNELS.BUSINESS_LOCK]: () => ({ state: "locked" }),
+  [IPC_CHANNELS.BUSINESS_LOCK]: () => ({ state: "databaseLocked" }),
+  [IPC_CHANNELS.PROFILE_LOGIN]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.PROFILE_LOGOUT]: () => ({ state: "profileLocked" }),
+  [IPC_CHANNELS.USERS_LIST]: () => [],
+  [IPC_CHANNELS.USER_CREATE_EDITOR]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.USER_UPDATE]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.USER_RESET_PASSWORD]: () => ({ reset: true }),
+  [IPC_CHANNELS.USER_SET_ACTIVE]: () => {
+    throw new Error("Business session is unavailable");
+  },
   [IPC_CHANNELS.BUSINESS_MANAGE_UNITS]: () => {
     throw new Error("Business session is unavailable");
   },
@@ -100,6 +117,12 @@ const defaultHandlers: IpcHandlers = {
   [IPC_CHANNELS.PAYMENT_REVERSE]: () => {
     throw new Error("Business session is unavailable");
   },
+  [IPC_CHANNELS.RECEIPT_GET]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.RECEIPT_PRINT]: () => {
+    throw new Error("Desktop printing is unavailable");
+  },
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: () => {
     throw new Error("Business session is unavailable");
   },
@@ -120,6 +143,13 @@ const registeredChannels = [
   IPC_CHANNELS.BUSINESS_CREATE,
   IPC_CHANNELS.BUSINESS_UNLOCK,
   IPC_CHANNELS.BUSINESS_LOCK,
+  IPC_CHANNELS.PROFILE_LOGIN,
+  IPC_CHANNELS.PROFILE_LOGOUT,
+  IPC_CHANNELS.USERS_LIST,
+  IPC_CHANNELS.USER_CREATE_EDITOR,
+  IPC_CHANNELS.USER_UPDATE,
+  IPC_CHANNELS.USER_RESET_PASSWORD,
+  IPC_CHANNELS.USER_SET_ACTIVE,
   IPC_CHANNELS.BUSINESS_MANAGE_UNITS,
   IPC_CHANNELS.BUSINESS_SET_RATE,
   IPC_CHANNELS.CUSTOMERS_LIST,
@@ -141,6 +171,8 @@ const registeredChannels = [
   IPC_CHANNELS.PAYMENT_REFUND,
   IPC_CHANNELS.PAYMENT_CORRECTION,
   IPC_CHANNELS.PAYMENT_REVERSE,
+  IPC_CHANNELS.RECEIPT_GET,
+  IPC_CHANNELS.RECEIPT_PRINT,
   IPC_CHANNELS.COMPENSATION_MONTHLY,
   IPC_CHANNELS.EXPENSES_LIST,IPC_CHANNELS.EXPENSE_CREATE,IPC_CHANNELS.SUPPLIERS_LIST,IPC_CHANNELS.SUPPLIER_CREATE,IPC_CHANNELS.SUPPLIER_PAYMENT,IPC_CHANNELS.RECURRING_EXPENSES_LIST,IPC_CHANNELS.RECURRING_EXPENSE_CREATE,
   IPC_CHANNELS.FINANCE_OVERVIEW,IPC_CHANNELS.BALANCE_SAVE,IPC_CHANNELS.INVENTORY_SAVE,IPC_CHANNELS.ASSET_CREATE,IPC_CHANNELS.ASSET_UPDATE,IPC_CHANNELS.LOAN_CREATE,IPC_CHANNELS.LOAN_UPDATE,IPC_CHANNELS.PERIOD_CLOSE,IPC_CHANNELS.PERIOD_REOPEN,
@@ -158,8 +190,23 @@ export function createBusinessIpcHandlers(
     [IPC_CHANNELS.BUSINESS_UNLOCK]: ({ password }) => session.unlock(password),
     [IPC_CHANNELS.BUSINESS_LOCK]: () => {
       session.lock();
-      return { state: "locked" };
+      return { state: "databaseLocked" };
     },
+    [IPC_CHANNELS.PROFILE_LOGIN]: (payload) => session.login(payload),
+    [IPC_CHANNELS.PROFILE_LOGOUT]: () => {
+      session.logout();
+      return { state: "profileLocked" };
+    },
+    [IPC_CHANNELS.USERS_LIST]: () => session.listUsers(),
+    [IPC_CHANNELS.USER_CREATE_EDITOR]: (payload) => session.createEditor(payload),
+    [IPC_CHANNELS.USER_UPDATE]: ({ id, ...payload }) =>
+      session.updateUserIdentity(id, payload),
+    [IPC_CHANNELS.USER_RESET_PASSWORD]: ({ id, password }) => {
+      session.resetEditorPassword(id, password);
+      return { reset: true };
+    },
+    [IPC_CHANNELS.USER_SET_ACTIVE]: ({ id, active }) =>
+      session.setUserActive(id, active),
     [IPC_CHANNELS.BUSINESS_MANAGE_UNITS]: (payload) => session.manageUnits(payload),
     [IPC_CHANNELS.BUSINESS_SET_RATE]: (payload) => session.setRate(payload),
     [IPC_CHANNELS.CUSTOMERS_LIST]: () => session.listCustomers(),
@@ -193,6 +240,7 @@ export function createBusinessIpcHandlers(
     [IPC_CHANNELS.PAYMENT_REFUND]: (payload) => session.recordRefund(payload),
     [IPC_CHANNELS.PAYMENT_CORRECTION]: (payload) => session.recordCorrection(payload),
     [IPC_CHANNELS.PAYMENT_REVERSE]: (payload) => session.reversePayment(payload),
+    [IPC_CHANNELS.RECEIPT_GET]: ({ paymentId }) => session.getReceipt(paymentId),
     [IPC_CHANNELS.COMPENSATION_MONTHLY]: ({ month }) =>
       session.getMonthlyCompensation(month),
     [IPC_CHANNELS.EXPENSES_LIST]:()=>session.listExpenses(), [IPC_CHANNELS.EXPENSE_CREATE]:(payload)=>session.createExpense(payload),
@@ -241,6 +289,12 @@ export function registerIpcHandlers(
         }
         if (error instanceof PaymentRepositoryError) {
           return publicFailure(error.code, error.message, error.fieldErrors);
+        }
+        if (error instanceof UserRepositoryError) {
+          return publicFailure(error.code, error.message);
+        }
+        if (error instanceof AuthorizationError) {
+          return publicFailure(error.code, error.message);
         }
         console.error(`[IPC] ${channel} failed`, error);
         return internalFailure();

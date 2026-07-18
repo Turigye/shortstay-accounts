@@ -15,6 +15,9 @@ import {
   type PaymentEditorMode,
   type PaymentEditorValue,
 } from "../components/PaymentEditor";
+import { useAppStore } from "../store/app-store";
+import type { ReceiptDocument } from "../../main/receipt-service";
+import { ReceiptDialog } from "../components/ReceiptDialog";
 
 function firstError(failure: IpcFailure): string {
   return Object.values(failure.fieldErrors)[0]?.[0] ?? failure.message;
@@ -31,6 +34,7 @@ type EditorState =
   | { mode: "correction"; movement: PaymentMovement };
 
 export function PaymentsScreen() {
+  const isEditor = useAppStore(({ user }) => user?.role === "editor");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
   const [movements, setMovements] = useState<PaymentMovement[]>([]);
@@ -50,6 +54,7 @@ export function PaymentsScreen() {
   const [reversalBusy, setReversalBusy] = useState(false);
   const [reversalError, setReversalError] = useState<string | null>(null);
   const [confirmReversalOverpayment, setConfirmReversalOverpayment] = useState(false);
+  const [receipt, setReceipt] = useState<ReceiptDocument | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -107,6 +112,18 @@ export function PaymentsScreen() {
     );
   }
 
+  async function openReceipt(paymentId: string) {
+    setError(null);
+    const result = await window.stayBooks.invoke(IPC_CHANNELS.RECEIPT_GET, { paymentId });
+    if (!result.ok) return setError(firstError(result));
+    setReceipt(result.data);
+  }
+
+  async function printReceipt(paymentId: string) {
+    const result = await window.stayBooks.invoke(IPC_CHANNELS.RECEIPT_PRINT, { paymentId });
+    if (!result.ok) setError(firstError(result));
+  }
+
   async function recordPayment(value: PaymentEditorValue): Promise<void> {
     if (!selectedBooking) return;
     setError(null);
@@ -136,6 +153,7 @@ export function PaymentsScreen() {
     }
     applyMovement(result.data);
     setEditor(null);
+    if (result.data.recordType === "receipt") await openReceipt(result.data.id);
   }
 
   function editAccount(account: PaymentAccount) {
@@ -265,9 +283,9 @@ export function PaymentsScreen() {
           <p>Collections, refunds, account routing, and customer balances.</p>
         </div>
         <div>
-          <button className="secondary-button compact-button" onClick={openAccounts} type="button">
+          {!isEditor ? <button className="secondary-button compact-button" onClick={openAccounts} type="button">
             <WalletCards aria-hidden="true" size={16} /> Accounts
-          </button>
+          </button> : null}
           <button
             className="primary-button compact-button"
             data-tour="payment-action"
@@ -289,7 +307,7 @@ export function PaymentsScreen() {
             ))}
           </select>
         </div>
-        {selectedBooking ? (
+        {selectedBooking && !isEditor ? (
           <button className="secondary-button compact-button" onClick={() => openEditor({ mode: "refund", movement: null })} type="button">
             Record refund
           </button>
@@ -313,8 +331,9 @@ export function PaymentsScreen() {
               <BookingBalance
                 booking={selectedBooking}
                 movements={selectedMovements}
-                onCorrect={(movement) => openEditor({ mode: "correction", movement })}
-                onReverse={beginReversal}
+                onCorrect={isEditor ? undefined : (movement) => openEditor({ mode: "correction", movement })}
+                onReverse={isEditor ? undefined : beginReversal}
+                onPrint={(movement) => void openReceipt(movement.id)}
               />
             </>
           ) : (
@@ -361,6 +380,13 @@ export function PaymentsScreen() {
           </aside>
         ) : null}
       </div>
+      {receipt ? (
+        <ReceiptDialog
+          onClose={() => setReceipt(null)}
+          onPrint={printReceipt}
+          receipt={receipt}
+        />
+      ) : null}
     </section>
   );
 }

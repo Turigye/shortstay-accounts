@@ -18,10 +18,10 @@ export const guideChapters: GuideChapter[] = [
     ],
   },
   {
-    id: "money", title: "Money In and Money Out", screen: "payments", keywords: ["payment", "receipt", "refund", "reversal", "correction", "expense", "supplier", "recurring"],
+    id: "money", title: "Money In and Money Out", screen: "payments", keywords: ["payment", "receipt", "print", "pdf", "refund", "reversal", "correction", "expense", "supplier", "recurring"],
     summary: "Record collections and costs while preserving the audit trail.",
     sections: [
-      { heading: "Collections", paragraphs: ["Choose the account and booking when recording a receipt. Partial payments leave an outstanding balance; payment allocation keeps each booking balance accurate.", "Record a refund when money is returned to a customer. Use a reversal or correction to correct a recorded movement instead of silently replacing history."] },
+      { heading: "Collections and receipts", paragraphs: ["Choose the account and booking when recording a receipt. Partial payments leave an outstanding balance; payment allocation keeps each booking balance accurate.", "The receipt opens after an incoming payment is saved. Use Print receipt to choose a printer or Save as PDF. Reopen it later with the printer button in payment history.", "Record a refund when money is returned to a customer. Use a reversal or correction to correct a recorded movement instead of silently replacing history."] },
       { heading: "Costs and suppliers", paragraphs: ["Add Visa or another card in Settings > Accounts, then choose it when recording the expense. Supplier credit records an amount due for later supplier payment.", "For Netflix, Yaka service fees, and similar costs, open Expenses > Recurring review > New template, choose Monthly, and confirm the real bill when due."] },
     ],
   },
@@ -51,11 +51,12 @@ export const guideChapters: GuideChapter[] = [
     ],
   },
   {
-    id: "administration", title: "Administration and Safety", screen: "settings", keywords: ["units", "rate", "category", "account", "backup", "restore", "export", "lock", "password", "local"],
+    id: "administration", title: "Administration and Safety", screen: "settings", keywords: ["admin", "editor", "user", "profile", "sign in", "units", "rate", "category", "account", "backup", "restore", "export", "lock", "password", "local"],
     summary: "Maintain settings and protect the local accounting file.",
     sections: [
+      { heading: "Profiles and permissions", paragraphs: ["The Admin has full access. In Settings > Users, the Admin can add an Editor, reset an Editor password, or deactivate the profile.", "An Editor can view Today, add or update active bookings, record incoming payments, and print receipts. Editors cannot access expenses, reports, settings, refunds, reversals, account management, or destructive booking actions."] },
       { heading: "Configuration", paragraphs: ["Manage units, effective-dated rates, categories, and payment accounts from Settings. Add a Card / Visa account before recording card-paid expenses.", "Changing a historical or closed-period rate requires a reason."] },
-      { heading: "Safety", paragraphs: ["Create encrypted backups regularly and keep them somewhere separate from the computer. Restore requires explicit overwrite confirmation because it replaces local data.", "Export creates a workbook for review. Data is stored locally only; password responsibility remains with the business owner."] },
+      { heading: "Safety", paragraphs: ["Lock returns to profile sign-in without deleting work. Each person should use their own username and password.", "Create encrypted backups regularly and keep them somewhere separate from the computer. Restore requires explicit overwrite confirmation because it replaces local data.", "Export creates a workbook for review. Data is stored locally only; password responsibility remains with the business owner."] },
     ],
   },
 ];
@@ -101,6 +102,7 @@ export const tourDefinitions: TourDefinition[] = [
     { id: "unit-settings", screen: "settings", target: "unit-settings", title: "Manage units", body: "Keep active units and their details current." },
     { id: "effective-rates", screen: "settings", target: "effective-rates", title: "Date rate changes", body: "Select the Compensation tab to review effective-dated role allocations, then record a rate change; effective dates retain the calculation basis for historical periods." },
     { id: "backup", screen: "settings", target: "backup", title: "Create encrypted backups", body: "Choose Backup to open the Backup section. Then enter the local password and use Create backup to store the encrypted copy separately." },
+    { id: "users", screen: "settings", target: "users", title: "Give limited access", body: "Choose Users to add an Editor who can manage active bookings, record incoming payments, and print receipts without seeing the Admin-only accounting areas." },
     { id: "restore", screen: "settings", target: "restore", title: "Restore deliberately", body: "Choose Restore shortcut to open the Backup section. Then use Restore only after reviewing the overwrite confirmation because it replaces local data." },
     { id: "security", screen: "settings", target: "security", title: "Keep the password safe", body: "Select the Security tab to review encrypted local access, then lock the application. Storage is local only, and the business owner is responsible for the password." },
   ] },
@@ -129,6 +131,8 @@ export const glossaryEntries: GlossaryEntry[] = [
   { term: "Collected", definition: "Booking revenue actually received, used for staff allocation calculations." },
   { term: "Outstanding", definition: "The amount still due on a booking after recorded movements." },
   { term: "Receipt", definition: "A recorded collection into a cash, bank, or mobile-money account." },
+  { term: "Admin", definition: "A full-access local profile that manages accounting, settings, backups, and Editor profiles." },
+  { term: "Editor", definition: "A restricted local profile that manages active bookings, incoming payments, and receipts only." },
   { term: "Refund", definition: "Money returned to a customer." },
   { term: "Reversal", definition: "A separate record that reverses a previous money movement while preserving history." },
   { term: "Supplier credit", definition: "An expense received now and payable to the supplier later." },
