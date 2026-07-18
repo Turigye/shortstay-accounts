@@ -160,6 +160,7 @@ export interface BusinessSession {
   recordInventory(input:Parameters<FinanceRepository["recordInventory"]>[0]):FinancialPosition;
   createAsset(input:Parameters<FinanceRepository["createAsset"]>[0]):AssetRecord;
   updateAsset(id:string,input:Parameters<FinanceRepository["updateAsset"]>[1]):AssetRecord;
+  archiveAsset(id:string):void;
   createLoan(input:Parameters<FinanceRepository["createLoan"]>[0]):LoanRecord;
   updateLoan(id:string,input:Parameters<FinanceRepository["updateLoan"]>[1]):LoanRecord;
   closeMonth(month:string):PeriodClose;
@@ -529,6 +530,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     recordInventory(input) { requireCapability("admin.all"); return finance().recordInventory(input); },
     createAsset(input) { requireCapability("admin.all"); return finance().createAsset(input); },
     updateAsset(id,input) { requireCapability("admin.all"); return finance().updateAsset(id,input); },
+    archiveAsset(id) { requireCapability("admin.all"); return finance().archiveAsset(id); },
     createLoan(input) { requireCapability("admin.all"); return finance().createLoan(input); },
     updateLoan(id,input) { requireCapability("admin.all"); return finance().updateLoan(id,input); },
     closeMonth(month) { requireCapability("admin.all"); return finance().closeMonth(month); },

@@ -74,6 +74,8 @@ describe("financial position and month close", () => {
       purchaseDate: "2026-07-02",
       purchaseAmount: 750_000,
     })).toMatchObject({ description: "Guest room bed", purchaseAmount: 750_000 });
+    finance.archiveAsset(asset.id);
+    expect(finance.listAssets()).toEqual([]);
     expect(finance.updateLoan(loan.id, {
       lender: "Aurevia Enterprise",
       kind: "non_bank",

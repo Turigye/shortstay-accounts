@@ -2109,14 +2109,16 @@ textarea:focus-visible {
 
 .status-badge {
   display: inline-flex;
-  min-height: 24px;
+  height: 24px;
   align-items: center;
+  justify-content: center;
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
   background: var(--color-surface-subtle);
   color: var(--color-ink);
   font-size: var(--text-xs);
   font-weight: 700;
+  line-height: 1;
   white-space: nowrap;
 }
 
@@ -2261,8 +2263,8 @@ textarea:focus-visible {
   gap: var(--space-2);
 }
 
-.payments-header > .page-actions {
-  align-items: flex-end;
+.payments-header > div.page-actions {
+  align-items: end;
 }
 
 .page-actions > .icon-button {
@@ -2273,6 +2275,26 @@ textarea:focus-visible {
 .page-actions > .primary-button,
 .page-actions > .secondary-button {
   min-height: var(--control-height);
+}
+
+.unit-setting-row > .unit-row-actions {
+  min-height: var(--control-height);
+  align-self: end;
+}
+
+.unit-setting-row > .unit-row-actions .icon-button {
+  width: var(--control-height);
+  height: var(--control-height);
+}
+
+.table-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.danger-action {
+  color: var(--color-danger);
 }
 
 .payments-toolbar {
