@@ -15,6 +15,7 @@ import type {
   PaymentMovement,
 } from "../../main/db/repositories/payment-repository";
 import { IPC_CHANNELS, type IpcFailure } from "../../shared/ipc";
+import { useAppStore } from "../store/app-store";
 import {
   BookingEditor,
   type BookingEditorValue,
@@ -83,6 +84,7 @@ function firstError(failure: IpcFailure): string {
 }
 
 export function BookingsScreen({ units, today = todayString() }: BookingsScreenProps) {
+  const isEditor = useAppStore(({ user }) => user?.role === "editor");
   const [view, setView] = useState<View>("schedule");
   const [startDate, setStartDate] = useState(today);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -392,6 +394,7 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
 
         {editorOpen ? (
           <BookingEditor
+            allowAdminActions={!isEditor}
             accounts={accounts}
             booking={selectedBooking}
             busy={busy}
@@ -402,7 +405,7 @@ export function BookingsScreen({ units, today = todayString() }: BookingsScreenP
             initialUnitId={editorSeed?.unitId}
             onCancel={closeEditor}
             onCreateCustomer={createCustomer}
-            onRemove={removeBooking}
+            onRemove={isEditor ? undefined : removeBooking}
             onSave={saveBooking}
             onTransition={transitionBooking}
             movements={movements.filter(({ bookingId }) => bookingId === selectedBooking?.id)}

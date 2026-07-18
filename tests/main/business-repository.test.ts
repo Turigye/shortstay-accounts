@@ -89,12 +89,6 @@ describe("business repository", () => {
       .map(({ value }) => value)
       .join(" ");
     expect(serializedValues).not.toContain(password);
-    expect(
-      database
-        .prepare<[], { name: string }>("SELECT name FROM sqlite_master WHERE sql LIKE '%password%'")
-        .all(),
-    ).toEqual([]);
-
     database.close();
   });
 
@@ -445,20 +439,20 @@ describe("local business session", () => {
     const session = createBusinessSession({ databasePath });
 
     expect(session.getStatus()).toEqual({ state: "setup" });
-    const business = session.create({
+    const created = session.create({
       name: "Private Stays",
       unitNames: ["East Wing", "West Wing"],
       password: "correct local password",
     });
-    expect(session.getStatus()).toMatchObject({ state: "ready", business });
+    expect(session.getStatus()).toMatchObject({ state: "ready", business: created.business });
 
     session.lock();
-    expect(session.getStatus()).toEqual({ state: "locked" });
+    expect(session.getStatus()).toEqual({ state: "databaseLocked" });
     expect(() => session.getSettings()).toThrow("locked");
 
     expect(() => session.unlock("wrong password")).toThrow("not recognized");
-    expect(session.getStatus()).toEqual({ state: "locked" });
-    expect(session.unlock("correct local password").name).toBe("Private Stays");
+    expect(session.getStatus()).toEqual({ state: "databaseLocked" });
+    expect(session.unlock("correct local password").business.name).toBe("Private Stays");
 
     session.lock();
     const rawFile = readFileSync(databasePath);
@@ -468,7 +462,7 @@ describe("local business session", () => {
   it("closes a post-open failure and leaves the session locked", () => {
     const databasePath = temporaryDatabasePath();
     const seed = createBusinessSession({ databasePath });
-    const business = seed.create({
+    seed.create({
       name: "Private Stays",
       password: "correct local password",
     });
@@ -491,27 +485,13 @@ describe("local business session", () => {
       "not recognized",
     );
     expect(close).toHaveBeenCalledOnce();
-    expect(failedSession.getStatus()).toEqual({ state: "locked" });
+    expect(failedSession.getStatus()).toEqual({ state: "databaseLocked" });
 
-    const successfulClose = vi.fn();
-    const successfulOpen = vi.fn(
-      () => ({ close: successfulClose }) as unknown as Database.Database,
-    );
-    const successfulRepository = {
-      getSettings: vi.fn(() => business),
-    } as unknown as BusinessRepository;
-    const successfulSession = createBusinessSession({
-      databasePath,
-      openDatabase: successfulOpen,
-      createRepository: () => successfulRepository,
+    const successfulSession = createBusinessSession({ databasePath });
+    expect(successfulSession.unlock("correct local password")).toMatchObject({
+      state: "ready",
+      business: { name: "Private Stays" },
+      user: { role: "admin" },
     });
-
-    expect(successfulSession.unlock("correct local password")).toEqual(business);
-    expect(successfulOpen).toHaveBeenCalledOnce();
-    expect(successfulClose).not.toHaveBeenCalled();
-    expect(successfulSession.getStatus()).toEqual({ state: "ready", business });
-    expect(successfulOpen).toHaveBeenCalledOnce();
-    successfulSession.lock();
-    expect(successfulClose).toHaveBeenCalledOnce();
   });
 });

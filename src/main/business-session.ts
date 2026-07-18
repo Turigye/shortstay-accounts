@@ -20,6 +20,9 @@ import {
 } from "./db/repositories/booking-repository";
 import type { Booking, Customer } from "../domain/bookings";
 import type { BookingStatus } from "../domain/types";
+import type { AuthenticatedUser, Capability } from "../domain/users";
+import { assertCapability } from "./authorization";
+import type { CredentialVault } from "./credential-vault";
 import {
   createPaymentRepository,
   type AccountInput,
@@ -41,6 +44,12 @@ import { createFinanceRepository, type AssetRecord, type FinancialPosition, type
 import { createDashboardRepository, type TodayOverview } from "./db/repositories/dashboard-repository";
 import { backupEncryptedDatabase,restoreEncryptedDatabase,validateEncryptedBackup } from "./backup";
 import { exportBusinessWorkbook } from "./export";
+import {
+  createUserRepository,
+  type CreateEditorInput,
+  type UserRecord,
+  type UserRepository,
+} from "./db/repositories/user-repository";
 
 type ExpenseRepository = ReturnType<typeof createExpenseRepository>;
 type FinanceRepository = ReturnType<typeof createFinanceRepository>;
@@ -48,8 +57,15 @@ type DashboardRepository = ReturnType<typeof createDashboardRepository>;
 
 export type BusinessSessionStatus =
   | { state: "setup" }
-  | { state: "locked" }
-  | { state: "ready"; business: BusinessSettings };
+  | { state: "databaseLocked" }
+  | { state: "profileLocked"; business: BusinessSettings }
+  | {
+      state: "ready";
+      business: BusinessSettings;
+      user: AuthenticatedUser;
+    };
+
+export type ReadyBusinessSession = Extract<BusinessSessionStatus, { state: "ready" }>;
 
 export class BusinessSessionError extends Error {
   constructor(
@@ -63,10 +79,19 @@ export class BusinessSessionError extends Error {
 
 interface BusinessSessionOptions {
   databasePath: string;
+  credentialVault?: CredentialVault;
   openDatabase?: typeof openEncryptedDatabase;
   createRepository?: (database: Database.Database) => BusinessRepository;
-  createBookingRepository?: (database: Database.Database, businessId: string) => BookingRepository;
-  createPaymentRepository?: (database: Database.Database, businessId: string) => PaymentRepository;
+  createBookingRepository?: (
+    database: Database.Database,
+    businessId: string,
+    actorUserId?: string | null,
+  ) => BookingRepository;
+  createPaymentRepository?: (
+    database: Database.Database,
+    businessId: string,
+    actorUserId?: string | null,
+  ) => PaymentRepository;
   createCompensationRepository?: (database: Database.Database, businessId: string) => CompensationRepository;
   createExpenseRepository?: (database: Database.Database, businessId: string) => ExpenseRepository;
   createFinanceRepository?: (database: Database.Database, businessId: string) => FinanceRepository;
@@ -75,9 +100,17 @@ interface BusinessSessionOptions {
 
 export interface BusinessSession {
   getStatus(): BusinessSessionStatus;
-  create(input: CreateBusinessInput): BusinessSettings;
-  unlock(password: string): BusinessSettings;
+  create(input: CreateBusinessInput): ReadyBusinessSession;
+  unlock(password: string): ReadyBusinessSession;
+  login(input: { username: string; password: string }): ReadyBusinessSession;
+  logout(): void;
   lock(): void;
+  getCurrentUser(): AuthenticatedUser | null;
+  listUsers(): UserRecord[];
+  createEditor(input: CreateEditorInput): UserRecord;
+  updateUserIdentity(id: string, input: { name: string; username: string }): UserRecord;
+  resetEditorPassword(id: string, password: string): void;
+  setUserActive(id: string, active: boolean): UserRecord;
   getSettings(): BusinessSettings;
   manageUnits(input: ManageUnitsInput): BusinessSettings;
   setRate(input: SetRateInput): BusinessSettings;
@@ -134,6 +167,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
   const createFinance = options.createFinanceRepository ?? createFinanceRepository;
   const createDashboard = options.createDashboardRepository ?? createDashboardRepository;
   let database: Database.Database | undefined;
+  let activeUser: AuthenticatedUser | null = null;
 
   function repository() {
     if (!database) {
@@ -148,7 +182,7 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     }
     const business = repository().getSettings();
     if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
-    return createBookings(database, business.businessId);
+    return createBookings(database, business.businessId, activeUser?.id ?? null);
   }
 
   function payments(): PaymentRepository {
@@ -157,7 +191,49 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     }
     const business = repository().getSettings();
     if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
-    return createPayments(database, business.businessId);
+    return createPayments(database, business.businessId, activeUser?.id ?? null);
+  }
+
+  function users(): UserRepository {
+    if (!database) {
+      throw new BusinessSessionError("LOCKED", "The business file is locked.");
+    }
+    const business = repository().getSettings();
+    if (!business) throw new BusinessSessionError("NOT_FOUND", "Business settings are missing.");
+    return createUserRepository(database, business.businessId);
+  }
+
+  function requireCapability(capability: Capability): void {
+    assertCapability(activeUser, capability);
+  }
+
+  function readyStatus(): ReadyBusinessSession {
+    if (!activeUser) throw new BusinessSessionError("LOCKED", "A user profile is not signed in.");
+    return {
+      state: "ready",
+      business: repository().getSettings() as BusinessSettings,
+      user: activeUser,
+    };
+  }
+
+  function saveDatabaseSecret(password: string): void {
+    try {
+      options.credentialVault?.save(password);
+    } catch {
+      // OS storage is optional; the existing database-password unlock remains available.
+    }
+  }
+
+  const savedSecret = existsSync(options.databasePath)
+    ? options.credentialVault?.load() ?? null
+    : null;
+  if (savedSecret) {
+    try {
+      database = openDatabase(options.databasePath, savedSecret);
+    } catch {
+      database = undefined;
+      options.credentialVault?.clear();
+    }
   }
 
   function compensation(): CompensationRepository {
@@ -191,22 +267,30 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     }
   }
 
-  return Object.freeze({
+  const session: BusinessSession = {
     getStatus(): BusinessSessionStatus {
       if (database) {
         const business = repository().getSettings();
-        return business ? { state: "ready", business } : { state: "setup" };
+        if (!business) return { state: "setup" };
+        return activeUser
+          ? { state: "ready", business, user: activeUser }
+          : { state: "profileLocked", business };
       }
-      return existsSync(options.databasePath) ? { state: "locked" } : { state: "setup" };
+      return existsSync(options.databasePath)
+        ? { state: "databaseLocked" }
+        : { state: "setup" };
     },
 
-    create(input: CreateBusinessInput): BusinessSettings {
+    create(input: CreateBusinessInput): ReadyBusinessSession {
       if (database || existsSync(options.databasePath)) {
         throw new BusinessSessionError("ALREADY_EXISTS", "A local business file already exists.");
       }
       try {
         database = openDatabase(options.databasePath, input.password);
-        return repository().create(input);
+        repository().create(input);
+        activeUser = users().bootstrapAdmin(input.password);
+        saveDatabaseSecret(input.password);
+        return readyStatus();
       } catch (error) {
         database?.close();
         database = undefined;
@@ -215,8 +299,8 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
       }
     },
 
-    unlock(password: string): BusinessSettings {
-      if (database) return repository().getSettings() as BusinessSettings;
+    unlock(password: string): ReadyBusinessSession {
+      if (database && activeUser) return readyStatus();
       if (!existsSync(options.databasePath)) {
         throw new BusinessSessionError("NOT_FOUND", "No local business file was found.");
       }
@@ -230,7 +314,9 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
         }
         database = opened;
         opened = undefined;
-        return business;
+        activeUser = users().bootstrapAdmin(password);
+        saveDatabaseSecret(password);
+        return readyStatus();
       } catch {
         opened?.close();
         database = undefined;
@@ -241,122 +327,195 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
       }
     },
 
+    login(input): ReadyBusinessSession {
+      activeUser = users().authenticate(input.username, input.password);
+      return readyStatus();
+    },
+
+    logout(): void {
+      activeUser = null;
+    },
+
     lock(): void {
+      activeUser = null;
       database?.close();
       database = undefined;
     },
 
+    getCurrentUser(): AuthenticatedUser | null {
+      return activeUser;
+    },
+
+    listUsers(): UserRecord[] {
+      requireCapability("users.manage");
+      return users().list();
+    },
+
+    createEditor(input: CreateEditorInput): UserRecord {
+      requireCapability("users.manage");
+      return users().createEditor(input);
+    },
+
+    updateUserIdentity(
+      id: string,
+      input: { name: string; username: string },
+    ): UserRecord {
+      requireCapability("users.manage");
+      return users().updateIdentity(id, input);
+    },
+
+    resetEditorPassword(id: string, password: string): void {
+      requireCapability("users.manage");
+      users().resetEditorPassword(id, password);
+    },
+
+    setUserActive(id: string, active: boolean): UserRecord {
+      requireCapability("users.manage");
+      return users().setActive(id, active);
+    },
+
     getSettings(): BusinessSettings {
-      return repository().getSettings() as BusinessSettings;
+      const settings = repository().getSettings() as BusinessSettings;
+      requireCapability("admin.all");
+      return settings;
     },
 
     manageUnits(input: ManageUnitsInput): BusinessSettings {
+      requireCapability("admin.all");
       return repository().manageUnits(input);
     },
 
     setRate(input: SetRateInput): BusinessSettings {
+      requireCapability("admin.all");
       return repository().setRate(input);
     },
 
     listCustomers(): Customer[] {
+      requireCapability("booking.read");
       return bookings().listCustomers();
     },
 
     createCustomer(input: CustomerInput): Customer {
+      requireCapability("booking.create");
       return bookings().createCustomer(input);
     },
 
     updateCustomer(id: string, input: CustomerInput): Customer {
+      requireCapability("booking.update");
       return bookings().updateCustomer(id, input);
     },
 
     archiveCustomer(id: string): void {
+      requireCapability("admin.all");
       bookings().archiveCustomer(id);
     },
 
     listBookings(filter: BookingListFilter = {}): Booking[] {
+      requireCapability("booking.read");
       return bookings().listBookings(filter);
     },
 
     getBooking(id: string): Booking {
+      requireCapability("booking.read");
       return bookings().getBooking(id);
     },
 
     createBooking(input: BookingInput): Booking {
+      requireCapability("booking.create");
+      if (activeUser?.role === "editor" && input.initialPayment?.confirmOverpayment) {
+        requireCapability("admin.all");
+      }
       return bookings().createBooking(input);
     },
 
     updateBooking(id: string, input: BookingInput): Booking {
+      requireCapability("booking.update");
       return bookings().updateBooking(id, input);
     },
 
     transitionBooking(id: string, status: BookingStatus): Booking {
+      requireCapability(status === "cancelled" ? "booking.cancel" : "booking.progress");
       return bookings().transitionBooking(id, status);
     },
 
     archiveBooking(id: string): void {
+      requireCapability("booking.archive");
       bookings().archiveBooking(id);
     },
 
     listAccounts(): PaymentAccount[] {
+      requireCapability("payment.read");
       return payments().listAccounts();
     },
 
     createAccount(input: AccountInput): PaymentAccount {
+      requireCapability("admin.all");
       return payments().createAccount(input);
     },
 
     updateAccount(id: string, input: AccountInput): PaymentAccount {
+      requireCapability("admin.all");
       return payments().updateAccount(id, input);
     },
 
     archiveAccount(id: string): void {
+      requireCapability("admin.all");
       payments().archiveAccount(id);
     },
 
     listPayments(filter = {}): PaymentMovement[] {
+      requireCapability("payment.read");
       return payments().listMovements(filter);
     },
 
     recordReceipt(input: ReceiptInput): PaymentMovement {
+      requireCapability("payment.receipt");
+      if (activeUser?.role === "editor" && input.confirmOverpayment) {
+        requireCapability("admin.all");
+      }
       return payments().recordReceipt(input);
     },
 
     recordRefund(input: RefundInput): PaymentMovement {
+      requireCapability("payment.refund");
       return payments().recordRefund(input);
     },
 
     recordCorrection(input: CorrectionInput): PaymentMovement {
+      requireCapability("payment.correct");
       return payments().recordCorrection(input);
     },
 
     reversePayment(input: ReversalInput): PaymentMovement {
+      requireCapability("payment.reverse");
       return payments().reverseMovement(input);
     },
 
     getMonthlyCompensation(month: string): MonthlyCompensationReport {
+      requireCapability("admin.all");
       return compensation().getMonthlyReport(month as `${number}-${string}`);
     },
-    listExpenses: () => expenses().listExpenses(),
-    createExpense: (input: Parameters<ExpenseRepository["createExpense"]>[0]) => expenses().createExpense(input),
-    listSuppliers: () => expenses().listSuppliers(),
-    createSupplier: (input: Parameters<ExpenseRepository["createSupplier"]>[0]) => expenses().createSupplier(input),
-    recordSupplierPayment: (input: Parameters<ExpenseRepository["recordSupplierPayment"]>[0]) => expenses().recordSupplierPayment(input),
-    listRecurringExpenses: (month: string) => expenses().listRecurringForReview(month),
-    createRecurringExpense: (input: Parameters<ExpenseRepository["createRecurringTemplate"]>[0]) => expenses().createRecurringTemplate(input),
-    getFinanceOverview:(month:string)=>({position:finance().getPosition(month),assets:finance().listAssets(),loans:finance().listLoans(),period:finance().getPeriodStatus(month)}),
-    recordBalance:(input:Parameters<FinanceRepository["recordBalance"]>[0])=>finance().recordBalance(input),
-    recordInventory:(input:Parameters<FinanceRepository["recordInventory"]>[0])=>finance().recordInventory(input),
-    createAsset:(input:Parameters<FinanceRepository["createAsset"]>[0])=>finance().createAsset(input),
-    updateAsset:(id:string,input:Parameters<FinanceRepository["updateAsset"]>[1])=>finance().updateAsset(id,input),
-    createLoan:(input:Parameters<FinanceRepository["createLoan"]>[0])=>finance().createLoan(input),
-    updateLoan:(id:string,input:Parameters<FinanceRepository["updateLoan"]>[1])=>finance().updateLoan(id,input),
-    closeMonth:(month:string)=>finance().closeMonth(month),
-    reopenMonth:(month:string,reason:string)=>finance().reopenMonth(month,reason),
-    getMonthlyFinancialReport:(month:string)=>finance().getMonthlyReport(month),
-    getTodayOverview:(date:string)=>dashboard().getToday(date),
-    async backupTo(destination:string,password:string){if(!database)throw new BusinessSessionError("LOCKED","The business file is locked.");await backupEncryptedDatabase(database,destination,password);},
-    restoreFrom(source:string,password:string):BusinessSettings{validateEncryptedBackup(source,password);database?.close();database=undefined;restoreEncryptedDatabase(source,options.databasePath,password,{confirmOverwrite:true});database=openDatabase(options.databasePath,password);return repository().getSettings() as BusinessSettings;},
-    exportTo(destination:string,month:string):void{if(!database)throw new BusinessSessionError("LOCKED","The business file is locked.");const business=repository().getSettings();if(!business)throw new BusinessSessionError("NOT_FOUND","Business settings are missing.");exportBusinessWorkbook(database,business,month,destination);},
-  });
+    listExpenses() { requireCapability("admin.all"); return expenses().listExpenses(); },
+    createExpense(input) { requireCapability("admin.all"); return expenses().createExpense(input); },
+    listSuppliers() { requireCapability("admin.all"); return expenses().listSuppliers(); },
+    createSupplier(input) { requireCapability("admin.all"); return expenses().createSupplier(input); },
+    recordSupplierPayment(input) { requireCapability("admin.all"); return expenses().recordSupplierPayment(input); },
+    listRecurringExpenses(month) { requireCapability("admin.all"); return expenses().listRecurringForReview(month); },
+    createRecurringExpense(input) { requireCapability("admin.all"); return expenses().createRecurringTemplate(input); },
+    getFinanceOverview(month) { requireCapability("admin.all"); return {position:finance().getPosition(month),assets:finance().listAssets(),loans:finance().listLoans(),period:finance().getPeriodStatus(month)}; },
+    recordBalance(input) { requireCapability("admin.all"); return finance().recordBalance(input); },
+    recordInventory(input) { requireCapability("admin.all"); return finance().recordInventory(input); },
+    createAsset(input) { requireCapability("admin.all"); return finance().createAsset(input); },
+    updateAsset(id,input) { requireCapability("admin.all"); return finance().updateAsset(id,input); },
+    createLoan(input) { requireCapability("admin.all"); return finance().createLoan(input); },
+    updateLoan(id,input) { requireCapability("admin.all"); return finance().updateLoan(id,input); },
+    closeMonth(month) { requireCapability("admin.all"); return finance().closeMonth(month); },
+    reopenMonth(month,reason) { requireCapability("admin.all"); return finance().reopenMonth(month,reason); },
+    getMonthlyFinancialReport(month) { requireCapability("admin.all"); return finance().getMonthlyReport(month); },
+    getTodayOverview(date) { requireCapability("booking.read"); return dashboard().getToday(date); },
+    async backupTo(destination,password){requireCapability("admin.all");if(!database)throw new BusinessSessionError("LOCKED","The business file is locked.");await backupEncryptedDatabase(database,destination,password);},
+    restoreFrom(source,password):BusinessSettings{requireCapability("admin.all");validateEncryptedBackup(source,password);activeUser=null;database?.close();database=undefined;restoreEncryptedDatabase(source,options.databasePath,password,{confirmOverwrite:true});database=openDatabase(options.databasePath,password);saveDatabaseSecret(password);return repository().getSettings() as BusinessSettings;},
+    exportTo(destination,month):void{requireCapability("admin.all");if(!database)throw new BusinessSessionError("LOCKED","The business file is locked.");const business=repository().getSettings();if(!business)throw new BusinessSessionError("NOT_FOUND","Business settings are missing.");exportBusinessWorkbook(database,business,month,destination);},
+  };
+  return Object.freeze(session);
 }

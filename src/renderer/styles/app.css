@@ -184,6 +184,7 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 .command-actions{display:flex;align-items:center;gap:var(--space-2)}.command-quick-action{display:inline-flex;align-items:center;gap:var(--space-1);height:34px;padding:0 var(--space-2);border:0;border-radius:var(--radius-sm);background:transparent;color:var(--color-ink-muted);cursor:pointer;font-size:var(--text-xs);font-weight:700}.command-quick-action:hover{background:var(--color-surface-subtle);color:var(--color-ink)}
+.active-profile{display:grid;min-width:90px;padding-right:var(--space-3);border-right:1px solid var(--color-border);line-height:1.2}.active-profile strong{max-width:150px;overflow:hidden;font-size:var(--text-xs);text-overflow:ellipsis;white-space:nowrap}.active-profile small{color:var(--color-ink-muted);font-size:11px}
 
 .command-button {
   display: inline-flex;

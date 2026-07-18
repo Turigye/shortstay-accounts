@@ -25,6 +25,10 @@ export interface AuthenticatedUser {
   readonly role: UserRole;
 }
 
+export interface UserProfile extends AuthenticatedUser {
+  readonly active: boolean;
+}
+
 const EDITOR_CAPABILITIES = [
   "booking.read",
   "booking.create",

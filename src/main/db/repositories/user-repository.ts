@@ -2,14 +2,16 @@ import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 import type Database from "better-sqlite3-multiple-ciphers";
 
-import type { AuthenticatedUser, UserRole } from "../../../domain/users";
+import type {
+  AuthenticatedUser,
+  UserProfile,
+  UserRole,
+} from "../../../domain/users";
 
 const PASSWORD_BYTES = 64;
 const MINIMUM_PASSWORD_LENGTH = 10;
 
-export interface UserRecord extends AuthenticatedUser {
-  readonly active: boolean;
-}
+export type UserRecord = UserProfile;
 
 export interface CreateEditorInput {
   readonly name: string;

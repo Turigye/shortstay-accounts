@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, safeStorage } from "electron";
 import path from "node:path";
 
 import { createBusinessSession, type BusinessSession } from "./business-session";
@@ -10,6 +10,7 @@ import {
 import { applySecurityGuards } from "./security";
 import { createBrowserWindowOptions } from "./windowOptions";
 import { IPC_CHANNELS } from "../shared/ipc";
+import { createCredentialVault } from "./credential-vault";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -41,6 +42,10 @@ void app.whenReady().then(() => {
     : undefined;
   businessSession = createBusinessSession({
     databasePath: path.join(app.getPath("userData"), "business.db"),
+    credentialVault: createCredentialVault(
+      safeStorage,
+      path.join(app.getPath("userData"), "database-key.bin"),
+    ),
     ...(captureDate ? {
       createRepository: (database) => createBusinessRepository(database, {
         now: () => new Date(`${captureDate}T12:00:00.000Z`),

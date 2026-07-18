@@ -16,6 +16,7 @@ import {
 import type { ReactNode } from "react";
 
 import { PRODUCT_NAME } from "../../shared/product";
+import type { AuthenticatedUser } from "../../domain/users";
 
 export type AppScreen =
   | "today"
@@ -51,6 +52,7 @@ interface AppShellProps {
   businessName?: string;
   onLock?: () => void;
   onHelp?: (opener: HTMLButtonElement) => void;
+  user?: AuthenticatedUser;
 }
 
 export function AppShell({
@@ -60,7 +62,13 @@ export function AppShell({
   businessName,
   onLock,
   onHelp,
+  user,
 }: AppShellProps) {
+  const visibleNavigation = user?.role === "editor"
+    ? navigationItems.filter(({ screen }) =>
+        screen === "today" || screen === "bookings" || screen === "payments")
+    : navigationItems;
+
   return (
     <div className="app-shell">
       <aside className="sidebar" data-tour="sidebar">
@@ -74,7 +82,7 @@ export function AppShell({
         </div>
 
         <nav className="primary-navigation" aria-label="Main navigation">
-          {navigationItems.map(({ screen, label, icon: Icon }) => (
+          {visibleNavigation.map(({ screen, label, icon: Icon }) => (
             <button
               className="navigation-item"
               data-active={activeScreen === screen}
@@ -99,9 +107,15 @@ export function AppShell({
         <header className="command-bar" aria-label="Quick actions">
           {businessName ? <strong className="command-business-name">{businessName}</strong> : null}
           <div className="command-actions" data-tour="quick-actions">
+            {user ? (
+              <span className="active-profile">
+                <strong>{user.name}</strong>
+                <small>{user.role === "admin" ? "Admin" : "Editor"}</small>
+              </span>
+            ) : null}
             <button className="command-quick-action" onClick={() => onScreenChange("bookings")} type="button"><CalendarPlus aria-hidden="true" size={15}/>Booking</button>
             <button className="command-quick-action" onClick={() => onScreenChange("payments")} type="button"><CreditCard aria-hidden="true" size={15}/>Payment</button>
-            <button className="command-quick-action" onClick={() => onScreenChange("expenses")} type="button"><ReceiptText aria-hidden="true" size={15}/>Expense</button>
+            {user?.role !== "editor" ? <button className="command-quick-action" onClick={() => onScreenChange("expenses")} type="button"><ReceiptText aria-hidden="true" size={15}/>Expense</button> : null}
           {onHelp ? (
             <button aria-label="Help" className="command-button" data-tour="help" onClick={(event) => onHelp(event.currentTarget)} title="Help" type="button">
               <CircleHelp aria-hidden="true" size={18} strokeWidth={1.9} />

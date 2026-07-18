@@ -16,6 +16,7 @@ import { HelpCenterScreen } from "./screens/HelpCenterScreen";
 import { ReportsScreen } from "./screens/ReportsScreen";
 import { TodayScreen } from "./screens/TodayScreen";
 import { UnlockScreen } from "./screens/UnlockScreen";
+import { ProfileLoginScreen } from "./screens/ProfileLoginScreen";
 import { useAppStore } from "./store/app-store";
 
 const screenContent: Record<Exclude<AppScreen, "settings">, { title: string; description: string }> = {
@@ -33,7 +34,20 @@ export function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [screenBeforeHelp, setScreenBeforeHelp] = useState<AppScreen>("today");
   const helpFocusReturnTarget = useRef<HTMLElement | null>(null);
-  const { phase, business, error, busy, hydrate, createBusiness, unlock, lock, manageUnits, setRate } = useAppStore();
+  const {
+    phase,
+    business,
+    user,
+    error,
+    busy,
+    hydrate,
+    createBusiness,
+    unlock,
+    login,
+    logout,
+    manageUnits,
+    setRate,
+  } = useAppStore();
 
   useEffect(() => { void hydrate(); }, [hydrate]);
   useEffect(() => {
@@ -47,10 +61,20 @@ export function App() {
   if (phase === "setup") {
     return <SetupScreen busy={busy} error={error} onCreate={createBusiness} />;
   }
-  if (phase === "locked") {
+  if (phase === "databaseLocked") {
     return <UnlockScreen busy={busy} error={error} onUnlock={unlock} />;
   }
-  if (!business) return null;
+  if (phase === "profileLocked" && business) {
+    return (
+      <ProfileLoginScreen
+        businessName={business.name}
+        busy={busy}
+        error={error}
+        onLogin={login}
+      />
+    );
+  }
+  if (!business || !user) return null;
 
   const content = activeScreen === "settings" ? null : screenContent[activeScreen];
   const openHelp = (opener?: HTMLButtonElement) => {
@@ -78,8 +102,9 @@ export function App() {
       <AppShell
         activeScreen={activeScreen}
         businessName={business.name}
+        user={user}
         onHelp={openHelp}
-        onLock={() => void lock()}
+        onLock={() => void logout()}
         onScreenChange={navigateFromShell}
       >
         {helpOpen ? <HelpCenterScreen onClose={closeHelp} onNavigate={navigateFromHelp} /> : activeScreen === "bookings" ? (
@@ -101,7 +126,7 @@ export function App() {
             business={business}
             busy={busy}
             error={error}
-            onLock={lock}
+            onLock={logout}
             onManageUnits={manageUnits}
             onSetRate={setRate}
           />

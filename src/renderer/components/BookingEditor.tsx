@@ -65,6 +65,7 @@ interface BookingEditorProps {
   onCancel: () => void;
   onTransition?: (status: BookingStatus) => void | Promise<void>;
   onRemove?: () => void | Promise<void>;
+  allowAdminActions?: boolean;
 }
 
 interface FormState {
@@ -180,6 +181,7 @@ export function BookingEditor({
   onCancel,
   onTransition,
   onRemove,
+  allowAdminActions = true,
 }: BookingEditorProps) {
   const [form, setForm] = useState<FormState>(() =>
     initialState(booking, initialUnitId, initialCheckIn),
@@ -562,7 +564,9 @@ export function BookingEditor({
         <footer className="booking-editor-footer">
           {booking && onTransition ? (
             <div className="booking-transition-actions">
-              {nextStatuses(booking.status).map((status) => (
+              {nextStatuses(booking.status)
+                .filter((status) => allowAdminActions || status !== "cancelled")
+                .map((status) => (
                 <button className="secondary-button compact-button" disabled={busy} key={status} onClick={() => void onTransition(status)} type="button">
                   {transitionLabels[status]}
                 </button>
@@ -570,7 +574,7 @@ export function BookingEditor({
             </div>
           ) : <span />}
           <div>
-            {booking && onRemove ? (
+            {booking && onRemove && allowAdminActions ? (
               <button className="secondary-button" disabled={busy} onClick={() => void onRemove()} type="button">
                 <Trash2 aria-hidden="true" size={16} /> Remove
               </button>
