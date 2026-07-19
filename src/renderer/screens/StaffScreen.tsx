@@ -178,16 +178,16 @@ export function StaffScreen() {
             <div className="table-scroll">
               {tab === "staff" ? (
                 <table className="statement-table staff-statement-table">
-                  <thead><tr><th>Role</th><th>NCBR base</th><th>Rate</th><th>Earned</th><th>Paid</th><th>Due</th><th><span className="visually-hidden">Actions</span></th></tr></thead>
+                  <thead><tr><th>Role</th><th className="money-column">NCBR base</th><th className="rate-column">Rate</th><th className="money-column">Earned</th><th className="money-column">Paid</th><th className="money-column">Due</th><th className="action-column"><span className="visually-hidden">Actions</span></th></tr></thead>
                   <tbody>{report.staff.map((line) => (
                     <tr key={line.role} data-worked={line.worked}>
                       <td><strong>{ROLE_LABELS[line.role]}</strong>{!line.worked ? <small>Not worked · {line.statusReason}</small> : null}</td>
                       <td className="money-cell">{formatUgx(line.base)}</td>
-                      <td>{line.rate}%</td>
+                      <td className="rate-column">{line.rate}%</td>
                       <td className="money-cell">{formatUgx(line.earned + line.adjustment)}</td>
                       <td className="money-cell">{formatUgx(line.paid)}</td>
                       <td className="money-cell"><strong>{formatUgx(line.due)}</strong></td>
-                      <td><div className="staff-row-actions">
+                      <td className="action-column"><div className="staff-row-actions">
                         {line.due > 0 ? <button aria-label={`Pay ${ROLE_LABELS[line.role]}`} className="text-button" onClick={() => openPanel(line, "payment")} type="button">Pay</button> : null}
                         {line.paid > 0 ? <button aria-label={`Return ${ROLE_LABELS[line.role]} funds`} className="text-button" onClick={() => openPanel(line, "return")} type="button">Return</button> : null}
                         <button aria-label={line.worked ? `Mark ${ROLE_LABELS[line.role]} not worked` : `Restore ${ROLE_LABELS[line.role]} as worked`} className="icon-button" onClick={() => openPanel(line, line.worked ? "attendance" : "restore")} title={line.worked ? "Not worked" : "Restore"} type="button"><RotateCcw size={15} /></button>
@@ -196,13 +196,13 @@ export function StaffScreen() {
                   ))}</tbody>
                 </table>
               ) : report.referrals.length > 0 ? (
-                <table className="statement-table">
-                  <thead><tr><th>Referrer / booking</th><th>Eligible base</th><th>Rate</th><th>Earned</th><th>Adjustment</th><th>Paid</th><th>Due</th></tr></thead>
+                <table className="statement-table referral-statement-table">
+                  <thead><tr><th>Referrer / booking</th><th className="money-column">Eligible base</th><th className="rate-column">Rate</th><th className="money-column">Earned</th><th className="money-column">Adjustment</th><th className="money-column">Paid</th><th className="money-column">Due</th></tr></thead>
                   <tbody>{report.referrals.map((line) => (
                     <tr key={`${line.bookingId}-${line.referrerName}`}>
                       <td><strong>{line.referrerName}</strong><small>{line.customerName} · {line.bookingId.slice(0, 8)}</small></td>
                       <td className="money-cell">{formatUgx(line.base)}</td>
-                      <td>{line.rate}%</td>
+                      <td className="rate-column">{line.rate}%</td>
                       <td className="money-cell">{formatUgx(line.earned)}</td>
                       <td className="money-cell">{formatUgx(line.adjustment)}</td>
                       <td className="money-cell">{formatUgx(line.paid)}</td>

@@ -1,7 +1,7 @@
 {
   "name": "short-stay-accounts",
   "productName": "Short-Stay Accounts",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "private": true,
   "description": "Private desktop accounting for short-stay accommodation",
   "author": "Turigye",

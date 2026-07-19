@@ -85,5 +85,9 @@ describe("receipt service", () => {
     expect(html).not.toContain("<script");
     expect(html).not.toContain("sidebar");
     expect(html).toContain("@media print");
+    expect(html).toContain("Content-Security-Policy");
+    expect(html).toContain('class="receipt-card receipt-total"');
+    expect(html).toContain('class="receipt-details"');
+    expect(html).toContain("font-variant-numeric:tabular-nums");
   });
 });

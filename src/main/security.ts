@@ -3,6 +3,20 @@ export function isAllowedNavigation(url: string): boolean {
 }
 
 export function contentSecurityPolicyFor(url: string): string {
+  if (url.startsWith("data:text/html")) {
+    return [
+      "default-src 'none'",
+      "base-uri 'none'",
+      "form-action 'none'",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "script-src 'none'",
+      "style-src 'unsafe-inline'",
+      "img-src data:",
+      "font-src 'none'",
+      "connect-src 'none'",
+    ].join("; ");
+  }
   const isViteDevelopment = url.startsWith("http://localhost:");
 
   return [

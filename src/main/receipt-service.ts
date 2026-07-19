@@ -196,32 +196,67 @@ function money(value: number): string {
 export function renderReceiptHtml(receipt: ReceiptDocument): string {
   const row = (label: string, value: string) =>
     `<div class="row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+  const businessInitials =
+    receipt.businessName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "SA";
+  const paidAt = new Intl.DateTimeFormat("en-UG", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(receipt.paidAt));
   return `<!doctype html>
-<html><head><meta charset="utf-8"><title>${escapeHtml(receipt.reference)}</title>
+<html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(receipt.reference)}</title>
 <style>
-  *{box-sizing:border-box}body{margin:0;background:#fff;color:#17211b;font:14px/1.45 Arial,sans-serif}
+  :root{color-scheme:light}*{box-sizing:border-box}
+  body{margin:0;background:#f3f5f2;color:#17211b;font:14px/1.5 Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased}
   .receipt-sheet{width:100%;max-width:760px;margin:0 auto;padding:36px}
-  header{display:flex;justify-content:space-between;gap:24px;padding-bottom:20px;border-bottom:2px solid #273a2f}
-  h1{margin:0;font-size:24px}header p{margin:4px 0 0;color:#5a655f}.reference{text-align:right}
-  .void{margin:18px 0;padding:10px;border:2px solid #9b2c2c;color:#9b2c2c;font-weight:700;text-align:center}
-  .amount{margin:24px 0;padding:18px 0;border-block:1px solid #cdd4d0}.amount strong{display:block;font-size:28px}
-  .row{display:grid;grid-template-columns:180px 1fr;gap:20px;padding:9px 0;border-bottom:1px solid #e4e8e6}.row span{color:#65706a}
-  footer{margin-top:28px;padding-top:16px;border-top:1px solid #cdd4d0;color:#65706a;font-size:12px}
-  @page{size:A4;margin:14mm}@media print{body{print-color-adjust:exact}.receipt-sheet{padding:0}}
+  .receipt-document{overflow:hidden;border:1px solid #cfd6d1;border-radius:10px;background:#fff;box-shadow:0 12px 35px rgba(23,33,27,.08)}
+  .receipt-header{display:flex;justify-content:space-between;gap:28px;padding:28px 30px 24px;border-top:7px solid #4f5700;border-bottom:1px solid #dce2de}
+  .brand{display:flex;align-items:center;gap:13px}.brand-mark{display:grid;width:42px;height:42px;place-items:center;border-radius:7px;background:#4f5700;color:#fff;font-size:16px;font-weight:800}
+  h1{margin:0;font-size:23px;line-height:1.2}.brand p,.reference p{margin:4px 0 0;color:#65706a;font-size:12px}
+  .reference{text-align:right}.reference span{display:block;color:#65706a;font-size:11px;font-weight:700;text-transform:uppercase}.reference strong{display:block;margin-top:3px;font-size:15px;font-variant-numeric:tabular-nums}
+  .void{margin:20px 30px 0;padding:10px;border:2px solid #9b2c2c;border-radius:6px;color:#9b2c2c;font-weight:800;text-align:center;letter-spacing:.08em}
+  .receipt-body{display:grid;gap:20px;padding:26px 30px 30px}
+  .receipt-card{border:1px solid #dce2de;border-radius:8px;background:#fff}
+  .receipt-total{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:20px;padding:20px 22px;background:#f4f5ea;border-color:#d8dac0}
+  .receipt-total span,.section-title{color:#65706a;font-size:11px;font-weight:800;text-transform:uppercase}
+  .receipt-total strong{display:block;margin-top:3px;color:#303700;font-size:28px;line-height:1.15;font-variant-numeric:tabular-nums}
+  .receipt-total small{display:block;max-width:380px;margin-top:6px;color:#65706a}
+  .paid-state{padding:6px 10px;border-radius:999px;background:#dff2e2;color:#21652d;font-size:11px;font-weight:800;text-transform:uppercase}
+  .receipt-details{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .detail-group{overflow:hidden;border:1px solid #dce2de;border-radius:8px}.section-title{display:block;padding:12px 16px;background:#f7f8f6;border-bottom:1px solid #dce2de}
+  .row{display:grid;grid-template-columns:125px minmax(0,1fr);gap:16px;padding:10px 16px;border-bottom:1px solid #e8ece9}.row:last-child{border-bottom:0}.row span{color:#65706a}.row strong{min-width:0;text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+  footer{padding:16px 30px 20px;border-top:1px solid #dce2de;background:#fafbfa;color:#65706a;font-size:11px}
+  @page{size:A4;margin:14mm}
+  @media print{body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}.receipt-sheet{max-width:none;padding:0}.receipt-document{box-shadow:none}}
+  @media(max-width:620px){.receipt-sheet{padding:16px}.receipt-header{padding:22px}.receipt-body{padding:22px}.receipt-details{grid-template-columns:1fr}.receipt-total{grid-template-columns:1fr}.reference{max-width:180px}}
 </style></head><body><main class="receipt-sheet">
-  <header><div><h1>${escapeHtml(receipt.businessName)}</h1><p>Payment Receipt</p></div><div class="reference"><strong>${escapeHtml(receipt.reference)}</strong><p>${escapeHtml(new Date(receipt.paidAt).toLocaleString("en-UG"))}</p></div></header>
-  ${receipt.reversed ? '<div class="void">REVERSED</div>' : ""}
-  <section class="amount"><span>Amount received</span><strong>${money(receipt.amount)}</strong><small>${escapeHtml(receipt.amountWords)}</small></section>
-  ${row("Guest", receipt.guestName)}
-  ${row("Telephone", receipt.guestPhone || "-")}
-  ${row("Accommodation", `${receipt.unitName} · ${receipt.occupancyMode === "one_room" ? "One room" : "Whole unit"}`)}
-  ${row("Stay", `${receipt.checkIn} to ${receipt.checkOut}`)}
-  ${row("Payment method", `${receipt.method} · ${receipt.accountName}`)}
-  ${receipt.externalReference ? row("Payment reference", receipt.externalReference) : ""}
-  ${row("Booking total", money(receipt.bookingTotal))}
-  ${row("Received to date", money(receipt.receivedAfter))}
-  ${row("Remaining balance", money(receipt.remainingBalance))}
-  ${row("Received by", receipt.receivedBy)}
-  <footer>This receipt confirms a payment recorded by ${escapeHtml(receipt.businessName)}. It is not represented as a URA tax invoice.</footer>
+  <article class="receipt-document">
+    <header class="receipt-header"><div class="brand"><span class="brand-mark">${escapeHtml(businessInitials)}</span><div><h1>${escapeHtml(receipt.businessName)}</h1><p>Official payment receipt</p></div></div><div class="reference"><span>Receipt number</span><strong>${escapeHtml(receipt.reference)}</strong><p>${escapeHtml(paidAt)}</p></div></header>
+    ${receipt.reversed ? '<div class="void">Reversed receipt</div>' : ""}
+    <div class="receipt-body">
+      <section class="receipt-card receipt-total"><div><span>Amount received</span><strong>${money(receipt.amount)}</strong><small>${escapeHtml(receipt.amountWords)}</small></div><b class="paid-state">${receipt.reversed ? "Reversed" : "Payment recorded"}</b></section>
+      <section class="receipt-details">
+        <div class="detail-group"><span class="section-title">Guest and stay</span>
+          ${row("Guest", receipt.guestName)}
+          ${row("Telephone", receipt.guestPhone || "-")}
+          ${row("Accommodation", `${receipt.unitName} · ${receipt.occupancyMode === "one_room" ? "One room" : "Two bedrooms"}`)}
+          ${row("Stay", `${receipt.checkIn} to ${receipt.checkOut}`)}
+        </div>
+        <div class="detail-group"><span class="section-title">Payment summary</span>
+          ${row("Method", `${receipt.method} · ${receipt.accountName}`)}
+          ${receipt.externalReference ? row("Reference", receipt.externalReference) : ""}
+          ${row("Booking total", money(receipt.bookingTotal))}
+          ${row("Received to date", money(receipt.receivedAfter))}
+          ${row("Balance", money(receipt.remainingBalance))}
+          ${row("Received by", receipt.receivedBy)}
+        </div>
+      </section>
+    </div>
+    <footer>This receipt confirms a payment recorded by ${escapeHtml(receipt.businessName)}. It is not represented as a URA tax invoice.</footer>
+  </article>
 </main></body></html>`;
 }

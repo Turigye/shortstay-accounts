@@ -107,4 +107,13 @@ describe("applySecurityGuards", () => {
       },
     });
   });
+
+  it("allows only inline styling for isolated print documents", () => {
+    expect(contentSecurityPolicyFor("data:text/html;charset=utf-8,receipt")).toContain(
+      "style-src 'unsafe-inline'",
+    );
+    expect(contentSecurityPolicyFor("data:text/html;charset=utf-8,receipt")).toContain(
+      "script-src 'none'",
+    );
+  });
 });

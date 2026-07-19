@@ -53,6 +53,10 @@ describe("staff compensation screen", () => {
     render(<StaffScreen />);
 
     await waitFor(() => expect(screen.getByText("Operations Manager")).toBeTruthy());
+    expect(screen.getByRole("columnheader", { name: "NCBR base" }).className).toContain("money-column");
+    expect(screen.getByRole("columnheader", { name: "Earned" }).className).toContain("money-column");
+    expect(screen.getByRole("columnheader", { name: "Paid" }).className).toContain("money-column");
+    expect(screen.getByRole("columnheader", { name: "Due" }).className).toContain("money-column");
     expect(screen.getByText("Sales and Marketing")).toBeTruthy();
     expect(screen.getByText("IT and Legal")).toBeTruthy();
     expect(screen.getAllByText("UGX 200,000").length).toBeGreaterThan(0);

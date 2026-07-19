@@ -354,7 +354,7 @@ export function PaymentsScreen() {
                 </header>
                 <div className="table-scroll">
                   <table className="statement-table payment-history-table">
-                    <thead><tr><th>Date</th><th>Customer</th><th>Unit</th><th>Type</th><th>Account</th><th>Reference</th><th>Amount</th><th><span className="visually-hidden">Actions</span></th></tr></thead>
+                    <thead><tr><th className="date-column">Date</th><th>Customer</th><th>Unit</th><th>Type</th><th>Account</th><th>Reference</th><th className="money-column">Amount</th><th className="action-column"><span className="visually-hidden">Actions</span></th></tr></thead>
                     <tbody>
                       {paymentHistory.length ? paymentHistory.map((movement) => {
                         const booking = bookings.find(({ id }) => id === movement.bookingId);
@@ -366,7 +366,7 @@ export function PaymentsScreen() {
                           <td>{movement.accountName}</td>
                           <td>{movement.reference ?? "—"}</td>
                           <td className="money-cell" data-direction={movement.direction}>{movement.direction === "receipt" ? "+" : "−"}{new Intl.NumberFormat("en-UG").format(movement.amount)}</td>
-                          <td>{movement.recordType === "receipt" ? <button aria-label={`Print receipt ${movement.reference ?? movement.id}`} className="icon-button" onClick={() => void openReceipt(movement.id)} title="Print receipt" type="button"><Printer size={15} /></button> : null}</td>
+                          <td className="action-column">{movement.recordType === "receipt" ? <button aria-label={`Print receipt ${movement.reference ?? movement.id}`} className="icon-button" onClick={() => void openReceipt(movement.id)} title="Print receipt" type="button"><Printer size={15} /></button> : null}</td>
                         </tr>;
                       }) : <tr><td className="table-empty" colSpan={8}>No payments recorded yet.</td></tr>}
                     </tbody>

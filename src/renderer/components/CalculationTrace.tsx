@@ -22,7 +22,7 @@ export function CalculationTrace({ traces }: { readonly traces: readonly Compens
         <div className="table-scroll">
           <table className="statement-table trace-table">
             <thead>
-              <tr><th>Booking</th><th>Unit</th><th>Stay</th><th>Earned revenue</th><th>Eligible collected</th></tr>
+              <tr><th>Booking</th><th>Unit</th><th>Stay</th><th className="money-column">Earned revenue</th><th className="money-column">Eligible collected</th></tr>
             </thead>
             <tbody>
               {traces.map((trace) => (
