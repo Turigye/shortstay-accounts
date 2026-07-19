@@ -233,6 +233,10 @@ for (const size of SIZES) {
     }
 
     await navigate(page, "Financial Position");
+    await page.getByRole("button", { name: "Assets", exact: true }).click();
+    await page.getByRole("heading", { name: "Fixed asset register" }).waitFor();
+    await assertLayout(page, "Fixed asset register", size);
+    await capture(page, directory, "fixed-assets");
     await page.getByRole("button", { name: "Investment Recovery" }).click();
     await page.getByRole("heading", { name: /recovered$/ }).waitFor();
     await assertLayout(page, "Investment Recovery", size);

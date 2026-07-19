@@ -129,6 +129,12 @@ const defaultHandlers: IpcHandlers = {
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: () => {
     throw new Error("Business session is unavailable");
   },
+  [IPC_CHANNELS.COMPENSATION_STAFF_SETTLEMENT]: () => {
+    throw new Error("Business session is unavailable");
+  },
+  [IPC_CHANNELS.COMPENSATION_STAFF_WORKED]: () => {
+    throw new Error("Business session is unavailable");
+  },
   [IPC_CHANNELS.EXPENSES_LIST]:()=>[], [IPC_CHANNELS.EXPENSE_CREATE]:()=>{throw new Error("Business session is unavailable");},
   [IPC_CHANNELS.SUPPLIERS_LIST]:()=>[], [IPC_CHANNELS.SUPPLIER_CREATE]:()=>{throw new Error("Business session is unavailable");}, [IPC_CHANNELS.SUPPLIER_PAYMENT]:()=>{throw new Error("Business session is unavailable");},
   [IPC_CHANNELS.RECURRING_EXPENSES_LIST]:()=>[], [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]:()=>{throw new Error("Business session is unavailable");}, [IPC_CHANNELS.RECURRING_EXPENSE_ADVANCE]:()=>{throw new Error("Business session is unavailable");},
@@ -178,6 +184,8 @@ const registeredChannels = [
   IPC_CHANNELS.RECEIPT_PRINT,
   IPC_CHANNELS.RECEIPT_EXPORT_PDF,
   IPC_CHANNELS.COMPENSATION_MONTHLY,
+  IPC_CHANNELS.COMPENSATION_STAFF_SETTLEMENT,
+  IPC_CHANNELS.COMPENSATION_STAFF_WORKED,
   IPC_CHANNELS.EXPENSES_LIST,IPC_CHANNELS.EXPENSE_CREATE,IPC_CHANNELS.SUPPLIERS_LIST,IPC_CHANNELS.SUPPLIER_CREATE,IPC_CHANNELS.SUPPLIER_PAYMENT,IPC_CHANNELS.RECURRING_EXPENSES_LIST,IPC_CHANNELS.RECURRING_EXPENSE_CREATE,IPC_CHANNELS.RECURRING_EXPENSE_ADVANCE,
   IPC_CHANNELS.FINANCE_OVERVIEW,IPC_CHANNELS.BALANCE_SAVE,IPC_CHANNELS.INVENTORY_SAVE,IPC_CHANNELS.ASSET_CREATE,IPC_CHANNELS.ASSET_UPDATE,IPC_CHANNELS.ASSET_ARCHIVE,IPC_CHANNELS.LOAN_CREATE,IPC_CHANNELS.LOAN_UPDATE,IPC_CHANNELS.PERIOD_CLOSE,IPC_CHANNELS.PERIOD_REOPEN,
   IPC_CHANNELS.REPORT_MONTHLY,
@@ -247,6 +255,10 @@ export function createBusinessIpcHandlers(
     [IPC_CHANNELS.RECEIPT_GET]: ({ paymentId }) => session.getReceipt(paymentId),
     [IPC_CHANNELS.COMPENSATION_MONTHLY]: ({ month }) =>
       session.getMonthlyCompensation(month),
+    [IPC_CHANNELS.COMPENSATION_STAFF_SETTLEMENT]: (payload) =>
+      session.recordStaffSettlement(payload),
+    [IPC_CHANNELS.COMPENSATION_STAFF_WORKED]: (payload) =>
+      session.setStaffWorked(payload),
     [IPC_CHANNELS.EXPENSES_LIST]:()=>session.listExpenses(), [IPC_CHANNELS.EXPENSE_CREATE]:(payload)=>session.createExpense(payload),
     [IPC_CHANNELS.SUPPLIERS_LIST]:()=>session.listSuppliers(), [IPC_CHANNELS.SUPPLIER_CREATE]:(payload)=>session.createSupplier(payload), [IPC_CHANNELS.SUPPLIER_PAYMENT]:(payload)=>session.recordSupplierPayment(payload),
     [IPC_CHANNELS.RECURRING_EXPENSES_LIST]:({month})=>session.listRecurringExpenses(month), [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]:(payload)=>session.createRecurringExpense(payload), [IPC_CHANNELS.RECURRING_EXPENSE_ADVANCE]:({id})=>session.advanceRecurringExpense(id),

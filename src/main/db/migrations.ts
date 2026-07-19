@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3-multiple-ciphers";
 
-export const LATEST_SCHEMA_VERSION = 10;
+export const LATEST_SCHEMA_VERSION = 11;
 
 interface Migration {
   readonly version: number;
@@ -738,6 +738,51 @@ const CREATE_VERSION_TEN_SCHEMA = `
     CHECK (owner_funded_amount >= 0 AND owner_funded_amount <= purchase_amount);
 `;
 
+const CREATE_VERSION_ELEVEN_SCHEMA = `
+  CREATE TABLE staff_month_status (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    staff_role_id TEXT NOT NULL REFERENCES staff_roles(id),
+    month TEXT NOT NULL,
+    worked INTEGER NOT NULL DEFAULT 1 CHECK (worked IN (0, 1)),
+    reason TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE (business_id, staff_role_id, month)
+  );
+  CREATE TABLE staff_payments (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    staff_role_id TEXT NOT NULL REFERENCES staff_roles(id),
+    month TEXT NOT NULL,
+    account_id TEXT NOT NULL REFERENCES accounts(id),
+    direction TEXT NOT NULL CHECK (direction IN ('payment', 'return')),
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    paid_at TEXT NOT NULL,
+    method TEXT NOT NULL CHECK (method IN ('cash', 'mobile_money', 'bank_transfer', 'card')),
+    reference TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+  CREATE INDEX staff_month_status_business_id_idx ON staff_month_status(business_id);
+  CREATE INDEX staff_month_status_staff_role_id_idx ON staff_month_status(staff_role_id);
+  CREATE INDEX staff_payments_business_id_idx ON staff_payments(business_id);
+  CREATE INDEX staff_payments_staff_role_id_idx ON staff_payments(staff_role_id);
+  CREATE INDEX staff_payments_account_id_idx ON staff_payments(account_id);
+  CREATE TRIGGER staff_month_status_touch_updated_at
+  AFTER UPDATE ON staff_month_status
+  WHEN NEW.updated_at = OLD.updated_at
+  BEGIN
+    UPDATE staff_month_status
+    SET updated_at = CASE
+      WHEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now') > OLD.updated_at
+        THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      ELSE strftime('%Y-%m-%dT%H:%M:%fZ', OLD.updated_at, '+0.001 seconds')
+    END
+    WHERE id = NEW.id;
+  END;
+`;
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -820,6 +865,14 @@ const migrations: readonly Migration[] = [
     version: 10,
     up(database) {
       database.exec(CREATE_VERSION_TEN_SCHEMA);
+      database.prepare("update app_meta set value = ? where key = 'schema_version'")
+        .run(String(LATEST_SCHEMA_VERSION));
+    },
+  },
+  {
+    version: 11,
+    up(database) {
+      database.exec(CREATE_VERSION_ELEVEN_SCHEMA);
       database.prepare("update app_meta set value = ? where key = 'schema_version'")
         .run(String(LATEST_SCHEMA_VERSION));
     },

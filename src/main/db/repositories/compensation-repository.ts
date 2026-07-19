@@ -13,6 +13,7 @@ import {
 import { ugx } from "../../../domain/money";
 import { splitStayByMonth } from "../../../domain/periods";
 import type { MonthKey, RoleKey, Ugx } from "../../../domain/types";
+import type { PaymentMethod } from "../../../domain/payments";
 
 export interface StaffStatementLine {
   readonly role: RoleKey;
@@ -22,6 +23,8 @@ export interface StaffStatementLine {
   readonly adjustment: Ugx;
   readonly paid: Ugx;
   readonly due: Ugx;
+  readonly worked: boolean;
+  readonly statusReason: string | null;
 }
 
 export interface ReferralStatementLine {
@@ -56,6 +59,27 @@ export interface MonthlyCompensationReport {
 
 export interface CompensationRepository {
   getMonthlyReport(month: MonthKey): MonthlyCompensationReport;
+  recordStaffSettlement(input: StaffSettlementInput): MonthlyCompensationReport;
+  setStaffWorked(input: StaffWorkedInput): MonthlyCompensationReport;
+}
+
+export interface StaffSettlementInput {
+  readonly month: string;
+  readonly role: RoleKey;
+  readonly direction: "payment" | "return";
+  readonly amount: number;
+  readonly paidAt: string;
+  readonly accountId: string;
+  readonly method: PaymentMethod;
+  readonly reference?: string | null;
+  readonly notes?: string | null;
+}
+
+export interface StaffWorkedInput {
+  readonly month: string;
+  readonly role: RoleKey;
+  readonly worked: boolean;
+  readonly reason: string;
 }
 
 interface BookingCalculationRow {
@@ -82,6 +106,10 @@ interface StaffRateRow {
 }
 
 const MONTH_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])$/;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const METHOD_TO_DATABASE: Readonly<Record<PaymentMethod, string>> = {
+  cash: "cash", mobileMoney: "mobile_money", bankTransfer: "bank_transfer", card: "card",
+};
 
 function requireMonth(month: string): MonthKey {
   if (!MONTH_PATTERN.test(month)) throw new Error("Month must use YYYY-MM.");
@@ -213,6 +241,18 @@ export function refreshBookingCompensation(
         Math.round(earning.rate * 100),
         earning.amount,
       );
+      database.prepare(`
+        UPDATE staff_earnings
+        SET adjustment = -earned_amount
+        WHERE booking_id = ? AND staff_role_id = ? AND month = ?
+          AND EXISTS (
+            SELECT 1 FROM staff_month_status status
+            WHERE status.business_id = staff_earnings.business_id
+              AND status.staff_role_id = staff_earnings.staff_role_id
+              AND status.month = staff_earnings.month
+              AND status.worked = 0
+          )
+      `).run(booking.id, rate.id, allocation.month);
     }
 
     if (booking.referrer_id) {
@@ -246,7 +286,7 @@ export function createCompensationRepository(
   database: Database.Database,
   businessId: string,
 ): CompensationRepository {
-  return Object.freeze({
+  const repository: CompensationRepository = {
     getMonthlyReport(monthInput: MonthKey) {
       const month = requireMonth(monthInput);
       const monthStart = `${month}-01`;
@@ -286,6 +326,11 @@ export function createCompensationRepository(
         const earned = row?.earned_amount ?? 0;
         const adjustment = row?.adjustment ?? 0;
         const paid = row?.paid_amount ?? 0;
+        const status = database.prepare<[string,string,string],{worked:number;reason:string}>(
+          `SELECT status.worked,status.reason FROM staff_month_status status
+           JOIN staff_roles role ON role.id=status.staff_role_id
+           WHERE status.business_id=? AND status.month=? AND role.role=?`,
+        ).get(businessId,month,role);
         return {
           role,
           base: ugx(row?.eligible_base ?? 0),
@@ -294,6 +339,8 @@ export function createCompensationRepository(
           adjustment: ugx(adjustment),
           paid: ugx(paid),
           due: ugx(Math.max(0, earned + adjustment - paid)),
+          worked: status?.worked !== 0,
+          statusReason: status?.reason ?? null,
         };
       });
       const referralRows = database.prepare<[string, string], {
@@ -361,7 +408,62 @@ export function createCompensationRepository(
         })),
       };
     },
-  });
+    recordStaffSettlement(input) {
+      const month=requireMonth(input.month);
+      if(!DATE_PATTERN.test(input.paidAt)||Number.isNaN(Date.parse(`${input.paidAt}T00:00:00.000Z`)))throw new Error("Choose a valid payment date.");
+      if(!Number.isSafeInteger(input.amount)||input.amount<=0)throw new Error("Enter a whole positive UGX amount.");
+      if(!["payment","return"].includes(input.direction))throw new Error("Choose payment or returned funds.");
+      const method=METHOD_TO_DATABASE[input.method];if(!method)throw new Error("Choose a valid payment method.");
+      if(database.prepare<[string,string],{status:string}>("SELECT status FROM period_closes WHERE business_id=? AND month=?").get(businessId,month)?.status==="closed")throw new Error(`${month} is closed. Reopen it before making changes.`);
+      if(!database.prepare("SELECT 1 FROM accounts WHERE id=? AND business_id=? AND archived_at IS NULL").get(input.accountId,businessId))throw new Error("Choose an active payment account.");
+      const roleRow=ratesForMonth(database,businessId,month).find(({role})=>role===input.role);if(!roleRow)throw new Error("Choose a valid staff role.");
+      const report=repository.getMonthlyReport(month);
+      const line=report.staff.find(({role})=>role===input.role);if(!line)throw new Error("Staff role not found.");
+      const limit=input.direction==="payment"?line.due:line.paid;
+      if(input.amount>limit)throw new Error(input.direction==="payment"?"Payment exceeds the amount due.":"Return exceeds the amount paid.");
+      const rows=database.prepare<[string,string,string],{id:string;earned_amount:number;adjustment:number;paid_amount:number}>(`
+        SELECT se.id,se.earned_amount,se.adjustment,se.paid_amount FROM staff_earnings se
+        JOIN staff_roles sr ON sr.id=se.staff_role_id
+        WHERE se.business_id=? AND se.month=? AND sr.role=?
+        ORDER BY se.created_at,se.id
+      `).all(businessId,month,input.role);
+      database.transaction(()=>{
+        let remaining=input.amount;
+        const ordered=input.direction==="payment"?rows:[...rows].reverse();
+        for(const row of ordered){
+          if(remaining<=0)break;
+          const capacity=input.direction==="payment"?Math.max(0,row.earned_amount+row.adjustment-row.paid_amount):row.paid_amount;
+          const allocated=Math.min(remaining,capacity);
+          if(allocated)database.prepare("UPDATE staff_earnings SET paid_amount=paid_amount+? WHERE id=?").run(input.direction==="payment"?allocated:-allocated,row.id);
+          remaining-=allocated;
+        }
+        database.prepare(`
+          INSERT INTO staff_payments (business_id,staff_role_id,month,account_id,direction,amount,paid_at,method,reference,notes)
+          VALUES (?,?,?,?,?,?,?,?,?,?)
+        `).run(businessId,roleRow.id,month,input.accountId,input.direction,input.amount,input.paidAt,method,input.reference?.trim()||null,input.notes?.trim()||null);
+      }).immediate();
+      return repository.getMonthlyReport(month);
+    },
+    setStaffWorked(input) {
+      const month=requireMonth(input.month),reason=input.reason.trim();
+      if(!reason)throw new Error("Explain the attendance change.");
+      if(database.prepare<[string,string],{status:string}>("SELECT status FROM period_closes WHERE business_id=? AND month=?").get(businessId,month)?.status==="closed")throw new Error(`${month} is closed. Reopen it before making changes.`);
+      const roleRow=ratesForMonth(database,businessId,month).find(({role})=>role===input.role);if(!roleRow)throw new Error("Choose a valid staff role.");
+      const line=repository.getMonthlyReport(month).staff.find(({role})=>role===input.role);if(!line)throw new Error("Staff role not found.");
+      if(!input.worked&&line.paid>0)throw new Error("Record all returned funds before marking this role as not worked.");
+      database.transaction(()=>{
+        database.prepare(`
+          INSERT INTO staff_month_status (business_id,staff_role_id,month,worked,reason)
+          VALUES (?,?,?,?,?)
+          ON CONFLICT (business_id,staff_role_id,month) DO UPDATE SET worked=excluded.worked,reason=excluded.reason
+        `).run(businessId,roleRow.id,month,input.worked?1:0,reason);
+        database.prepare("UPDATE staff_earnings SET adjustment=CASE WHEN ?=1 THEN 0 ELSE -earned_amount END WHERE business_id=? AND staff_role_id=? AND month=?")
+          .run(input.worked?1:0,businessId,roleRow.id,month);
+      }).immediate();
+      return repository.getMonthlyReport(month);
+    },
+  };
+  return Object.freeze(repository);
 }
 
 export const FALLBACK_STAFF_RATES = DEFAULT_STAFF_RATES;
