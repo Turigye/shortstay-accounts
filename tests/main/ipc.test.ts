@@ -100,6 +100,8 @@ describe("IPC contract", () => {
       IPC_CHANNELS.RECEIPT_PRINT,
       IPC_CHANNELS.RECEIPT_EXPORT_PDF,
       IPC_CHANNELS.COMPENSATION_MONTHLY,
+      IPC_CHANNELS.COMPENSATION_STAFF_SETTLEMENT,
+      IPC_CHANNELS.COMPENSATION_STAFF_WORKED,
       IPC_CHANNELS.EXPENSES_LIST,
       IPC_CHANNELS.EXPENSE_CREATE,
       IPC_CHANNELS.SUPPLIERS_LIST,
@@ -135,6 +137,42 @@ describe("IPC contract", () => {
     expect(ipcRequestSchema.safeParse({
       channel: IPC_CHANNELS.COMPENSATION_MONTHLY,
       payload: { month: "2026-7" },
+    }).success).toBe(false);
+  });
+
+  it("validates staff settlement and attendance requests", () => {
+    expect(ipcRequestSchema.safeParse({
+      channel: IPC_CHANNELS.COMPENSATION_STAFF_SETTLEMENT,
+      payload: {
+        month: "2026-07",
+        role: "security",
+        direction: "payment",
+        amount: 50_000,
+        paidAt: "2026-07-31",
+        accountId: "account-1",
+        method: "mobileMoney",
+      },
+    }).success).toBe(true);
+    expect(ipcRequestSchema.safeParse({
+      channel: IPC_CHANNELS.COMPENSATION_STAFF_WORKED,
+      payload: {
+        month: "2026-07",
+        role: "security",
+        worked: false,
+        reason: "Security guard was unavailable.",
+      },
+    }).success).toBe(true);
+    expect(ipcRequestSchema.safeParse({
+      channel: IPC_CHANNELS.COMPENSATION_STAFF_SETTLEMENT,
+      payload: {
+        month: "2026-07",
+        role: "security",
+        direction: "payment",
+        amount: 0,
+        paidAt: "2026-07-31",
+        accountId: "account-1",
+        method: "mobileMoney",
+      },
     }).success).toBe(false);
   });
 

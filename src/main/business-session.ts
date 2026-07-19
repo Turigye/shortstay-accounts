@@ -148,6 +148,8 @@ export interface BusinessSession {
   reversePayment(input: ReversalInput): PaymentMovement;
   getReceipt(paymentId: string): ReceiptDocument;
   getMonthlyCompensation(month: string): MonthlyCompensationReport;
+  recordStaffSettlement(input: Parameters<CompensationRepository["recordStaffSettlement"]>[0]): MonthlyCompensationReport;
+  setStaffWorked(input: Parameters<CompensationRepository["setStaffWorked"]>[0]): MonthlyCompensationReport;
   listExpenses(): ExpenseRecord[];
   createExpense(input: Parameters<ExpenseRepository["createExpense"]>[0]): ExpenseRecord;
   listSuppliers(): Supplier[];
@@ -518,6 +520,14 @@ export function createBusinessSession(options: BusinessSessionOptions): Business
     getMonthlyCompensation(month: string): MonthlyCompensationReport {
       requireCapability("admin.all");
       return compensation().getMonthlyReport(month as `${number}-${string}`);
+    },
+    recordStaffSettlement(input) {
+      requireCapability("admin.all");
+      return compensation().recordStaffSettlement(input);
+    },
+    setStaffWorked(input) {
+      requireCapability("admin.all");
+      return compensation().setStaffWorked(input);
     },
     listExpenses() { requireCapability("admin.all"); return expenses().listExpenses(); },
     createExpense(input) { requireCapability("admin.all"); return expenses().createExpense(input); },

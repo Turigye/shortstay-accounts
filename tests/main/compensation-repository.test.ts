@@ -7,6 +7,7 @@ import {
   createCompensationRepository,
 } from "../../src/main/db/repositories/compensation-repository";
 import { createPaymentRepository } from "../../src/main/db/repositories/payment-repository";
+import { createFinanceRepository } from "../../src/main/db/repositories/finance-repository";
 import { migrateDatabase } from "../../src/main/db/migrations";
 
 const databases: Database.Database[] = [];
@@ -94,5 +95,41 @@ describe("compensation read model", () => {
     expect(report.staff.every(({ earned, due }) => earned === 0 && due === 0)).toBe(true);
     expect(report.referrals).toEqual([]);
     expect(report.traces).toEqual([]);
+  });
+
+  it("records staff payments and returned funds against the selected account", () => {
+    const { database, business, bookings, booking, payments, account } = fixture();
+    payments.recordReceipt({ bookingId: booking.id, amount: 400_000, paidAt: "2026-07-30T09:30:00.000Z", method: "mobileMoney", accountId: account.id });
+    bookings.transitionBooking(booking.id, "checkedIn");
+    bookings.transitionBooking(booking.id, "completed");
+    const repository = createCompensationRepository(database, business.businessId);
+
+    repository.recordStaffSettlement({ month: "2026-07", role: "operations", direction: "payment", amount: 10_000, paidAt: "2026-07-31", accountId: account.id, method: "mobileMoney", reference: "PAY-001" });
+    expect(repository.getMonthlyReport("2026-07").staff.find(({ role }) => role === "operations"))
+      .toMatchObject({ earned: 10_000, paid: 10_000, due: 0 });
+
+    repository.recordStaffSettlement({ month: "2026-07", role: "operations", direction: "return", amount: 4_000, paidAt: "2026-08-01", accountId: account.id, method: "mobileMoney", reference: "RETURN-001" });
+    expect(repository.getMonthlyReport("2026-07").staff.find(({ role }) => role === "operations"))
+      .toMatchObject({ paid: 6_000, due: 4_000 });
+    expect(database.prepare("SELECT direction,amount,reference FROM staff_payments ORDER BY created_at,id").all())
+      .toEqual([{ direction: "payment", amount: 10_000, reference: "PAY-001" }, { direction: "return", amount: 4_000, reference: "RETURN-001" }]);
+    expect(createFinanceRepository(database,business.businessId).getMonthlyReport("2026-07").cashFlow.cashPayments).toBe(10_000);
+    expect(createFinanceRepository(database,business.businessId).getMonthlyReport("2026-08").cashFlow.cashReceipts).toBe(4_000);
+  });
+
+  it("removes unpaid entitlement when a role did not work and can restore it", () => {
+    const { database, business, bookings, booking, payments, account } = fixture();
+    payments.recordReceipt({ bookingId: booking.id, amount: 400_000, paidAt: "2026-07-30T09:30:00.000Z", method: "mobileMoney", accountId: account.id });
+    bookings.transitionBooking(booking.id, "checkedIn");
+    bookings.transitionBooking(booking.id, "completed");
+    const repository = createCompensationRepository(database, business.businessId);
+
+    repository.setStaffWorked({ month: "2026-07", role: "security", worked: false, reason: "Guard was unavailable" });
+    expect(repository.getMonthlyReport("2026-07").staff.find(({ role }) => role === "security"))
+      .toMatchObject({ earned: 10_000, adjustment: -10_000, paid: 0, due: 0, worked: false, statusReason: "Guard was unavailable" });
+
+    repository.setStaffWorked({ month: "2026-07", role: "security", worked: true, reason: "Corrected attendance" });
+    expect(repository.getMonthlyReport("2026-07").staff.find(({ role }) => role === "security"))
+      .toMatchObject({ adjustment: 0, due: 10_000, worked: true });
   });
 });

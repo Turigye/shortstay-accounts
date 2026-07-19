@@ -52,6 +52,8 @@ export const IPC_CHANNELS = {
   RECEIPT_PRINT: "receipts:print",
   RECEIPT_EXPORT_PDF: "receipts:export-pdf",
   COMPENSATION_MONTHLY: "compensation:monthly",
+  COMPENSATION_STAFF_SETTLEMENT: "compensation:staff-settlement",
+  COMPENSATION_STAFF_WORKED: "compensation:staff-worked",
   EXPENSES_LIST: "expenses:list", EXPENSE_CREATE: "expenses:create",
   SUPPLIERS_LIST: "suppliers:list", SUPPLIER_CREATE: "suppliers:create", SUPPLIER_PAYMENT: "suppliers:payment",
   RECURRING_EXPENSES_LIST: "recurring-expenses:list", RECURRING_EXPENSE_CREATE: "recurring-expenses:create", RECURRING_EXPENSE_ADVANCE: "recurring-expenses:advance",
@@ -545,6 +547,29 @@ const compensationMonthlyRequestSchema = z
     payload: z.object({ month: z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/) }).strict(),
   })
   .strict();
+const compensationStaffSettlementRequestSchema = z.object({
+  channel: z.literal(IPC_CHANNELS.COMPENSATION_STAFF_SETTLEMENT),
+  payload: z.object({
+    month: z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/),
+    role: roleSchema,
+    direction: z.enum(["payment", "return"]),
+    amount: positiveWholeUgxSchema,
+    paidAt: dateSchema,
+    accountId: idSchema,
+    method: paymentMethodSchema,
+    reference: z.string().max(500).nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+  }).strict(),
+}).strict();
+const compensationStaffWorkedRequestSchema = z.object({
+  channel: z.literal(IPC_CHANNELS.COMPENSATION_STAFF_WORKED),
+  payload: z.object({
+    month: z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/),
+    role: roleSchema,
+    worked: z.boolean(),
+    reason: z.string().trim().min(1).max(500),
+  }).strict(),
+}).strict();
 const expenseScopeSchema=z.enum(["unit","shared"]); const purchaseTypeSchema=z.enum(["cash","credit"]);
 const expenseInputSchema=z.object({date:dateSchema,amount:positiveWholeUgxSchema,categoryId:z.string().min(1),scope:expenseScopeSchema,unitId:idSchema.nullable().optional(),supplierId:idSchema.nullable().optional(),accountId:idSchema.nullable().optional(),purchaseType:purchaseTypeSchema,dueDate:dateSchema.nullable().optional(),reference:z.string().max(500).nullable().optional(),notes:z.string().max(2000).nullable().optional()}).strict();
 const supplierInputSchema=z.object({name:z.string().trim().min(1).max(160),phone:z.string().max(80).nullable().optional(),email:z.string().email().max(254).nullable().optional(),notes:z.string().max(2000).nullable().optional()}).strict();
@@ -620,6 +645,8 @@ export const ipcRequestSchema = z.discriminatedUnion("channel", [
   receiptPrintRequestSchema,
   receiptExportPdfRequestSchema,
   compensationMonthlyRequestSchema,
+  compensationStaffSettlementRequestSchema,
+  compensationStaffWorkedRequestSchema,
   ...expenseRequests,
   ...financeRequests,
 ]);
@@ -819,6 +846,8 @@ const staffStatementLineSchema = z.object({
   adjustment: wholeUgxSchema,
   paid: wholeUgxSchema.nonnegative(),
   due: wholeUgxSchema.nonnegative(),
+  worked: z.boolean(),
+  statusReason: z.string().nullable(),
 }).strict();
 const referralStatementLineSchema = z.object({
   bookingId: z.string(),
@@ -905,6 +934,8 @@ const responseSchemas = {
   [IPC_CHANNELS.RECEIPT_PRINT]: responseSchema(z.object({ cancelled: z.boolean() }).strict()),
   [IPC_CHANNELS.RECEIPT_EXPORT_PDF]: responseSchema(z.object({ cancelled: z.boolean(), path: z.string().nullable() }).strict()),
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: responseSchema(monthlyCompensationReportSchema),
+  [IPC_CHANNELS.COMPENSATION_STAFF_SETTLEMENT]: responseSchema(monthlyCompensationReportSchema),
+  [IPC_CHANNELS.COMPENSATION_STAFF_WORKED]: responseSchema(monthlyCompensationReportSchema),
   [IPC_CHANNELS.EXPENSES_LIST]: responseSchema(z.array(expenseSchema)), [IPC_CHANNELS.EXPENSE_CREATE]: responseSchema(expenseSchema),
   [IPC_CHANNELS.SUPPLIERS_LIST]: responseSchema(z.array(supplierSchema)), [IPC_CHANNELS.SUPPLIER_CREATE]: responseSchema(supplierSchema), [IPC_CHANNELS.SUPPLIER_PAYMENT]: responseSchema(expenseSchema),
   [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: responseSchema(z.array(recurringExpenseSchema)), [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: responseSchema(recurringExpenseSchema), [IPC_CHANNELS.RECURRING_EXPENSE_ADVANCE]: responseSchema(recurringExpenseSchema),
@@ -987,6 +1018,8 @@ interface IpcDataByChannel {
   [IPC_CHANNELS.RECEIPT_PRINT]: { readonly cancelled: boolean };
   [IPC_CHANNELS.RECEIPT_EXPORT_PDF]: { readonly cancelled: boolean; readonly path: string | null };
   [IPC_CHANNELS.COMPENSATION_MONTHLY]: MonthlyCompensationReport;
+  [IPC_CHANNELS.COMPENSATION_STAFF_SETTLEMENT]: MonthlyCompensationReport;
+  [IPC_CHANNELS.COMPENSATION_STAFF_WORKED]: MonthlyCompensationReport;
   [IPC_CHANNELS.EXPENSES_LIST]: ExpenseRecord[]; [IPC_CHANNELS.EXPENSE_CREATE]: ExpenseRecord;
   [IPC_CHANNELS.SUPPLIERS_LIST]: Supplier[]; [IPC_CHANNELS.SUPPLIER_CREATE]: Supplier; [IPC_CHANNELS.SUPPLIER_PAYMENT]: ExpenseRecord;
   [IPC_CHANNELS.RECURRING_EXPENSES_LIST]: RecurringExpenseTemplate[]; [IPC_CHANNELS.RECURRING_EXPENSE_CREATE]: RecurringExpenseTemplate; [IPC_CHANNELS.RECURRING_EXPENSE_ADVANCE]: RecurringExpenseTemplate;
